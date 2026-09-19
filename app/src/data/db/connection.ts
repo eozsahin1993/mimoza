@@ -16,7 +16,6 @@ type Database = ExpoSQLiteDatabase<typeof schema>;
  * A production build never re-evaluates, so this costs a property read.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __mimozaDb: Database | undefined;
 }
 

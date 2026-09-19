@@ -26,6 +26,7 @@ import { getAppSettings } from '@/core/services/settings';
 
 // Synchronous, at import: the first render and the headless push task both
 // need `t` working before anything could await it.
+// eslint-disable-next-line import/no-named-as-default-member
 i18n.use(initReactI18next).init({
   resources: {
     en: { translation: en },
@@ -45,6 +46,7 @@ export { i18n };
 /** Switches the app to a stored preference, resolving 'system' against the device. */
 export function applyLanguage(preference: LanguagePreference, deviceLocales = getLocales()): LanguageCode {
   const language = resolveLanguage(preference, deviceLocales);
+  // eslint-disable-next-line import/no-named-as-default-member
   if (i18n.language !== language) void i18n.changeLanguage(language);
   return language;
 }

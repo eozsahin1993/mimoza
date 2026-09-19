@@ -7,7 +7,7 @@ import { missingPhotoFor } from '@/ui/components/photo-placeholder';
 import { PostCard, type Post } from '@/features/post/components/post-card';
 import { Spacing } from '@/ui/theme/tokens';
 import { showError } from '@/core/services/messages';
-import type { CommentSummary, CommentWithAuthor, Profile } from '@/data/db';
+import type { CommentWithAuthor, Profile } from '@/data/db';
 import type { FeedPostView } from '@/features/feed/usecases/circle-feed';
 import { getCommentSummaries, markPostViewed } from '@/data/db';
 import { addComment } from '@/features/post/usecases/comment-on-post';
