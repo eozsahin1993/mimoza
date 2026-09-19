@@ -24,7 +24,8 @@
         "com.apple.security.application-groups": [
           "group.com.eozsahin.mimoza"
         ]
-      }
+      },
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.eozsahin.mimoza",
@@ -35,7 +36,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
