@@ -59,9 +59,7 @@ function SocialButton({ label, icon, contentColor, fillStyle, disabled, ...rest 
           <ThemedText
             type="labelLarge"
             style={{ color: contentColor, flexShrink: 1 }}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.85}>
+            numberOfLines={1}>
             {label}
           </ThemedText>
         </View>

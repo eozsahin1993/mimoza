@@ -18,7 +18,7 @@ export function PrimaryButton({ label, style, disabled, ...rest }: PrimaryButton
       {({ pressed }) =>
         disabled ? (
           <ThemedView style={styles.button} type="surface">
-            <ThemedText type="labelLarge" themeColor="faintest" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            <ThemedText type="labelLarge" themeColor="faintest" numberOfLines={1}>
               {label}
             </ThemedText>
           </ThemedView>
@@ -28,7 +28,7 @@ export function PrimaryButton({ label, style, disabled, ...rest }: PrimaryButton
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={[styles.button, pressed && styles.pressed]}>
-            <ThemedText type="labelLarge" themeColor="accentLabel" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            <ThemedText type="labelLarge" themeColor="accentLabel" numberOfLines={1}>
               {label}
             </ThemedText>
           </LinearGradient>
