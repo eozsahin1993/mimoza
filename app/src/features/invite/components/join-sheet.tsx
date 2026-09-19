@@ -9,7 +9,7 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { Space, Spacing } from '@/ui/theme/tokens';
 import { findPendingJoinRequestForInvite, previewInvite, requestToJoin } from '@/features/invite/usecases/join-circle';
 import { bytesToDataUri, parsePictureThumbnail } from '@/core/photo/image';
-import { showError } from '@/core/services/messages';
+import { showDone, showError } from '@/core/services/messages';
 
 /**
  * The whole join flow, in one sheet over the circle list.
@@ -21,7 +21,7 @@ import { showError } from '@/core/services/messages';
  * need a screen underneath it, and nothing about opening an invite should
  * replace what you were looking at.
  */
-type Phase = 'checking' | 'error' | 'asking' | 'submitting' | 'waiting';
+type Phase = 'checking' | 'error' | 'asking' | 'submitting';
 
 export type JoinSheetProps = {
   /** The invite code to preview, or null when nothing is being joined. */
@@ -58,7 +58,11 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
         setInviterName(preview.createdByName);
         setInviterPictureUri(picture ? bytesToDataUri(picture) : undefined);
         setInviterPublicKey(preview.createdByPublicKey);
-        setPhase(already ? 'waiting' : 'asking');
+        if (already) {
+          acknowledge(preview.createdByName);
+          return;
+        }
+        setPhase('asking');
       } catch (err) {
         console.error('Failed to load invite preview', err);
         if (stale) return;
@@ -69,15 +73,25 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
     return () => {
       stale = true;
     };
+    // `acknowledge` closes over callbacks the parent rebuilds each render;
+    // taking the dep would refetch the preview every time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
+
+  // The pending card on the list behind this says the same thing, with
+  // how long ago and a way to cancel.
+  function acknowledge(name: string) {
+    showDone(name ? t('invite.join.waitingOn', { name }) : t('invite.join.waitingOnUnknown'));
+    onRequested();
+    onClose();
+  }
 
   async function handleRequestToJoin() {
     if (!code) return;
     setPhase('submitting');
     try {
       await requestToJoin(code);
-      setPhase('waiting');
-      onRequested();
+      acknowledge(inviterName);
     } catch (err) {
       console.error('Failed to request to join', err);
       // Back to 'asking', not 'error': the invite is fine, the send wasn't.
@@ -117,25 +131,15 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
             </View>
 
             <ThemedText type="labelSmall" themeColor="muted">
-              {phase === 'waiting'
-                ? inviterName
-                  ? t('invite.join.waitingOn', { name: inviterName })
-                  : t('invite.join.waitingOnUnknown')
-                : inviterName
-                  ? t('invite.join.needsApproval', { name: inviterName })
-                  : t('invite.join.needsApprovalUnknown')}
+              {inviterName
+                ? t('invite.join.needsApproval', { name: inviterName })
+                : t('invite.join.needsApprovalUnknown')}
             </ThemedText>
 
             <PrimaryButton
-              label={
-                phase === 'waiting'
-                  ? t('invite.done')
-                  : phase === 'submitting'
-                    ? t('invite.join.sending')
-                    : t('invite.join.request')
-              }
+              label={phase === 'submitting' ? t('invite.join.sending') : t('invite.join.request')}
               disabled={phase === 'submitting'}
-              onPress={phase === 'waiting' ? onClose : handleRequestToJoin}
+              onPress={handleRequestToJoin}
               style={styles.button}
             />
           </>
