@@ -17,7 +17,6 @@ import migrationsData from '@/data/db/migrations/migrations';
  * being reloaded into a running app.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __mimozaMigrations: Promise<void> | undefined;
 }
 

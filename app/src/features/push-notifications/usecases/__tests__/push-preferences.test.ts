@@ -9,8 +9,8 @@ import { getCircle, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
-import { PushLevels } from '@/features/push-notifications/usecases/push-preferences';
 import {
+  PushLevels,
   circlePushPreferences,
   levelForMask,
   maskForLevel,

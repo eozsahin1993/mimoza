@@ -166,7 +166,7 @@ test('a legacy departure tombstone with no syncId is skipped, not retried foreve
   // The old two-field {circleId, leftAt} shape, from before DepartedCircle
   // kept an address — real data an existing account can still carry.
   (fetchAccountManifest as jest.Mock).mockResolvedValue({
-    circles: [{ circleId: 'ancient-departure', leftAt: 1000 } as unknown as { circleId: string; syncId: string; keyMap: {}; leftAt: number }],
+    circles: [{ circleId: 'ancient-departure', leftAt: 1000 } as unknown as { circleId: string; syncId: string; keyMap: Record<string, string>; leftAt: number }],
   });
 
   await deleteAccount();

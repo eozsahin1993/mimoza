@@ -116,7 +116,7 @@ describe('predicate', () => {
    * Rejecting it there logged a warning on every delete.
    */
   test('accepts a deletion whose post is already gone, from a plain member', async () => {
-    const { circleId, postId, author } = await circleWithPost();
+    const { circleId, postId } = await circleWithPost();
     const member = await otherMember(circleId);
     await deletePostLocally(circleId, postId);
 
