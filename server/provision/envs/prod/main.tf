@@ -23,8 +23,8 @@ module "lambda" {
   binary_path = "${path.root}/../../build/bootstrap"
   storage     = module.storage
 
-  # Locks the function URL to signed requests once there is a distribution
-  # to sign them. Both flip together on the apply that sets api_domain.
+  # Permanent, not pending: locking the URL makes Lambda demand a body hash
+  # on every write, and only the app is in a position to add it.
   behind_cloudfront = false
 
   # Starting guesses, not measurements — see internal/config. Here rather

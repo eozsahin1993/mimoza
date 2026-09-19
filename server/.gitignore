@@ -17,6 +17,7 @@ provision/**/*.tfstate
 provision/**/*.tfstate.*
 provision/**/crash.log
 provision/**/*.tfvars
+provision/**/*.tfplan
 
 # The FCM service-account key, for local runs (see FCM_CREDENTIAL_FILE).
 # Anyone holding one can push arbitrary text to every user's lock screen.
