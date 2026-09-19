@@ -27,23 +27,29 @@ so a stale "done" is visible.
 
 ## Production environment
 
-Prod has no AWS account yet; staging is 223057859233. See
+Prod is 852138521113, staging 223057859233. See
 [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
-- [ ] AWS account for prod, root MFA, billing alarm, `mimoza-prod-admin`
-      IAM user, access key profile.
-- [ ] `server/provision/envs/prod` applied — the modules are written and
-      staging-proven, but `envs/prod` has no `cloudfront-signing-key.pub`,
-      and `main.tf` reads that file the moment `env_domain` is set. So:
-      generate the key pair, then apply, then the certificate validation
-      record and the CNAMEs for `api.` and `cdn.`.
-- [ ] Apple: **production** APNs key in SSM (staging's is separate — the
-      2-key account limit is why).
-- [ ] FCM key in SSM. The prod Firebase project (`mimozaapp-1587f`) and
-      `app/google-services.json` already exist; the upload waits on the
-      account.
-- [ ] Google OAuth clients for the prod bundle id; Apple Services ID.
-- [ ] `.env.production` locally: `APP_ENV=production`, relay URL, three
+- [x] AWS account for prod, `mimoza-prod-admin` IAM user, and two local
+      profiles: `mimoza-prod-admin` via `aws login`, and `mimoza-prod-tf`
+      with static keys because Terraform can't read a `login_session` one.
+- [ ] Root MFA, and Activate IAM Access so the billing pages open to an
+      IAM user at all.
+- [ ] **Confirm the alarm email.** Both accounts' SNS subscriptions are
+      still `PendingConfirmation`, so every alarm — billing included —
+      currently notifies nobody.
+- [x] `server/provision/envs/prod` applied, with the wildcard certificate
+      validated and `api.` and `cdn.` resolving.
+- [x] Apple keys in SSM. The APNs key is team-wide and serves both envs,
+      so prod reuses staging's — what differs is `APNS_TOPIC`. The Sign in
+      with Apple key does not: it belongs to a primary App ID, so prod has
+      its own.
+- [x] FCM key in SSM, from the prod Firebase project (`mimozaapp-1587f`).
+- [x] Google OAuth clients for the prod bundle id — they already existed,
+      since dev shares production's bundle id and had been using them. No
+      Apple Services ID: that's for web and Android Apple sign-in, and a
+      native app authenticates as its bundle id.
+- [x] `.env.production` locally: `APP_ENV=production`, relay URL, three
       Google client IDs.
 - [ ] GitHub `production` environment (role ARN, account id, domain,
       alert email) + OIDC role. The workflow's prod job already exists,

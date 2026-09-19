@@ -45,13 +45,13 @@ module.exports = ({ config }) => {
   }
   requireEnvironment(name, env);
 
-  if (!env.idSuffix) return withGoogleScheme(withEnv(withPushEnvironment(config, name), name));
+  if (!env.idSuffix) return withGoogleScheme(withEnv(withPushEnvironment(config), name));
 
   const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
   const appGroup = `group.${bundleIdentifier}`;
 
   return withGoogleScheme(withEnv({
-    ...withPushEnvironment(config, name),
+    ...withPushEnvironment(config),
     name: `${config.name}${env.nameSuffix}`,
     scheme: env.scheme,
     icon: env.icon ?? config.icon,
@@ -110,18 +110,20 @@ function requireEnvironment(name, env) {
  * silently — it registers, the relay accepts the token, and nothing ever
  * arrives.
  *
- * Only `production` flips it. dev and staging are signed with development
- * profiles, which don't permit the production entitlement, so hardcoding
- * it everywhere would break local builds instead.
+ * Keyed on how the build is signed, not on APP_ENV: only a distribution
+ * profile carries the production entitlement, so a locally-run production
+ * build has to register against the sandbox or it won't sign at all.
+ * Named for the relay's own APNS_PRODUCTION, which has to agree with it.
  */
-function withPushEnvironment(config, name) {
+function withPushEnvironment(config) {
+  const production = process.env.APNS_PRODUCTION === 'true';
   return {
     ...config,
     ios: {
       ...config.ios,
       entitlements: {
         ...config.ios.entitlements,
-        'aps-environment': name === 'production' ? 'production' : 'development',
+        'aps-environment': production ? 'production' : 'development',
       },
     },
   };
