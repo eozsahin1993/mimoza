@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { CARD_HEIGHT } from '@/features/circle/components/circle-card';
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { Icons, Radius, Space } from '@/ui/theme/tokens';
@@ -21,11 +22,17 @@ export type PendingCircleCardProps = {
 /**
  * A circle asked for but not yet joined.
  *
- * Dashed rather than solid, and no cover photo: there is nothing of the
- * circle to show yet, and the outline says the row is a placeholder for
- * one rather than a circle that failed to load. Cancel sits on the row
- * itself because withdrawing is the only other thing you can do here, and
- * burying it behind a tap would make waiting feel like the only option.
+ * Built to `CircleCard`'s silhouette — same height, same corner, same
+ * square leading slot — because the two sit in one list and anything else
+ * reads as a different kind of thing rather than the same thing waiting.
+ * The icon stands where the cover photo goes, which is what this is: a
+ * circle with nothing to show yet.
+ *
+ * Dashed rather than solid is the one difference that carries meaning —
+ * the outline says placeholder, not a circle that failed to load. Cancel
+ * sits on the row itself because withdrawing is the only other thing you
+ * can do here, and burying it behind a tap would make waiting feel like
+ * the only option.
  */
 export function PendingCircleCard({ circleName, createdByName, submittedAt, onPress, onCancel }: PendingCircleCardProps) {
   const { t } = useTranslation();
@@ -37,13 +44,15 @@ export function PendingCircleCard({ circleName, createdByName, submittedAt, onPr
     <Pressable
       style={[styles.card, { borderColor: tints.raisedBorder, backgroundColor: tints.chipIdleBg }]}
       onPress={onPress}>
-      <Icon icon={Icons.waiting} size={22} color={theme.muted} />
+      <View style={styles.leading}>
+        <Icon icon={Icons.waiting} size={22} color={theme.muted} />
+      </View>
 
-      <View style={styles.body}>
+      <View style={styles.content}>
         <ThemedText type="titleMedium" numberOfLines={1}>
           {circleName}
         </ThemedText>
-        <ThemedText type="labelSmall" themeColor="muted">
+        <ThemedText type="labelSmall" themeColor="muted" numberOfLines={2}>
           {createdByName
             ? t('invite.card.waitingOn', { name: createdByName, ago: formatAgo(submittedAt, language) })
             : t('invite.card.waitingOnUnknown', { ago: formatAgo(submittedAt, language) })}
@@ -51,7 +60,7 @@ export function PendingCircleCard({ circleName, createdByName, submittedAt, onPr
       </View>
 
       {onCancel ? (
-        <Pressable onPress={onCancel} hitSlop={12}>
+        <Pressable onPress={onCancel} hitSlop={12} style={styles.cancel}>
           <ThemedText type="bodyMedium" themeColor="secondary">
             {t('common.cancel')}
           </ThemedText>
@@ -63,16 +72,28 @@ export function PendingCircleCard({ circleName, createdByName, submittedAt, onPr
 
 const styles = StyleSheet.create({
   card: {
+    // No minHeight: the line below the name is capped at two, so this can't
+    // outgrow the card beside it and break the list's rhythm.
+    height: CARD_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.s400,
-    padding: Space.s500,
-    borderRadius: Radius.panel,
+    borderRadius: Radius.circleCard,
     borderWidth: 1,
     borderStyle: 'dashed',
   },
-  body: {
+  leading: {
+    width: CARD_HEIGHT,
+    height: CARD_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
     flex: 1,
+    padding: Space.s300,
+    justifyContent: 'center',
     gap: Space.s100,
+  },
+  cancel: {
+    paddingHorizontal: Space.s400,
   },
 });

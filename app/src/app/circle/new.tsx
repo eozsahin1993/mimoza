@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
@@ -48,30 +48,36 @@ export default function NewCircleScreen() {
         <ScreenHeader variant="close" title={t('circle.create.title')} />
 
         <KeyboardAvoider style={styles.form}>
-          <View>
-            <ThemedText type="labelMedium" style={styles.fieldLabel}>
-              {t('circle.create.name')}
-            </ThemedText>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder={t('circle.create.namePlaceholder')}
-              placeholderTextColor={theme.faint}
-              style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
-            />
-          </View>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            <View>
+              <ThemedText type="labelMedium" style={styles.fieldLabel}>
+                {t('circle.create.name')}
+              </ThemedText>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder={t('circle.create.namePlaceholder')}
+                placeholderTextColor={theme.faint}
+                style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
+              />
+            </View>
 
-          <View>
-            <ThemedText type="labelMedium" style={styles.fieldLabel}>
-              {t('circle.create.cover')}
+            <View>
+              <ThemedText type="labelMedium" style={styles.fieldLabel}>
+                {t('circle.create.cover')}
+              </ThemedText>
+              <PhotoPicker
+                uri={cover?.uri}
+                aspectRatio={PhotoAspect.cover}
+                label={t('circle.create.pickCover')}
+                onPress={handlePickCover}
+              />
+            </View>
+
+            <ThemedText type="labelSmall" themeColor="faint" style={styles.footnote}>
+              {t('circle.create.footnote')}
             </ThemedText>
-            <PhotoPicker
-              uri={cover?.uri}
-              aspectRatio={PhotoAspect.cover}
-              label={t('circle.create.pickCover')}
-              onPress={handlePickCover}
-            />
-          </View>
+          </ScrollView>
 
           {error ? (
             <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
@@ -81,9 +87,6 @@ export default function NewCircleScreen() {
 
           <PrimaryButton label={t('circle.create.submit')} disabled={!name.trim() || creating} onPress={handleCreate} />
 
-          <ThemedText type="labelSmall" themeColor="faint" style={styles.footnote}>
-            {t('circle.create.footnote')}
-          </ThemedText>
         </KeyboardAvoider>
       </ThemedSafeAreaView>
     </ThemedView>
@@ -100,7 +103,10 @@ const styles = StyleSheet.create({
   },
   form: {
     flex: 1,
+  },
+  scrollContent: {
     gap: Spacing.cardListGap,
+    paddingBottom: Spacing.cardListGap,
   },
   input: {
     height: 60,

@@ -115,7 +115,7 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
 export function pendingRequestRow(request: PendingRequest, actions: RequestRowActions): FeedRow {
   return {
     key: `request:${request.requesterId}`,
-    spacing: Spacing.cardListGap,
+    spacing: Spacing.gapBetweenPosts,
     // Not sticky, despite wanting to be. This was the only sticky row in
     // the feed, and under Fabric on Android it reserved its height and
     // drew nothing — so the request was invisible rather than merely
@@ -136,6 +136,6 @@ export function pendingRequestRow(request: PendingRequest, actions: RequestRowAc
 
 const styles = StyleSheet.create({
   row: {
-    marginHorizontal: Spacing.cardListGap,
+    marginHorizontal: Spacing.feedTextPadding,
   },
 });

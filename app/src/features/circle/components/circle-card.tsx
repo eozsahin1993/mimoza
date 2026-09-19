@@ -20,7 +20,8 @@ export type CircleCardProps = {
   onPress?: () => void;
 };
 
-const CARD_HEIGHT = 92;
+/** Exported so the pending card can hold the same silhouette in the list. */
+export const CARD_HEIGHT = 92;
 
 /**
  * A real card, not a photo with text laid over it — the cover gets a
