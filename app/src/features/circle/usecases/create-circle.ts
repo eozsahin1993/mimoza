@@ -10,6 +10,7 @@ import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { compressToThumbnail } from '@/core/photo/image';
 import { writeCoverFile } from '@/core/photo/photo-cache';
+import { publishCoverPhoto } from '@/features/circle/usecases/publish-cover-photo';
 import { bootstrapCircle, appendEntry } from '@/core/services/log-relay';
 import { defaultCircleMask } from '@/features/push-notifications/usecases/push-preferences';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
@@ -138,6 +139,17 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   });
 
   await ensureCircleNotificationChannel(circleId, input.name);
+
+  // The picture above is this device's copy. Without this, a cover chosen
+  // at creation never leaves the phone that chose it — only the details
+  // screen's "change cover" ever uploaded one.
+  if (input.picture) {
+    try {
+      await publishCoverPhoto(circleId, input.picture);
+    } catch (err) {
+      console.error('Failed to upload the cover photo at creation', err);
+    }
+  }
 
   await recordInManifestBestEffort();
 
