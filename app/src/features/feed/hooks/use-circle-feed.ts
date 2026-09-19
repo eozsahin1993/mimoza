@@ -169,7 +169,11 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     () => [requests, justJoined, posts, rosterChanges],
     [requests, justJoined, posts, rosterChanges],
   );
-  sourcesRef.current = sources;
+  // In an effect, not during render: a discarded render would leave
+  // `reload` fanning out to sources that never mounted.
+  useEffect(() => {
+    sourcesRef.current = sources;
+  }, [sources]);
 
   const rows = useMemo(() => buildFeedRows(sources.flatMap((source) => source.rows)), [sources]);
 

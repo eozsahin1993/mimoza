@@ -11,43 +11,52 @@ file is just a map to find your way around the code.
 
 ```
 cmd/
-  server/    entry point for `go run` / local dev — http.ListenAndServe
-  lambda/    entry point for AWS Lambda (behind a Function URL)
+  server/     entry point for `go run` / local dev — http.ListenAndServe
+  lambda/     entry point for AWS Lambda (behind a Function URL)
+  testrelay/  the same relay against LocalStack, for the integration suite
+  decryptlog/ developer-only: decrypts a circle's log to a local file
 internal/
-  api/       one subpackage per endpoint ("vertical slice": handler + service + route),
-             plus router.go, the composition root that wires everything together
-  storage/   one subpackage per data domain — port (interface) + dynamodb/s3 impl
-  secrets/   KMS-backed root secret storage
-  crypto/    server-side key derivation (HKDF from the KMS root secret)
+  api/       router.go alone — the composition root that wires everything together
+  synclog/ auth/ account/ invite/ push/ ratelimit/
+             one column per entity: domain types and store interface at the
+             root, one subpackage per endpoint under http/, one per adapter
+             (dynamodb/, s3/, cdn/) — see AGENTS.md
+  app/       builds the real AWS-backed adapters both cmd/ entries run on
   config/    reads every env var once, in one place
-  testsupport/ real adapters against LocalStack, shared by every package's tests
+  util/      httputil, dynamoutil, localstack, testsupport — cross-cutting
 provision/
-  modules/   storage (tables, bucket) and lambda (function, IAM, URL), shared by every env
+  modules/   storage, lambda, cdn, certificate, alarms, github-deploy
   envs/      one thin root per environment: local (LocalStack), staging, prod
   bootstrap/ the S3 bucket staging/prod state lives in — applied once per account
 ```
 
-Both `cmd/` entry points call the same `api.NewRouter(...)` — nothing
+`cmd/server` and `cmd/lambda` both build their handler with
+`internal/app.New`, which calls the same `api.NewRouter(...)` — nothing
 below `internal/api` knows or cares whether it's running on Lambda or as a
 long-lived process.
 
-## Storage: three tables, three different reasons
+## Storage: six tables, six different reasons
 
-- **sync-log** (`internal/synclog`) — one row per circle-log
-  entry, keyed by `circleLogId` + `epoch`. TTL'd (`LOG_RETENTION_DAYS`) —
-  the relay is a sync cache, not a permanent archive; each device's local
-  SQLite is the real source of truth.
+- **sync-log** (`internal/synclog`) — one row per circle-log entry, keyed
+  by `syncId` + `<namespace>#<epoch>`. Never evicted: entries are retained
+  and immutable, and the only rows carrying a TTL are idempotency markers
+  and a deleted circle's leftover meta.
 - **sessions** (`internal/auth`) — one row per bearer token.
-  TTL'd (90 days from issuance). Looked up by token, never by account.
+  TTL'd (90 days from issuance). Looked up by token, and by account
+  through the `accountId` GSI when deletion revokes every session at once.
 - **accounts** (`internal/account`) — one row per account,
   holding a single opaque `blob` the client encrypted itself. Never
   TTL'd. The relay only ever reads/writes ciphertext here — see
   DESIGN.md's "Account recovery" section.
+- **invites** (`internal/invite`), **rate-limit** (`internal/ratelimit`),
+  **push** (`internal/push`) — the invite/join mailbox (TTL'd,
+  `INVITE_RETENTION_DAYS`), the per-account request budget, and push
+  routing prefs plus one row per device.
 
 Each table exists because its access pattern and lifecycle genuinely
 differ from the others — see each package's own doc comment for the
 specific reasoning, and `internal/util/dynamoutil` for the handful of
-attribute-encoding helpers all three share.
+attribute-encoding helpers they all share.
 
 ## Auth flow, end to end
 
@@ -69,7 +78,7 @@ directly rather than just reading five files in isolation.
    "Account recovery" section for the full reasoning.
 
 2. **`auth.Issue`** (`internal/auth/session.go`) mints a random
-   bearer token and stores `authstore.Session{AccountID: accountID,
+   bearer token and stores `auth.Session{AccountID: accountID,
    ExpiresAt: ...}` in the sessions table, keyed by that token. The
    token — not the accountID — is what the client gets back and sends on
    every future request. This indirection is what makes a session
@@ -113,7 +122,7 @@ to its own code.
 | **accountId** | `"google:<sub>"` / `"apple:<sub>"` | Provider's OIDC `sub` claim | The relay, for session lookup. See "Auth flow" above. |
 | **masterSeed** | 128 bits of entropy behind the 12-word recovery phrase | Random, generated once at onboarding (`generateSeedPhrase()`) | Nobody but your own devices — never leaves the client, never sent to the relay in any form. |
 | **circleId** | A local UUID | `generateUUID()`, freely chosen per circle | Only your own devices, across time (see below) — never other members. |
-| **circleLogId** | The relay-visible address for a circle's log | `sha256("circle-log" \|\| circleSecret)` | Every member — it's the one thing that *has* to match, since it's how independent devices agree on a relay address with zero coordination. |
+| **syncId** | The relay-visible address for a circle's log | `generateUUID()` once, by the founder (`createCircle`) | Every member — it's the one thing that *has* to match, and the only one a joiner is told rather than derives. |
 
 The relationship: your circle **identity keypair** is
 `deriveCircleIdentity(masterSeed, circleId)` — a pure function of your own
@@ -123,58 +132,50 @@ the circle's roster, which syncs like any other content. So `circleId`
 only has one real job: staying *stable for your own account across a lost
 device*, which is exactly what the account-recovery manifest
 (`internal/account`) exists to guarantee — it's a durable,
-client-encrypted list of the circleId values your account used, so a
-recovering device reproduces the *same* keypairs the rest of the circle
-already recognizes, instead of showing up as an unrecognized stranger.
+client-encrypted record of each circle's `circleId`, its `syncId` and its
+content keys, so a recovering device reproduces the *same* keypairs the
+rest of the circle already recognizes, instead of showing up as an
+unrecognized stranger.
 
-**How `circleId` and the secret get paired**: not by any derivation —
-`circleId` and the circle secret are two independently-random values with
-no mathematical relationship. They're linked purely by local storage: the
-moment a device obtains a circle's secret (generating it, for the
-founder; decrypting the mailbox's approval response, for a joiner), it's
-saved to Keychain keyed by that device's own `circleId`
-(`saveCircleSecret(circleId, secret)`) — before anything else happens.
-From then on, `circleId` is just the lookup key that gets the secret back
-out; the secret itself is what everything cryptographic (`circleLogId`,
-decrypting entries) actually derives from.
+**How `circleId` and a circle's keys get paired**: not by any derivation —
+`syncId` and the content key are independently random, with no
+mathematical relationship to `circleId`. They're linked purely by local
+storage: the moment a device has them (generating them, for the founder;
+opening the sealed approval, for a joiner), the key map goes to Keychain
+under that device's own `circleId` (`saveCircleKeyMap`) and the `syncId`
+onto the circle's SQLite row. From then on `circleId` is the lookup key
+for both; the content key is what everything cryptographic (the write
+token via `deriveWriteToken`, decrypting entries) derives from.
 
-**How you actually fetch a circle's content**: look up the secret via
-`circleId` (a plain local read, not a derivation), derive `circleLogId`
-from *that*, then `GET /v1/circles/{circleLogId}/entries?since=` — see
-`fetchEntries` (app-side) / `internal/api/fetchentries` (this repo).
-Concretely, this two-step chain is exactly what `drainOutbox` does on
-every sync:
+**How you actually fetch a circle's content**: read `syncId` off the
+local circle row and the key map out of Keychain — both plain local
+reads, no derivation — then `GET
+/v1/circles/{syncId}/entries?namespace=&sinceEpoch=`; see `fetchEntries`
+(app-side) / `internal/synclog/http/getlog` (this repo). The local
+`circleId` never itself talks to the relay, it only ever unlocks what's
+stored under it.
 
-```ts
-const secret = await getCircleSecret(circleId);   // local lookup
-const circleLogId = deriveCircleLogId(secret);    // real derivation
-```
-
-Everything needed to read a circle comes from the secret alone once
-you've looked it up; the local `circleId` never itself talks to the
-relay, it only ever unlocks what's stored under it.
-
-**How you get the circle secret in the first place** (join-by-invite,
-design only — not built yet, see DESIGN.md's "Mailbox" section): the
-invite code itself carries no secret, just a lookup tag
-(`hash(invite_code)`). The requester generates a one-time keypair, posts
-a join request to that tag; the inviter encrypts the circle secret to the
-requester's one-time public key and posts the response to the same tag.
-Only the requester's matching private key can open it — the relay
-forwards ciphertext under an opaque tag either side can compute, never
-learning what's inside or that the two messages are related to the same
-handshake beyond sharing a tag.
+**How a joiner gets those in the first place** (join-by-invite — built;
+see `docs/INVITE_FLOW.md` and `internal/invite`): the invite code itself
+carries no secret, just a lookup tag (`sha256("invite-tag" ||
+invite_code)`). The requester generates a one-time keypair and posts a
+join request to that tag; the approver seals `{keyMap, syncId,
+circleName}` to the requester's one-time public key and posts the
+response under the same tag. Only the requester's matching private key
+can open it — the relay forwards ciphertext under an opaque tag either
+side can compute, never learning what's inside or that the two messages
+belong to the same handshake beyond sharing a tag.
 
 ## Running locally
 
-The relay runs against LocalStack (DynamoDB, S3, KMS) instead of real AWS.
+The relay runs against LocalStack (DynamoDB, S3, SSM) instead of real AWS.
 All commands are from `server/`.
 
 **1. Start LocalStack** (once per machine boot; `docker start localstack`
 after the first time):
 
 ```
-docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3 localstack/localstack:4.4.0
+docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,ssm localstack/localstack:4.4.0
 ```
 
 **2. Provision the tables and bucket** (again whenever `provision/modules`
@@ -190,13 +191,16 @@ changes, or after LocalStack's container is recreated):
 cp .env.example local.env
 ```
 
-Then in `local.env`: set `RESOURCE_PREFIX=mimoza-local` (the relay derives every
-table and bucket name from it, the same way Terraform names them), set
-`S3_FORCE_PATH_STYLE=true`,
-and uncomment the LocalStack block (`AWS_ENDPOINT_URL=http://localhost:4566`
-and the `test`/`test` keys). For push, point `FCM_CREDENTIAL_FILE` and
-`APNS_AUTH_KEY_FILE` at the key files in this directory. `.gitignore` keeps
-every `*.env` and both keys out of the repo.
+The example is already a working LocalStack configuration:
+`RESOURCE_PREFIX=mimoza-local` (the relay derives every table and bucket
+name from it, the same way Terraform names them),
+`S3_FORCE_PATH_STYLE=true`, and the LocalStack block
+(`AWS_ENDPOINT_URL=http://localhost:4566` and the `test`/`test` keys).
+What's missing is the sign-in client IDs and the credential-file lines,
+which ship commented out — point `FCM_CREDENTIAL_FILE`,
+`APNS_AUTH_KEY_FILE` and, only if you need Apple grant revocation,
+`APPLE_SIGNIN_KEY_FILE` at the key files in this directory. `.gitignore`
+keeps every `*.env` and every key out of the repo.
 
 **4. Run it with `local.env` loaded.** Go doesn't read env files itself, so export
 it into the shell first:
@@ -215,9 +219,11 @@ Or in one line, without leaking the vars into your shell:
 Don't use `export $(cat local.env | xargs)`: bash chokes on the comment lines
 (`export: '#': not a valid identifier`), and any value with a space splits.
 
-Set `PORT=8090`: a dev build of the app talks to the relay on the same
-host as the Metro packager, at `EXPO_PUBLIC_RELAY_PORT` (default 8090). It
-only uses `EXPO_PUBLIC_RELAY_URL` when no packager is serving (see
+Set `PORT=8090` (the example ships 8080): a dev build of the app talks to
+the relay on the same host as the Metro packager, at
+`EXPO_PUBLIC_RELAY_PORT` (default 8090), whenever `EXPO_PUBLIC_RELAY_URL`
+is unset or loopback. A non-loopback `EXPO_PUBLIC_RELAY_URL` wins even in
+a dev build — a staging build is a dev build too (see
 `app/src/core/services/relay.ts`).
 
 Photo uploads and downloads go straight to LocalStack through presigned
@@ -249,7 +255,7 @@ code in front of you, **check the server's start time before debugging
 the client**:
 
 ```
-ps -o lstart,command -p $(lsof -ti :8080)
+ps -o lstart,command -p $(lsof -ti :8090)
 ```
 
 **Pin LocalStack to exactly `4.4.0`** (the last version usable without a
@@ -262,10 +268,12 @@ even a byte-for-byte correct multipart request against a
 lifecycle-configuration API hangs until Terraform times out. Both are
 fixed in `4.4.0`.
 
-`go test ./...` runs against the same LocalStack instance (`testsupport`
-creates tables lazily on first use, shared across test packages — see its
-own doc comment for why IDs in tests are always freshly generated, never
-hardcoded).
+`go test ./...` runs against the same LocalStack instance
+(`internal/util/testsupport` creates tables lazily on first use, shared
+across test packages — see its own doc comment for why IDs in tests are
+always freshly generated, never hardcoded). Without LocalStack those
+tests skip; `AGENTS.md` has the two legs CI runs and how to make a
+missing LocalStack fail instead.
 
 ## Deploying (staging, prod)
 
@@ -275,8 +283,10 @@ creates resources under it, and the Lambda gets it as `RESOURCE_PREFIX` and
 derives the rest. See `docs/INFRASTRUCTURE.md` for the accounts, domains and
 what lives where.
 
-Once per AWS account, create the bucket Terraform state lives in, then copy
-`envs/<env>/<env>.auto.tfvars.example` and fill in the account id:
+Once per AWS account, create the bucket Terraform state lives in (copy
+`bootstrap/bootstrap.auto.tfvars.example` first), then copy
+`envs/<env>/<env>.auto.tfvars.example` and fill it in — account id, domain
+and alert address:
 
 ```
 (cd provision/bootstrap && terraform init && terraform apply)
@@ -285,10 +295,11 @@ Once per AWS account, create the bucket Terraform state lives in, then copy
 Settings reach a deployed relay three ways, and only the first needs a file
 on your machine:
 
-- **`server/<env>.env`** — the sign-in client IDs and APNs identifiers, plus
-  `FCM_CREDENTIAL_FILE`/`APNS_AUTH_KEY_FILE` pointing at the key files.
-  `push-config.sh` uploads the settings to `/mimoza-<env>/config/` and the two
-  keys as SecureStrings. Re-run it whenever the file changes:
+- **`server/<env>.env`** — the sign-in client IDs and the Apple/APNs
+  identifiers, plus `FCM_CREDENTIAL_FILE`/`APNS_AUTH_KEY_FILE`/
+  `APPLE_SIGNIN_KEY_FILE` pointing at the key files. `push-config.sh`
+  uploads the settings to `/mimoza-<env>/config/` and those three keys as
+  SecureStrings. Re-run it whenever the file changes:
 
   ```
   provision/push-config.sh staging
@@ -299,7 +310,15 @@ on your machine:
 - **SSM, written by Terraform** — the blob CDN's own settings, which the relay
   reads at runtime because the Lambda can't be told them directly.
 
-Then, whenever the Go code or the Terraform changes:
+Deploying itself is CI's job (`.github/workflows/server-deploy.yml`):
+staging applies on every `main` push whose Server Tests run passed, prod
+only on a `server-v*` tag, and `workflow_dispatch` re-runs staging by
+hand. Each job runs `provision/build.sh` and then `terraform apply` in
+`envs/<env>`, with the account id and domain coming from that GitHub
+Environment rather than a `.tfvars` file.
+
+Applying from your own machine — and reading an env's outputs — is the
+same sequence:
 
 ```
 provision/build.sh

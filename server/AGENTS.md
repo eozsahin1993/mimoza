@@ -50,10 +50,11 @@ go test -race $(go list ./... | grep -Ev '^mimoza-relay/integration(/|$)')  # un
 go test -race ./integration/...                                            # integration, black-box HTTP
 ```
 
-Both need LocalStack (DynamoDB + S3) reachable at `localhost:4566` — see
-`internal/util/localstack` and `internal/util/testsupport`. Without it, tests skip
-rather than fail; set `REQUIRE_LOCALSTACK=1` (what CI does) to make a
-missing LocalStack a hard failure instead of a silent green run.
+Both need LocalStack (DynamoDB, S3 and SSM) reachable at
+`localhost:4566` — see `internal/util/localstack` and
+`internal/util/testsupport`. Without it, tests skip rather than fail; set
+`REQUIRE_LOCALSTACK=1` (what CI does) to make a missing LocalStack a hard
+failure instead of a silent green run.
 
 Before pushing, also run what CI checks as a separate `build` job:
 
