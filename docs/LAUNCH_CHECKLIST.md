@@ -35,9 +35,9 @@ Prod is 852138521113, staging 223057859233. See
       with static keys because Terraform can't read a `login_session` one.
 - [ ] Root MFA, and Activate IAM Access so the billing pages open to an
       IAM user at all.
-- [ ] **Confirm the alarm email.** Both accounts' SNS subscriptions are
-      still `PendingConfirmation`, so every alarm — billing included —
-      currently notifies nobody.
+- [x] Alarm email confirmed in both accounts, and delivery tested by
+      publishing to each topic. The listing lies while a confirmation is
+      pending, so publish rather than trust it.
 - [x] `server/provision/envs/prod` applied, with the wildcard certificate
       validated and `api.` and `cdn.` resolving.
 - [x] Apple keys in SSM. The APNs key is team-wide and serves both envs,
@@ -51,7 +51,7 @@ Prod is 852138521113, staging 223057859233. See
       native app authenticates as its bundle id.
 - [x] `.env.production` locally: `APP_ENV=production`, relay URL, three
       Google client IDs.
-- [ ] GitHub `production` environment (role ARN, account id, domain,
+- [x] GitHub `production` environment (role ARN, account id, domain,
       alert email) + OIDC role. The workflow's prod job already exists,
       on `server-v*` tags — commit 5680ce9.
 

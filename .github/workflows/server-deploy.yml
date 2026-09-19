@@ -64,7 +64,7 @@ jobs:
 
       - name: Refuse to apply a half-configured environment
         run: |
-          for name in AWS_ACCOUNT_ID ENV_DOMAIN; do
+          for name in AWS_ACCOUNT_ID ENV_DOMAIN ALERT_EMAIL; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is not set on the staging environment"
               exit 1
@@ -73,6 +73,9 @@ jobs:
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           ENV_DOMAIN: ${{ secrets.ENV_DOMAIN }}
+          # Empty means alert_email = "", which takes the topic, the
+          # subscription and every alarm with it.
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
 
       - name: Apply
         working-directory: server/provision/envs/staging
@@ -122,7 +125,7 @@ jobs:
 
       - name: Refuse to apply a half-configured environment
         run: |
-          for name in AWS_ACCOUNT_ID ENV_DOMAIN; do
+          for name in AWS_ACCOUNT_ID ENV_DOMAIN ALERT_EMAIL; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is not set on the prod environment"
               exit 1
@@ -131,6 +134,9 @@ jobs:
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           ENV_DOMAIN: ${{ secrets.ENV_DOMAIN }}
+          # Empty means alert_email = "", which takes the topic, the
+          # subscription and every alarm with it.
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
 
       - name: Apply
         working-directory: server/provision/envs/prod

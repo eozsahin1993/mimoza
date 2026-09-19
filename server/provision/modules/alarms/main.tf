@@ -23,6 +23,8 @@ resource "aws_sns_topic" "alarms" {
 
 # Confirm by clicking the link AWS mails when this is first created —
 # until then the subscription is pending and every alarm reaches nobody.
+# State goes on saying pending long after it isn't, so replacing this
+# unsubscribes a working address behind a plan that reads as harmless.
 resource "aws_sns_topic_subscription" "alarms" {
   count     = local.enabled
   topic_arn = aws_sns_topic.alarms[0].arn
