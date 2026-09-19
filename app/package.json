@@ -61,6 +61,7 @@
   },
   "devDependencies": {
     "@bacons/apple-targets": "^5.0.0",
+    "@expo/fingerprint": "^0.20.11",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.4.0",
     "@types/react": "~19.2.2",
@@ -88,6 +89,9 @@
     "ios": "dotenv -e .env.dev -- expo run:ios --device \"iPhone 17\"",
     "ios:staging": "dotenv -e .env.staging -- expo run:ios --device \"iPhone 17\"",
     "ios:prod": "dotenv -e .env.production -- expo run:ios --device \"iPhone 17\"",
+    "fingerprint:dev": "dotenv -e .env.dev -- fingerprint fingerprint:generate",
+    "fingerprint:staging": "dotenv -e .env.staging -- fingerprint fingerprint:generate",
+    "fingerprint:prod": "dotenv -e .env.production -- fingerprint fingerprint:generate",
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "fnm exec --using=22.23.2 -- jest",

@@ -76,3 +76,27 @@ npm run db:generate
 which writes the next numbered migration. Don't reach for the old
 consolidate-in-place habit to keep the history tidy — it costs every
 device a wipe, and eventually one you can't reach.
+
+## Fingerprints are per environment, so compare like with like
+
+`npm run fingerprint:dev|staging|prod` hashes what a native build is made
+of, which answers the only question that matters before shipping: does
+this change need a new binary, or will the JS bundle carry it?
+
+The three are not interchangeable. The hash covers the resolved app
+config, and `app.config.js` gives each environment its own bundle id, App
+Group and APNs entitlement, so the same commit fingerprints differently
+per environment:
+
+```
+production  69c7f5c76f98e42b5583c23f6126fbb4c0e0f0c6
+staging     f89f05343453ed02a2332628ff60145e13de79c2
+```
+
+Diff a hash against the one from that environment's last build, never
+against another environment's. `fingerprint fingerprint:diff <a> <b>`
+takes two generated files and names what moved.
+
+Adding a dependency changes the hash even when it ships no native code —
+the tool can't know, so it assumes a rebuild. That's the right way round;
+the expensive mistake is shipping JS against a binary that can't run it.
