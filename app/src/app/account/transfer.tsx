@@ -54,6 +54,8 @@ export default function DeviceTransferScreen() {
     return () => {
       cancelled = true;
     };
+    // Mount only: re-running on a language change would start a second transfer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function DeviceTransferScreen() {
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(timer);
-  }, [pending]);
+  }, [pending, t]);
 
   return (
     <ThemedView style={styles.screen}>

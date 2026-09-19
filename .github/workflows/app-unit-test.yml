@@ -28,10 +28,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Errors only: the 500-odd warnings are a separate cleanup, and
-      # failing on them here would train everyone to skip the job.
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Run tests
         run: npx jest --ci
