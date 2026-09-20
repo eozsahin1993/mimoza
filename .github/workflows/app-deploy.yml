@@ -10,8 +10,32 @@ on:
     tags: ['app-v*']
 
 jobs:
+  # Cheap and on Ubuntu, so a failing test costs a minute rather than the
+  # fifteen a macOS archive takes — and nothing reaches App Store Connect
+  # that couldn't pass on a pull request. The relay gates its deploy the
+  # same way, on Server Tests.
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: app/.node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint -- --max-warnings 0
+      - run: npx jest --ci
+
   ios:
     name: iOS to TestFlight
+    needs: test
     runs-on: macos-latest
     environment: ${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
     # Two at once would claim the same build number, and the second upload
