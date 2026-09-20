@@ -45,12 +45,12 @@ module.exports = ({ config }) => {
   }
   requireEnvironment(name, env);
 
-  if (!env.idSuffix) return withGoogleScheme(withEnv(withPushEnvironment(config), name));
+  if (!env.idSuffix) return withBuildNumber(withGoogleScheme(withEnv(withPushEnvironment(config), name)));
 
   const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
   const appGroup = `group.${bundleIdentifier}`;
 
-  return withGoogleScheme(withEnv({
+  return withBuildNumber(withGoogleScheme(withEnv({
     ...withPushEnvironment(config),
     name: `${config.name}${env.nameSuffix}`,
     scheme: env.scheme,
@@ -73,8 +73,24 @@ module.exports = ({ config }) => {
       package: `${config.android.package}${env.idSuffix}`,
       googleServicesFile: './google-services.staging.json',
     },
-  }, name));
+  }, name)));
 };
+
+/**
+ * A build number that can't repeat or be forgotten: CI passes its run
+ * number, which only ever goes up. app.json's value is the local
+ * fallback — every upload burns a number permanently, so two builds from
+ * one commit still need two.
+ */
+function withBuildNumber(config) {
+  const build = process.env.APP_BUILD_NUMBER;
+  if (!build) return config;
+  return {
+    ...config,
+    ios: { ...config.ios, buildNumber: String(build) },
+    android: { ...config.android, versionCode: Number(build) },
+  };
+}
 
 /**
  * Refuses to build an environment against the wrong relay.

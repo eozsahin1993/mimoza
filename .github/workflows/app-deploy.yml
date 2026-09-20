@@ -1,0 +1,78 @@
+name: Deploy App
+
+# Staging follows main, the same as the relay. Production is a tag, the
+# same as the relay's server-v*. Both land in App Store Connect; only
+# production is ever submitted from there.
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/app-deploy.yml']
+    tags: ['app-v*']
+
+jobs:
+  ios:
+    name: iOS to TestFlight
+    runs-on: macos-latest
+    environment: ${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
+    # Two at once would claim the same build number, and the second upload
+    # is rejected after ten minutes of work.
+    concurrency:
+      group: ship-app-${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: app/.node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # Pinned rather than whatever macos-latest defaults to, which lags and
+      # changes without notice. Shell rather than an action: this job holds
+      # the signing secrets, and selecting a preinstalled Xcode is one line.
+      - name: Pin Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: app
+          bundler-cache: true
+
+      - run: npm ci
+
+      - name: Ship
+        run: bundle exec fastlane ios ${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          # SSH won't work on a runner, so match reads the certificates repo
+          # over HTTPS with a token.
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+          FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_IS_KEY_CONTENT_BASE64: true
+          # There is no .env file here — both are gitignored — but dotenv
+          # tolerates a missing one and never overrides what is already set.
+          APP_ENV: ${{ secrets.APP_ENV }}
+          APNS_PRODUCTION: ${{ secrets.APNS_PRODUCTION }}
+          EXPO_PUBLIC_RELAY_URL: ${{ secrets.EXPO_PUBLIC_RELAY_URL }}
+          EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+
+      - name: Keep the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: app/build/logs
+          if-no-files-found: ignore
+          retention-days: 7
