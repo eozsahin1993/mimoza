@@ -11,12 +11,16 @@ ENVIRONMENTS = {
     workspace: 'ios/MimozaStaging.xcworkspace',
     app_identifier: 'com.eozsahin.mimoza.staging',
     env_file: '.env.staging',
+    project: 'ios/MimozaStaging.xcodeproj',
+    target: 'MimozaStaging',
   },
   'production' => {
     scheme: 'Mimoza',
     workspace: 'ios/Mimoza.xcworkspace',
     app_identifier: 'com.eozsahin.mimoza',
     env_file: '.env.production',
+    project: 'ios/Mimoza.xcodeproj',
+    target: 'Mimoza',
   },
 }.freeze
 
@@ -71,6 +75,11 @@ def ship(name)
     readonly: is_ci,
   )
 
+  # Expo generates the project with automatic signing, which resolves fine
+  # against a logged-in Xcode and finds nothing on a runner — it looks for
+  # development profiles while match has installed App Store ones.
+  sign_manually(config)
+
   # Outside Bundler: Xcode's script phases inherit BUNDLE_GEMFILE and then
   # resolve their own Ruby against vendor/bundle.
   Bundler.with_unbundled_env do
@@ -109,6 +118,23 @@ def next_build_number(app_identifier)
     initial_build_number: 0,
   )
   (latest.to_i + 1).to_s
+end
+
+def sign_manually(config)
+  project = File.join(app_root, config[:project])
+  { config[:target] => config[:app_identifier],
+    'MimozaNotificationService' => "#{config[:app_identifier]}.notification-service" }
+    .each do |target, identifier|
+      update_code_signing_settings(
+        path: project,
+        targets: [target],
+        use_automatic_signing: false,
+        team_id: ENV.fetch('FASTLANE_TEAM_ID'),
+        bundle_identifier: identifier,
+        profile_name: "match AppStore #{identifier}",
+        code_sign_identity: 'Apple Distribution',
+      )
+    end
 end
 
 # fastlane's `sh` runs beside the Fastfile, where expo finds no
