@@ -1,0 +1,141 @@
+# Builds and uploads the iOS app.
+#
+# Lives here rather than in ios/fastlane, which is where fastlane init puts
+# it: ios/ is generated output and every prebuild script passes --clean, so
+# anything kept there is deleted the next time someone regenerates the
+# project — silently, and usually mid-release.
+#
+# Each lane prebuilds before it archives. The Xcode project is a build
+# artifact, so building whatever happens to be on disk means shipping
+# whichever environment was last generated. That has already caught us
+# once: a staging project archived while everything else said production.
+
+default_platform(:ios)
+
+# The app and its notification service extension. Both need a profile, and
+# an archive fails on the extension long after the app itself has signed.
+ENVIRONMENTS = {
+  'staging' => {
+    scheme: 'MimozaStaging',
+    workspace: 'ios/MimozaStaging.xcworkspace',
+    app_identifier: 'com.eozsahin.mimoza.staging',
+    env_file: '.env.staging',
+  },
+  'production' => {
+    scheme: 'Mimoza',
+    workspace: 'ios/Mimoza.xcworkspace',
+    app_identifier: 'com.eozsahin.mimoza',
+    env_file: '.env.production',
+  },
+}.freeze
+
+# Reads APP_STORE_CONNECT_API_KEY_* from the environment, so nothing here
+# stops for two-factor and CI needs no Apple password. The key is held as
+# base64 content rather than a file path: a path that has to exist differs
+# between this laptop and a runner, and the content is a secret either way.
+before_all do
+  app_store_connect_api_key
+end
+
+platform :ios do
+  desc 'Build staging and upload it to TestFlight'
+  lane :staging do
+    ship('staging')
+  end
+
+  desc 'Build production and upload it to TestFlight'
+  lane :production do
+    ship('production')
+  end
+
+  desc 'Fetch or create signing certificates and profiles for every bundle id'
+  lane :certificates do
+    match(
+      type: 'appstore',
+      app_identifier: ENVIRONMENTS.values.flat_map { |e| identifiers(e[:app_identifier]) },
+      readonly: false,
+    )
+  end
+end
+
+def identifiers(app_identifier)
+  [app_identifier, "#{app_identifier}.notification-service"]
+end
+
+def ship(name)
+  config = ENVIRONMENTS.fetch(name)
+
+  # APNS_PRODUCTION is what gives the build the production APNs entitlement,
+  # which TestFlight requires and a development profile won't carry. It is
+  # deliberately absent from the .env files so local device builds stay on
+  # the sandbox and keep signing with a development profile.
+  prebuild(config[:env_file])
+
+  # The workspace gym wants is CocoaPods' output, not Expo's. `expo
+  # prebuild` usually installs pods itself but skips it silently when it
+  # can't find a usable CocoaPods, which is how a lane ends up archiving a
+  # project that has no workspace at all.
+  cocoapods(podfile: File.join(app_root, 'ios', 'Podfile'))
+
+  match(
+    type: 'appstore',
+    app_identifier: identifiers(config[:app_identifier]),
+    readonly: is_ci,
+  )
+
+  # Outside Bundler's environment on purpose. `bundle exec fastlane` exports
+  # BUNDLE_GEMFILE and friends, Xcode's script phases inherit them, and the
+  # Ruby those phases run then resolves against vendor/bundle and can't find
+  # its own default gems — "Could not find cgi, json, nkf..." from inside a
+  # build that has nothing to do with our Gemfile.
+  Bundler.with_unbundled_env do
+    build_app(
+      workspace: File.join(app_root, config[:workspace]),
+      scheme: config[:scheme],
+      export_method: 'app-store',
+      # Raw xcodebuild output, kept. xcpretty summarises away the one line
+      # that matters — an export failure showed as an empty "Command line
+      # invocation:" and nothing else — and it isn't on PATH here anyway,
+      # since with_unbundled_env drops vendor/bundle's binaries.
+      disable_xcpretty: true,
+      buildlog_path: File.join(app_root, 'build', 'logs'),
+      # Passed explicitly rather than left to gym to infer. match installs the
+      # profiles and records a mapping, but the export step doesn't pick it up
+      # on its own — it archives happily and then fails with "No profiles for
+      # <bundle id> were found", minutes later and nowhere near the cause.
+      export_options: {
+        provisioningProfiles: identifiers(config[:app_identifier]).to_h do |id|
+          [id, "match AppStore #{id}"]
+        end,
+      },
+      # The build number comes from app.json, so nothing here may rewrite it:
+      # the change would land in generated output and vanish on the next
+      # prebuild, and the upload after that would be rejected as a duplicate.
+      output_directory: 'build',
+    )
+  end
+
+  upload_to_testflight(
+    app_identifier: config[:app_identifier],
+    # Internal testers only, which skips Beta App Review entirely.
+    distribute_external: false,
+    skip_waiting_for_build_processing: true,
+  )
+end
+
+# fastlane's `sh` runs in the directory holding the Fastfile, so every one
+# of these has to be told otherwise: expo resolves the project from the
+# working directory and finds no package.json under app/fastlane.
+def prebuild(env_file)
+  Dir.chdir(app_root) do
+    sh(
+      { 'APNS_PRODUCTION' => 'true' },
+      'npx', 'dotenv', '-e', env_file, '--',
+      'sh', '-c', 'expo prebuild --platform ios --clean && node scripts/write-xcode-env.js',
+    )
+  end
+end
+
+def app_root
+  File.expand_path('..', __dir__)
+end

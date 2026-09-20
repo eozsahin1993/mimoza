@@ -1,0 +1,7 @@
+source 'https://rubygems.org'
+
+gem 'fastlane'
+# Here rather than left to the machine: `bundle exec` hides gems outside the
+# Gemfile, so a pod installed globally is invisible to the lane that needs
+# it — and the workspace gym archives is CocoaPods' output.
+gem 'cocoapods', '~> 1.17'

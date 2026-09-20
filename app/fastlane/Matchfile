@@ -1,0 +1,9 @@
+# Certificates and profiles live in a private repo, encrypted with
+# MATCH_PASSWORD. Not this repo: it's public, and match stores real signing
+# material.
+git_url(ENV['MATCH_GIT_URL'])
+storage_mode('git')
+
+# App Store profiles only. Development signing stays with Xcode, which
+# manages it fine for `npm run ios:*` and needs no coordination.
+type('appstore')

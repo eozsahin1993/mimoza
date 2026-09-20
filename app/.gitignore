@@ -53,3 +53,16 @@ example
 # whatever project generated them.
 *firebase-adminsdk*.json
 *service-account*.json
+
+# Fastlane: build output and generated reports. The Fastfile, Appfile and
+# Matchfile are versioned; what they produce is not.
+/build
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Gems install into the project rather than Homebrew's shared directory,
+# which isn't writable here. The lockfile is versioned; the gems are not.
+/vendor/bundle
+/.bundle

@@ -1,0 +1,7 @@
+# Per-lane, since this project ships two apps from one codebase — the
+# staging bundle id and production's differ, and each has a notification
+# service extension under it. The lanes pass app_identifier explicitly
+# rather than leaning on a default that would be wrong half the time.
+
+apple_id(ENV['FASTLANE_APPLE_ID'])
+team_id(ENV['FASTLANE_TEAM_ID'])
