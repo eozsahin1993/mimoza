@@ -1,0 +1,33 @@
+name: Check match auth
+
+# Throwaway. Answers in seconds whether MATCH_GIT_BASIC_AUTHORIZATION can
+# clone the certificates repo, instead of finding out fifteen minutes into
+# a macOS build. Reports shape only — never the value or anything derived
+# from it, since GitHub masks the secret itself but not what you decode
+# out of it.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect the value
+        env:
+          AUTH: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        run: |
+          printf 'length:        %s\n' "${#AUTH}"
+          printf 'lines:         %s\n' "$(printf '%s' "$AUTH" | wc -l | tr -d ' ')"
+          printf 'base64 chars:  %s\n' "$(printf '%s' "$AUTH" | grep -qE '^[A-Za-z0-9+/]+=*$' && echo yes || echo 'NO — has characters outside the base64 alphabet')"
+          printf 'decodes:       %s\n' "$(printf '%s' "$AUTH" | base64 -d >/dev/null 2>&1 && echo yes || echo no)"
+          printf 'has one colon: %s\n' "$(printf '%s' "$AUTH" | base64 -d 2>/dev/null | tr -cd ':' | wc -c | tr -d ' ')"
+          printf 'decoded bytes: %s\n' "$(printf '%s' "$AUTH" | base64 -d 2>/dev/null | wc -c | tr -d ' ')"
+
+      - name: Try the clone
+        env:
+          AUTH: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        run: |
+          git -c http.extraHeader="Authorization: Basic $AUTH" \
+            ls-remote https://github.com/eozsahin1993/mimoza-certificates.git >/dev/null \
+            && echo 'clone: OK' \
+            || { echo 'clone: FAILED'; exit 1; }
