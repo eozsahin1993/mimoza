@@ -503,5 +503,14 @@
     "reaction": "{{name}} a réagi à ta photo",
     "reactionWithEmoji": "{{name}} a réagi avec {{emoji}} à ta photo",
     "channelGroup": "Cercles"
+  },
+  "notifications": {
+    "prompt": {
+      "title": "Activer les notifications",
+      "body": "Reste au courant des photos, des commentaires et des demandes d’adhésion dans tes cercles.",
+      "bodyWaiting": "On te préviendra quand {{name}} t’aura accepté dans {{circle}}.",
+      "turnOn": "Activer",
+      "notNow": "Plus tard"
+    }
   }
 }

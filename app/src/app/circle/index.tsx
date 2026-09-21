@@ -15,6 +15,8 @@ import { FabButton } from '@/ui/components/buttons/fab-button';
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { PrivacyNotice } from '@/features/account/components/privacy-notice';
+import { NotificationPromptDialog } from '@/features/push-notifications/components/notification-prompt-dialog';
+import { answerNotificationPrompt, shouldOfferNotifications } from '@/features/push-notifications/usecases/enable-push';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Space, Spacing } from '@/ui/theme/tokens';
@@ -78,6 +80,9 @@ export default function CircleListScreen() {
   // this screen rather than being a route of its own.
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
+  // The notification ask. The first screen after onboarding, and every
+  // later one until it's answered either way.
+  const [offerNotifications, setOfferNotifications] = useState(false);
 
   /** Re-reads the circle list from the local database. No network. */
   const loadFromDatabase = useCallback(async () => {
@@ -140,7 +145,15 @@ export default function CircleListScreen() {
     takePendingInviteCode()
       .then((code) => code && setJoinCode(code))
       .catch((err) => console.error('Failed to read a pending invite code', err));
+    shouldOfferNotifications()
+      .then(setOfferNotifications)
+      .catch((err) => console.error('Failed to check notification permission', err));
   }, [loadFromDatabase]);
+
+  const handleNotificationAnswer = useCallback((turnOn: boolean) => {
+    setOfferNotifications(false);
+    answerNotificationPrompt(turnOn).catch((err) => console.error('Failed to set up notifications', err));
+  }, []);
 
   // Re-check on every focus, not just mount — picture/circles may have just
   // changed on a screen this one returns to (profile, new circle, a post).
@@ -289,6 +302,15 @@ export default function CircleListScreen() {
             .then(setPending)
             .catch((err) => console.error('Failed to reload pending requests', err));
         }}
+      />
+
+      {/* Held back while an invite's join sheet is up, so it follows the
+          request: then the reason can name who they're waiting on. */}
+      <NotificationPromptDialog
+        visible={offerNotifications && !joinCode}
+        waitingOn={pending[0]}
+        onTurnOn={() => handleNotificationAnswer(true)}
+        onNotNow={() => handleNotificationAnswer(false)}
       />
 
       <PrivacyInfoModal visible={showPrivacyInfo} onClose={() => setShowPrivacyInfo(false)} />

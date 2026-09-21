@@ -1,7 +1,8 @@
 import { getPermissionsAsync } from 'expo-notifications';
 
-import { getAllCircles } from '@/data/db';
+import { getAllCircles, getCircle } from '@/data/db';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
+import { getAppSettings, updateAppSettings } from '@/core/services/settings';
 import { circlePushPreferences } from '@/features/push-notifications/usecases/push-preferences';
 import { registerPushForCircle, unregisterDeviceForCircle } from '@/features/push-notifications/usecases/push-registration';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
@@ -60,22 +61,41 @@ export async function unregisterPushEverywhere(): Promise<void> {
 }
 
 /**
- * Asks for notification permission and registers one circle. Called from
- * the feed, which is the only place with that circle on screen to explain
- * what is being asked for — a usecase should not be popping OS dialogs.
- *
- * Returns immediately once permission has been answered either way, so
- * opening a feed costs nothing after the first time.
+ * Whether the home screen should ask about notifications: not answered
+ * there yet, and the OS would still show its prompt. Local reads only.
  */
-export async function askForPushOnCircle(circleId: string): Promise<void> {
+export async function shouldOfferNotifications(): Promise<boolean> {
+  if ((await getAppSettings()).notificationPromptAnswered) return false;
   // Not keyed on `status`: iOS reports `undetermined` before the first ask,
-  // Android reports denied-with-canAskAgain, so testing for `undetermined`
-  // meant Android was never asked at all. These two cover both.
+  // Android reports denied-with-canAskAgain. These two cover both.
   const existing = await getPermissionsAsync();
-  if (existing.granted) return; // launch already registered this circle
-  if (!existing.canAskAgain) return; // the OS will not ask again
+  return !existing.granted && existing.canAskAgain;
+}
+
+/**
+ * The home screen's answer. Only a yes spends the OS prompt, and a grant
+ * registers every circle straight away rather than at the next launch.
+ */
+export async function answerNotificationPrompt(turnOn: boolean): Promise<void> {
+  await updateAppSettings({ notificationPromptAnswered: true });
+  if (!turnOn) return;
 
   const device = await getDevicePushToken({ ask: true });
+  if (device) await enablePushEverywhere();
+}
+
+/**
+ * Registers a circle this phone never has, when a feed opens. Launch
+ * registers every circle, but not one created or joined since; without
+ * this it stays unreachable until the next cold start. `pushKeyVersion`
+ * is null until the first registration, so this runs once per circle.
+ * Never prompts: the ask lives on the home screen.
+ */
+export async function ensurePushForCircle(circleId: string): Promise<void> {
+  const circle = await getCircle(circleId);
+  if (!circle || circle.pushSilenced || circle.pushKeyVersion !== null) return;
+
+  const device = await getDevicePushToken();
   if (!device) return;
 
   const { categories } = await circlePushPreferences(circleId);

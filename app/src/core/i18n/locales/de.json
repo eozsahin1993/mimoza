@@ -503,5 +503,14 @@
     "reaction": "{{name}} hat auf dein Foto reagiert",
     "reactionWithEmoji": "{{name}} hat mit {{emoji}} auf dein Foto reagiert",
     "channelGroup": "Kreise"
+  },
+  "notifications": {
+    "prompt": {
+      "title": "Mitteilungen aktivieren",
+      "body": "Bleib auf dem Laufenden über Fotos, Kommentare und Beitrittsanfragen in deinen Kreisen.",
+      "bodyWaiting": "Wir sagen dir Bescheid, wenn {{name}} dich in {{circle}} aufnimmt.",
+      "turnOn": "Aktivieren",
+      "notNow": "Später"
+    }
   }
 }

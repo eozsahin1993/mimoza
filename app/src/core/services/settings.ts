@@ -9,6 +9,8 @@ export type AppSettings = {
   /** Which level a newly created or joined circle starts at — see push-preferences.ts. */
   defaultPushLevel: string;
   language: LanguagePreference;
+  /** Whether the home screen's notification ask has had its answer — either one. It isn't shown again. */
+  notificationPromptAnswered: boolean;
 };
 
 const STORAGE_KEY = 'app_settings';
@@ -21,6 +23,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   // first reaction to it, so that volume concern is gone.
   defaultPushLevel: 'reactions',
   language: 'system',
+  notificationPromptAnswered: false,
 };
 
 /**

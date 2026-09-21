@@ -503,5 +503,14 @@
     "reaction": "{{name}} fotoğrafına tepki verdi",
     "reactionWithEmoji": "{{name}} fotoğrafına {{emoji}} tepkisi verdi",
     "channelGroup": "Çevreler"
+  },
+  "notifications": {
+    "prompt": {
+      "title": "Bildirimleri aç",
+      "body": "Çevrelerindeki fotoğraflardan, yorumlardan ve katılma isteklerinden anında haberin olsun.",
+      "bodyWaiting": "{{name}} seni {{circle}} çevresine aldığında haber vereceğiz.",
+      "turnOn": "Aç",
+      "notNow": "Şimdi değil"
+    }
   }
 }
