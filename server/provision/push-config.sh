@@ -57,6 +57,14 @@ for pair in FCM_CREDENTIAL_FILE=fcm-service-account APNS_AUTH_KEY_FILE=apns-auth
     continue
   fi
   [[ "$path" = /* ]] || path="$server_dir/$path"
+  # Refuse a key that doesn't parse. Uploaded, it only shows up as a relay
+  # that quietly can't sign: prod's FCM key sat broken that way for days,
+  # damaged on disk by a repo-wide find-and-replace.
+  if [[ "$key" == FCM_CREDENTIAL_FILE ]]; then
+    jq -er .private_key "$path" 2>/dev/null | openssl pkey -noout 2>/dev/null
+  else
+    openssl pkey -in "$path" -noout 2>/dev/null
+  fi || { echo "refusing $name: $path doesn't hold a key that parses" >&2; exit 1; }
   put SecureString "$name" "$(cat "$path")"
   echo "set     $name (from $key)"
 done
