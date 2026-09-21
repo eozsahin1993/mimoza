@@ -41,6 +41,27 @@ Fetch or create signing certificates and profiles for every bundle id
 
 ----
 
+
+## Android
+
+### android staging
+
+```sh
+[bundle exec] fastlane android staging
+```
+
+Build staging and upload it to Play internal testing
+
+### android production
+
+```sh
+[bundle exec] fastlane android production
+```
+
+Build production and upload it to Play internal testing
+
+----
+
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.
 
 More information about _fastlane_ can be found on [fastlane.tools](https://fastlane.tools).

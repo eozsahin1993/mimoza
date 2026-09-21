@@ -5,3 +5,6 @@ gem 'fastlane'
 # Gemfile, so a pod installed globally is invisible to the lane that needs
 # it — and the workspace gym archives is CocoaPods' output.
 gem 'cocoapods', '~> 1.17'
+
+plugins_path = File.join(File.dirname(__FILE__), 'fastlane', 'Pluginfile')
+eval_gemfile(plugins_path) if File.exist?(plugins_path)

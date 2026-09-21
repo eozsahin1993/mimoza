@@ -13,6 +13,8 @@ ENVIRONMENTS = {
     env_file: '.env.staging',
     project: 'ios/MimozaStaging.xcodeproj',
     target: 'MimozaStaging',
+    package_name: 'com.eozsahin.mimoza.staging',
+    firebase_app: '1:1049240173156:android:f139763b32092d5ac97d71',
   },
   'production' => {
     scheme: 'Mimoza',
@@ -21,11 +23,12 @@ ENVIRONMENTS = {
     env_file: '.env.production',
     project: 'ios/Mimoza.xcodeproj',
     target: 'Mimoza',
+    package_name: 'com.eozsahin.mimoza',
   },
 }.freeze
 
 before_all do
-  app_store_connect_api_key
+  app_store_connect_api_key if lane_context[SharedValues::PLATFORM_NAME] == :ios
   # A runner has no login keychain for match to install into.
   setup_ci if is_ci
 end
@@ -48,6 +51,18 @@ platform :ios do
       app_identifier: ENVIRONMENTS.values.flat_map { |e| identifiers(e[:app_identifier]) },
       readonly: false,
     )
+  end
+end
+
+platform :android do
+  desc 'Build staging and upload it to Play internal testing'
+  lane :staging do
+    ship_android('staging')
+  end
+
+  desc 'Build production and upload it to Play internal testing'
+  lane :production do
+    ship_android('production')
   end
 end
 
@@ -105,6 +120,120 @@ def ship(name)
     distribute_external: false,
     skip_waiting_for_build_processing: true,
   )
+end
+
+def ship_android(name)
+  config = ENVIRONMENTS.fetch(name)
+
+  # Gradle runs Metro, so EXPO_PUBLIC_* has to reach it too — without this
+  # the bundle is built against no relay at all, and the config plugins
+  # that read those vars fail the build first.
+  load_env(config[:env_file])
+
+  version_code = next_version_code(config[:package_name])
+  prebuild_android(config[:env_file], version_code)
+
+  keystore = fetch_keystore
+
+  # APK for App Distribution, AAB for Play: App Distribution only takes a
+  # bundle from an app that is linked to a Play listing, and staging has
+  # none on purpose.
+  #
+  # Injected rather than written into build.gradle: that file is generated,
+  # and --clean would drop the signing config on the next run.
+  gradle(
+    task: config[:firebase_app] ? 'assemble' : 'bundle',
+    build_type: 'Release',
+    project_dir: File.join(app_root, 'android'),
+    properties: {
+      'android.injected.signing.store.file' => keystore,
+      'android.injected.signing.store.password' => ENV.fetch('ANDROID_KEYSTORE_PASSWORD'),
+      'android.injected.signing.key.alias' => 'mimoza-upload',
+      'android.injected.signing.key.password' => ENV.fetch('ANDROID_KEYSTORE_PASSWORD'),
+    },
+    # The properties carry the keystore password, and fastlane echoes the
+    # command it runs into both the log and report.xml.
+    print_command: false,
+  )
+
+  return distribute_to_testers(config) if config[:firebase_app]
+
+  aab = lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH]
+  if ENV['PLAY_JSON_KEY'].nil?
+    UI.important("No PLAY_JSON_KEY — built #{aab}, upload it by hand.")
+    return
+  end
+
+  upload_to_play_store(
+    package_name: config[:package_name],
+    track: 'internal',
+    aab: aab,
+    json_key: ENV.fetch('PLAY_JSON_KEY'),
+    # The listing is managed in the console, not here.
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true,
+  )
+end
+
+# Testers get an email, then every later build appears in App Tester.
+# Invite-only: nothing here publishes a public download link.
+def distribute_to_testers(config)
+  apk = lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH]
+  if ENV['FIREBASE_SERVICE_ACCOUNT'].nil?
+    UI.important("No FIREBASE_SERVICE_ACCOUNT — built #{apk}, install it by hand.")
+    return
+  end
+
+  firebase_app_distribution(
+    app: config[:firebase_app],
+    android_artifact_path: apk,
+    groups: ENV.fetch('FIREBASE_TESTER_GROUP', 'internal'),
+    release_notes: `git log -1 --pretty=%s`.strip,
+    service_credentials_file: ENV.fetch('FIREBASE_SERVICE_ACCOUNT'),
+  )
+end
+
+# Play rejects a repeat, and a failed upload must not burn the number.
+def next_version_code(package_name)
+  return '1' if ENV['PLAY_JSON_KEY'].nil?
+
+  codes = google_play_track_version_codes(
+    package_name: package_name,
+    track: 'internal',
+    json_key: ENV.fetch('PLAY_JSON_KEY'),
+  )
+  ((codes.max || 0) + 1).to_s
+rescue StandardError => e
+  UI.important("Could not read Play version codes (#{e.message}); starting at 1.")
+  '1'
+end
+
+# The keystore lives in the certs repo; its password does not.
+def fetch_keystore
+  dir = File.join(Dir.tmpdir, 'mimoza-certs')
+  FileUtils.rm_rf(dir)
+  sh('git', 'clone', '--depth', '1', ENV.fetch('MATCH_GIT_URL'), dir)
+  File.join(dir, 'android', 'mimoza-upload.jks')
+end
+
+def load_env(env_file)
+  File.readlines(File.join(app_root, env_file)).each do |line|
+    key, value = line.strip.split('=', 2)
+    next if value.nil? || key.start_with?('#')
+
+    ENV[key] = value
+  end
+end
+
+def prebuild_android(env_file, build_number)
+  Dir.chdir(app_root) do
+    sh(
+      { 'APP_BUILD_NUMBER' => build_number },
+      'npx', 'dotenv', '-e', env_file, '--',
+      'expo', 'prebuild', '--platform', 'android', '--clean',
+    )
+  end
 end
 
 # Asked of Apple rather than derived from the run: a re-run reuses

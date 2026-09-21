@@ -53,6 +53,11 @@ example
 # whatever project generated them.
 *firebase-adminsdk*.json
 *service-account*.json
+fastlane/*.json
+
+# JVM crash dumps, which a Gradle daemon leaves in the project root.
+hs_err_pid*.log
+replay_pid*.log
 
 # Fastlane: build output and generated reports. The Fastfile, Appfile and
 # Matchfile are versioned; what they produce is not.
