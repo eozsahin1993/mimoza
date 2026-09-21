@@ -187,7 +187,7 @@ func Load() Config {
 		BlobCDNSettingsParameter:   "/" + prefix + "/cdn",
 		BlobCDNSigningKeyParameter: "/" + prefix + "/cloudfront-signing-key",
 		MaxBlobSize:                intEnv("MAX_BLOB_SIZE_BYTES", 0),
-		InviteRetentionDays:        intEnv("INVITE_RETENTION_DAYS", DefaultInviteRetentionDays),
+		InviteRetentionDays:        positiveIntEnv("INVITE_RETENTION_DAYS", DefaultInviteRetentionDays),
 		LogLevel:                   envOr("LOG_LEVEL", "info"),
 		Port:                       envOr("PORT", "8080"),
 		S3ForcePathStyle:           envOr("S3_FORCE_PATH_STYLE", "false") == "true",
@@ -214,6 +214,17 @@ func envOr(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// positiveIntEnv is intEnv for a value where zero or less is never
+// meant: a retention of 0 would write expiry times that have already
+// passed.
+func positiveIntEnv(name string, fallback int64) int64 {
+	value := intEnv(name, fallback)
+	if value <= 0 {
+		log.Fatalf("%s must be positive, got %d", name, value)
+	}
+	return value
 }
 
 func intEnv(name string, fallback int64) int64 {

@@ -379,3 +379,21 @@ func TestBecomingACircleClearsTheExpiry(t *testing.T) {
 		t.Fatal("a circle address kept the pending expiry")
 	}
 }
+
+// TTL deletes lazily; a temporary routing past its expiry must stop
+// taking pushes at once, not whenever DynamoDB gets to it.
+func TestAnExpiredTemporaryRoutingReadsAsGone(t *testing.T) {
+	store := testsupport.NewPushStoreWithRetention(t, -1)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	ctx := context.Background()
+	prefs := samplePrefs()
+	prefs.Kind = push.KindInvite
+
+	if err := store.PutPrefs(ctx, pushRoutingID, prefs); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.GetPrefs(ctx, pushRoutingID); !errors.Is(err, push.ErrPushRoutingNotFound) {
+		t.Fatalf("expected an expired routing to read as not found, got %v", err)
+	}
+}

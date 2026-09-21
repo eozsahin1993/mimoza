@@ -182,9 +182,11 @@ sees a circle-to-routing-ID map.
 - routing IDs come from the sender's own decrypted roster, minus their
   own, and are shuffled — roster order is stable, so sending in it would
   leak the ordering across posts
-- `payload` is the entry's existing ciphertext, nothing else. The
-  placeholder is the relay's own constant (`push.Placeholder`), stapled
-  on at dispatch; a sender cannot choose it
+- `payload` is the entry's existing ciphertext, nothing else, and may be
+  empty for a push the recipient writes from its own state (a pending
+  request's; see INVITE_PUSH). The alert text is the relay's own, picked
+  from the recipient routing's `kind` (`PushKind.Alert`: "New activity"
+  for a circle) and stapled on at dispatch; a sender cannot choose it
 
 **Verify** — per routing ID, the relay recomputes
 `hash(fanoutToken || routingId)` and compares against that row. A mismatch
@@ -203,8 +205,9 @@ design exists to withhold.
 
 **Deliver** — check the category bit, then dispatch to each `enabled`
 token individually rather than as one grouped send. Each delivered push
-carries only that recipient's own `routingId` (plus `keyVersion` and the
-ciphertext) — the full `routingIds[]` list exists only in the send
+carries only that recipient's own `routingId` (plus its `kind`,
+`keyVersion`, the ciphertext, and the kind's alert) — the full
+`routingIds[]` list exists only in the send
 request, so no member ever sees another member's routing id, and nothing
 delivered reveals the grouping.
 
@@ -218,14 +221,16 @@ background task (`services/task.ts`).
 One log entry that skipped the line. `payload` is byte-for-byte the
 `encryptedMeta` the sender appended to the sync log — same encryption,
 same signature, the bytes the next sync would deliver anyway — with a
-delivery address stapled on. The iOS shape (Android carries the same
-three in an FCM data message, `keyVersion` as a string, plus a
-`placeholder` field neither receiver reads):
+delivery address stapled on. The iOS shape for a circle push (Android
+carries the same fields in an FCM data message, `keyVersion` as a
+string, plus a `placeholder` field with the kind's alert that neither
+receiver reads):
 
 ```
 {
   "aps": { "alert": "New activity", "mutable-content": 1 },
   "pushRoutingId": "837256bc0d92…",   ← recipient's own address, resolvable only by their seed
+  "kind": "circle",                    ← the routing's kind; picks the alert and the device's text
   "keyVersion": 3,                     ← already plaintext on every append
   "payload": "KP6zUVZg6cgu…"          ← base64: nonce(24) ‖ XChaCha20-Poly1305 box
 }

@@ -375,6 +375,17 @@ func NewPushStore(t testing.TB) push.Store {
 	return pushdynamodb.New(client, pushTableName, config.DefaultInviteRetentionDays)
 }
 
+// NewPushStoreWithRetention is NewPushStore with a chosen invite retention
+// — negative to write temporary rows that have already expired.
+func NewPushStoreWithRetention(t testing.TB, retentionDays int64) push.Store {
+	t.Helper()
+	NewPushStore(t)
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
+	})
+	return pushdynamodb.New(client, pushTableName, retentionDays)
+}
+
 // NewRateLimitStore returns a real dynamodb-backed ratelimit.Store
 // against LocalStack, creating the rate-limit table once per test binary
 // run (see server/provision/modules/storage/rate_limit_table.tf). Unlike the other New*

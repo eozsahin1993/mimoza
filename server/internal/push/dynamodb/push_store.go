@@ -117,6 +117,12 @@ func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*push.Prefs
 	// empty one authorizes no write (see Service.authorize).
 	ownerHash, _ := dynamoutil.AttrBytes(out.Item, "ownerHash")
 
+	// DynamoDB's TTL deletes lazily, days after expiresAt at worst; until
+	// then an expired row would still take pushes. Past it is past.
+	if expiresAt, err := dynamoutil.AttrInt(out.Item, "expiresAt"); err == nil && expiresAt <= dynamoutil.NowMillis()/1000 {
+		return nil, push.ErrPushRoutingNotFound
+	}
+
 	// Rows from before kinds existed are all circles.
 	kind := push.KindCircle
 	if stored, ok := dynamoutil.AttrString(out.Item, "kind"); ok {

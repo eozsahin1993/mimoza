@@ -25,6 +25,7 @@ import { signOut } from '@/features/account/usecases/sign-in';
 import { InvitePushLevels, invitePushLevelForMask, PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 import { applyInvitePushMask } from '@/features/invite/usecases/invite-push';
+import { getAppSettings } from '@/core/services/settings';
 import { Languages, resolveLanguage, type LanguagePreference } from '@/core/i18n/languages';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
@@ -401,8 +402,12 @@ export default function AccountScreen() {
         onSelect={(id) => {
           setInviteLevelPicker(false);
           const mask = InvitePushLevels.find((level) => level.id === id)?.mask ?? 0;
-          updateSettings({ invitePushMask: mask });
-          applyInvitePushMask(mask).catch((err) => console.error('Failed to apply invite notifications', err));
+          // Applies what was actually stored: a failed save rolls the setting
+          // back, and the relay mustn't be left holding the unsaved choice.
+          void updateSettings({ invitePushMask: mask })
+            .then(getAppSettings)
+            .then((stored) => applyInvitePushMask(stored.invitePushMask))
+            .catch((err) => console.error('Failed to apply invite notifications', err));
         }}
       />
       <OptionSheet
