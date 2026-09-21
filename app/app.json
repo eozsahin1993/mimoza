@@ -39,10 +39,6 @@
       "googleServicesFile": "./google-services.json",
       "versionCode": 1
     },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "@bacons/apple-targets",
       "expo-router",
@@ -78,6 +74,13 @@
       "es": "./locales/es.json",
       "fr": "./locales/fr.json",
       "de": "./locales/de.json"
-    }
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "platforms": [
+      "ios",
+      "android"
+    ]
   }
 }

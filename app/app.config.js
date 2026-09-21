@@ -27,8 +27,9 @@ function iosUrlScheme() {
  */
 const ENVIRONMENTS = {
   dev: {},
-  production: {},
+  production: { channel: 'production' },
   staging: {
+    channel: 'staging',
     nameSuffix: ' Staging',
     idSuffix: '.staging',
     scheme: 'mimoza-staging',
@@ -45,7 +46,7 @@ module.exports = ({ config }) => {
   }
   requireEnvironment(name, env);
 
-  if (!env.idSuffix) return withBuildNumber(withGoogleScheme(withEnv(withPushEnvironment(config), name)));
+  if (!env.idSuffix) return withBuildNumber(withGoogleScheme(withEnv(withPushEnvironment(config), name, env)));
 
   const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
   const appGroup = `group.${bundleIdentifier}`;
@@ -73,7 +74,7 @@ module.exports = ({ config }) => {
       package: `${config.android.package}${env.idSuffix}`,
       googleServicesFile: './google-services.staging.json',
     },
-  }, name)));
+  }, name, env)));
 };
 
 /**
@@ -145,15 +146,50 @@ function withPushEnvironment(config) {
   };
 }
 
-function withEnv(config, name) {
-  return { ...config, extra: { ...config.extra, appEnv: name } };
-}
-
-function withGoogleScheme(config) {
+/**
+ * The EAS project id and owning account come from the environment rather
+ * than app.json: the repo is public, and neither is worth handing over
+ * for free. Both ship inside the binary anyway, so this is tidiness
+ * rather than secrecy — an update url is public by design.
+ */
+function withEnv(config, name, env) {
+  const projectId = process.env.EAS_PROJECT_ID;
   return {
     ...config,
-    plugins: config.plugins.map((plugin) =>
-      plugin === GOOGLE_SIGN_IN ? [GOOGLE_SIGN_IN, { iosUrlScheme: iosUrlScheme() }] : plugin,
-    ),
+    owner: process.env.EAS_PROJECT_OWNER ?? config.owner,
+    extra: {
+      ...config.extra,
+      appEnv: name,
+      ...(projectId ? { eas: { ...config.extra?.eas, projectId } } : {}),
+    },
+    ...(projectId && env.channel
+      ? {
+          updates: {
+            ...config.updates,
+            url: `https://u.expo.dev/${projectId}`,
+            requestHeaders: { 'expo-channel-name': env.channel },
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Dropped rather than left unconfigured when there is no client id: the
+ * plugin throws on a missing iosUrlScheme, and every tool that reads this
+ * config — eas, expo install, gradle — evaluates it without an env file
+ * and would fail on a project it never intended to build.
+ *
+ * A build that actually needs Google sign-in has the id, because
+ * requireEnvironment refuses to build staging or production without one.
+ */
+function withGoogleScheme(config) {
+  const scheme = iosUrlScheme();
+  return {
+    ...config,
+    plugins: config.plugins.flatMap((plugin) => {
+      if (plugin !== GOOGLE_SIGN_IN) return [plugin];
+      return scheme ? [[GOOGLE_SIGN_IN, { iosUrlScheme: scheme }]] : [];
+    }),
   };
 }
