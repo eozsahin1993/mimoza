@@ -210,10 +210,21 @@ rescue StandardError => e
 end
 
 # The keystore lives in the certs repo; its password does not.
+#
+# Cloned the way match itself authenticates, so both halves of a release
+# read the same repo with the same credential: an SSH url resolves against
+# the agent, an https one needs the basic header a runner has instead of a
+# key. Unlogged — that header is the credential.
 def fetch_keystore
   dir = File.join(Dir.tmpdir, 'mimoza-certs')
   FileUtils.rm_rf(dir)
-  sh('git', 'clone', '--depth', '1', ENV.fetch('MATCH_GIT_URL'), dir)
+
+  auth = ENV['MATCH_GIT_BASIC_AUTHORIZATION']
+  args = ['git']
+  args += ['-c', "http.extraheader=AUTHORIZATION: basic #{auth}"] if auth
+  args += ['clone', '--depth', '1', ENV.fetch('MATCH_GIT_URL'), dir]
+  sh(*args, log: false)
+
   File.join(dir, 'android', 'mimoza-upload.jks')
 end
 
