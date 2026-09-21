@@ -47,6 +47,13 @@ class NotificationService: UNNotificationServiceExtension {
     let strings = Strings(language: snapshot?.language)
     content.title = ""
     content.body = strings("push.placeholder")
+    // The relay names the address's kind. Invite pushes aren't decrypted
+    // here yet (that needs the invite code), so the kind alone picks the line.
+    switch request.content.userInfo["kind"] as? String {
+    case "invite": content.body = strings("push.joinRequestAnyCircle")
+    case "pending_request": content.body = strings("push.joinApprovedAnyCircle")
+    default: break
+    }
     if let snapshot, let composed = compose(userInfo: request.content.userInfo, snapshot: snapshot, strings: strings) {
       content.title = composed.title
       content.body = composed.body

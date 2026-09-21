@@ -1,7 +1,7 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/log-relay');
-jest.mock('@/features/push-notifications/services/relay');
+jest.mock('@/core/services/push-relay');
 jest.mock('@/core/photo/image');
 jest.mock('@/features/push-notifications/services/tokens');
 
@@ -23,10 +23,10 @@ import {
   unregisterDeviceForCircle,
 } from '@/features/push-notifications/usecases/push-registration';
 import { derivePushRoutingId } from '@/core/crypto/identity';
-import { derivePushFanoutHash, derivePushFanoutToken, derivePushOwnerToken } from '@/features/push-notifications/crypto';
+import { derivePushFanoutHash, derivePushFanoutToken, derivePushOwnerToken } from '@/core/crypto/push';
 import { deleteCircleKeys, getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/features/push-notifications/services/relay';
+import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/core/services/push-relay';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';

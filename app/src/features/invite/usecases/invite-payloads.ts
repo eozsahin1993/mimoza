@@ -41,6 +41,12 @@ export type InvitePreviewPayload = {
    * both the invite code and the circle secret.
    */
   createdByPublicKey: string;
+  /**
+   * The creator's push routing id for this invite (`derivePushInviteRoutingId`),
+   * which the requester sends to once their request is in. Absent on
+   * invites created before invite push existed.
+   */
+  pushRoutingId?: string;
 };
 
 /**

@@ -23,7 +23,9 @@ import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { logTestPushPayload } from '@/features/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
 import { PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
+import { ALL_INVITE_PUSH } from '@/features/push-notifications/usecases/push-categories';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
+import { applyInvitePushMask } from '@/features/invite/usecases/invite-push';
 import { Languages, resolveLanguage, type LanguagePreference } from '@/core/i18n/languages';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
@@ -145,13 +147,27 @@ export default function AccountScreen() {
       ],
     },
     {
-      title: t('settings.newCircles'),
-      footnote: t('settings.newCirclesFootnote'),
+      title: t('settings.notifications'),
+      footnote: t('settings.notificationsFootnote'),
       rows: [
         {
-          label: t('settings.notifyMeAbout'),
+          label: t('settings.newCirclesRow'),
           control: { kind: 'value', text: t(`settings.pushLevels.${settings.defaultPushLevel as PushLevelId}`) },
           onPress: () => setLevelPicker(true),
+        },
+        {
+          label: t('settings.invitesRow'),
+          control: {
+            kind: 'switch',
+            // One switch for both invite categories; the mask keeps them
+            // separate underneath, should they ever need their own.
+            value: settings.invitePushMask !== 0,
+            onValueChange: (on) => {
+              const mask = on ? ALL_INVITE_PUSH : 0;
+              updateSettings({ invitePushMask: mask });
+              applyInvitePushMask(mask).catch((err) => console.error('Failed to apply invite notifications', err));
+            },
+          },
         },
       ],
     },

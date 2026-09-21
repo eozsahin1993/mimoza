@@ -23,8 +23,6 @@
       "fr": "Fransızca",
       "de": "Almanca"
     },
-    "newCircles": "Yeni çevreler için varsayılan",
-    "newCirclesFootnote": "Her çevrenin kendi ayarı vardır; onu çevrenin içinden değiştirebilirsin. Bildirimler telefonunda oluşturulur; sunucuya ne olduğu iletilmez.",
     "notifyMeAbout": "Bildirim tercihleri",
     "pushLevels": {
       "posts": "Sadece yeni fotoğraflar",
@@ -56,7 +54,11 @@
     "deleteMessage": "Bu işlem katıldığın tüm çevrelerde paylaştığın her şeyi kaldırır ve hesabını kalıcı olarak siler. Geri alınamaz.",
     "deleteConfirm": "Sil",
     "deleting": "Hesabın siliniyor…",
-    "deletingDetail": "Bu işlem biraz zaman alabilir. Lütfen uygulamayı kapatma."
+    "deletingDetail": "Bu işlem biraz zaman alabilir. Lütfen uygulamayı kapatma.",
+    "notifications": "Bildirimler",
+    "newCirclesRow": "Yeni çevreler",
+    "invitesRow": "Davetler",
+    "notificationsFootnote": "Yeni çevreler bu ayarla başlar; katıldıktan sonra her çevre kendi ayarını korur. Davetler, biri katılmak istediğinde ve kendi isteklerin yanıtlandığında gelen bildirimleri kapsar ve yalnızca bu telefonda geçerlidir. Bildirimler telefonunda oluşturulur; hiçbir bildirim sunucusuna ne olduğu söylenmez."
   },
   "account": {
     "credits": {
@@ -502,7 +504,12 @@
     "alsoCommentedWithText": "{{name}} aynı fotoğrafa yorum yaptı: “{{text}}”",
     "reaction": "{{name}} fotoğrafına tepki verdi",
     "reactionWithEmoji": "{{name}} fotoğrafına {{emoji}} tepkisi verdi",
-    "channelGroup": "Çevreler"
+    "joinRequest": "{{name}} çevrene katılmak istiyor",
+    "joinRequestAnyCircle": "Biri çevrene katılmak istiyor",
+    "joinRequestNews": "Katılma isteğinle ilgili bir gelişme var",
+    "joinApprovedAnyCircle": "Bir çevreye katılma isteğinle ilgili bir gelişme var",
+    "channelGroup": "Çevreler",
+    "invitesChannel": "Katılma istekleri"
   },
   "notifications": {
     "prompt": {

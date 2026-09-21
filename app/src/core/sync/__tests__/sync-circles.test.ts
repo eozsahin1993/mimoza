@@ -1,3 +1,5 @@
+jest.mock('@/core/services/push-relay');
+jest.mock('@/features/push-notifications/services/tokens');
 jest.mock('@/core/services/log-relay');
 jest.mock('@/core/services/blob-relay');
 jest.mock('@/features/account/usecases/account-manifest');

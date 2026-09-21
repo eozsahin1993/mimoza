@@ -10,7 +10,7 @@ const path = require('path');
 
 const LANGUAGES = ['en', 'tr', 'es', 'fr', 'de'];
 /** Android names its notification channel group; iOS has no such thing. */
-const ANDROID_ONLY = new Set(['channelGroup']);
+const ANDROID_ONLY = new Set(['channelGroup', 'invitesChannel']);
 
 const app = path.join(__dirname, '..');
 const locales = path.join(app, 'src/core/i18n/locales');

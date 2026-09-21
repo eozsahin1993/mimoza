@@ -32,3 +32,9 @@ export async function markPendingJoinRequestApproved(id: string): Promise<void> 
 export async function deletePendingJoinRequest(id: string): Promise<void> {
   await db.delete(pendingJoinRequests).where(eq(pendingJoinRequests.id, id));
 }
+
+/** The request registered under this push routing id, if this device made one. */
+export async function getPendingJoinRequestByPushRoutingId(pushRoutingId: string): Promise<PendingJoinRequest | null> {
+  const rows = await db.select().from(pendingJoinRequests).where(eq(pendingJoinRequests.pushRoutingId, pushRoutingId)).limit(1);
+  return rows[0] ?? null;
+}

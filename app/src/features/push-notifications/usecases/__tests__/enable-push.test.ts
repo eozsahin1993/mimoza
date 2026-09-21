@@ -1,7 +1,7 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/log-relay');
-jest.mock('@/features/push-notifications/services/relay');
+jest.mock('@/core/services/push-relay');
 jest.mock('@/core/photo/image');
 jest.mock('@/features/push-notifications/services/tokens');
 jest.mock('@/core/services/settings');
@@ -19,7 +19,7 @@ import {
 } from '@/features/push-notifications/usecases/enable-push';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { saveAuthToken } from '@/core/services/keystore/auth-token';
-import { putPushDevice, putPushPrefs } from '@/features/push-notifications/services/relay';
+import { putPushDevice, putPushPrefs } from '@/core/services/push-relay';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';

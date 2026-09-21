@@ -2,6 +2,7 @@ import { deleteCircle, getCircleMembers, MemberRoles } from '@/data/db';
 import { removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
 import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
+import { unregisterPushForCircleInvites } from '@/features/invite/usecases/invite-push';
 import { asRecord, numberField, type EntryHandler } from '@/core/sync/entry-handlers/types';
 
 /**
@@ -39,6 +40,8 @@ export const circleDeletedHandler: EntryHandler = {
    * cache directory, which the OS reclaims.
    */
   async apply(circleId) {
+    // Before the rows: the invite rows are what name its push routings.
+    await unregisterPushForCircleInvites(circleId);
     await deleteCircle(circleId);
     deleteCirclePhotoFiles(circleId);
     await deleteCircleKeys(circleId);

@@ -11,6 +11,12 @@ export type AppSettings = {
   language: LanguagePreference;
   /** Whether the home screen's notification ask has had its answer — either one. It isn't shown again. */
   notificationPromptAnswered: boolean;
+  /**
+   * Which invite pushes this phone takes, as a mask of InvitePushCategories
+   * bits: someone asking to join through a link it made, and an answer to a
+   * request it sent. Per phone, since it only decides this device's rows.
+   */
+  invitePushMask: number;
 };
 
 const STORAGE_KEY = 'app_settings';
@@ -24,6 +30,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultPushLevel: 'reactions',
   language: 'system',
   notificationPromptAnswered: false,
+  // Both, spelled out rather than imported: this module stays free of
+  // feature code. InvitePushCategories' ALL_INVITE_PUSH is the same value.
+  invitePushMask: 0b11,
 };
 
 /**

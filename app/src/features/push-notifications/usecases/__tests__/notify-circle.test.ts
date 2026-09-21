@@ -1,7 +1,7 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/log-relay');
-jest.mock('@/features/push-notifications/services/relay');
+jest.mock('@/core/services/push-relay');
 jest.mock('@/core/photo/image');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -14,10 +14,10 @@ import { notifyCircle } from '@/features/push-notifications/usecases/notify-circ
 import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
 import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
 import { derivePushRoutingId } from '@/core/crypto/identity';
-import { derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { derivePushFanoutToken } from '@/core/crypto/push';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { sendPush } from '@/features/push-notifications/services/relay';
+import { sendPush } from '@/core/services/push-relay';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 const payload = new Uint8Array([7, 7, 7]);

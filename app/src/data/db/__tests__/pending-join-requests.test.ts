@@ -22,6 +22,7 @@ function makeRequest(overrides: Partial<{ id: string; inviteCode: string; circle
     ephemeralPublicKey: 'aa'.repeat(32),
     submittedAt: Date.now(),
     status: PendingJoinRequestStatuses.pending,
+    pushRoutingId: null,
     ...overrides,
   };
 }

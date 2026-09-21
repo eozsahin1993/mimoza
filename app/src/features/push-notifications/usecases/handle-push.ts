@@ -1,12 +1,13 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getAllCircles, getCircleMembers } from '@/data/db';
+import { getAllCircles, getCircle, getCircleMembers, getInviteByPushRoutingId, getPendingJoinRequestByPushRoutingId } from '@/data/db';
 import { EntryTypes } from '@/core/sync/log-entry';
 import { verifyLogEntry, type LogEntryEnvelope } from '@/core/sync/log-entry';
 import { derivePushRoutingId } from '@/core/crypto/identity';
 import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
-import { circleNotificationChannelId } from '@/features/push-notifications/services/channels';
+import { circleNotificationChannelId, INVITES_CHANNEL_ID } from '@/features/push-notifications/services/channels';
+import { readJoinRequestPush } from '@/features/invite/usecases/invite-push';
 import { i18n } from '@/core/i18n/i18n';
 
 /**
@@ -18,8 +19,14 @@ import { i18n } from '@/core/i18n/i18n';
 
 export type PushNotification = { circleId: string; channelId: string; title: string; body: string };
 
-/** keyVersion is a string in FCM data messages, a number in APNs userInfo. */
-export type PushData = { pushRoutingId?: string; keyVersion?: string | number; payload?: string };
+/**
+ * keyVersion is a string in FCM data messages, a number in APNs userInfo.
+ * `kind` is the routing's own, named by the relay from the recipient's row.
+ */
+export type PushData = { pushRoutingId?: string; kind?: string; keyVersion?: string | number; payload?: string };
+
+/** The most of a requester's self-reported name a lock screen shows: the sender chose it. */
+const MAX_REQUESTER_NAME = 40;
 
 /**
  * Decrypts a push and writes its notification, or null if it cannot —
@@ -32,6 +39,10 @@ export type PushData = { pushRoutingId?: string; keyVersion?: string | number; p
  */
 export async function handlePush(data: PushData): Promise<PushNotification | null> {
   if (!data.pushRoutingId) return null;
+
+  // The join handshake's two pushes aren't circle entries (invite-push.ts).
+  if (data.kind === 'invite') return describeJoinRequest(data.pushRoutingId, data.payload);
+  if (data.kind === 'pending_request') return describeJoinApproval(data.pushRoutingId);
 
   const circle = await circleForRoutingId(data.pushRoutingId);
   if (!circle) return null;
@@ -125,4 +136,39 @@ async function authorName(circleId: string, authorPubkey: string): Promise<strin
     (candidate) => candidate.identityPublicKey === authorPubkey,
   );
   return member?.name || i18n.t('push.someone');
+}
+
+/** "Priya wants to join", under the circle's name. Someone, if the payload doesn't open. */
+async function describeJoinRequest(pushRoutingId: string, payload?: string): Promise<PushNotification | null> {
+  const invite = await getInviteByPushRoutingId(pushRoutingId);
+  if (!invite) return null;
+
+  const circle = await getCircle(invite.circleId);
+  const name = payload ? readJoinRequestPush(new Uint8Array(Buffer.from(payload, 'base64')), invite.code) : null;
+  const shown = name?.trim().slice(0, MAX_REQUESTER_NAME) || i18n.t('push.someone');
+  return {
+    circleId: invite.circleId,
+    channelId: INVITES_CHANNEL_ID,
+    title: circle?.name ?? '',
+    body: i18n.t('push.joinRequest', { name: shown }),
+  };
+}
+
+/**
+ * The requester's side: sent only when the request is approved. Written
+ * from their own pending row, not the push, and it says there's news
+ * rather than "you're in": anyone else holding the code could send the
+ * same push, so it can't be trusted to mean approval. Opening the app
+ * checks.
+ */
+async function describeJoinApproval(pushRoutingId: string): Promise<PushNotification | null> {
+  const pending = await getPendingJoinRequestByPushRoutingId(pushRoutingId);
+  if (!pending) return null;
+
+  return {
+    circleId: pending.circleId,
+    channelId: INVITES_CHANNEL_ID,
+    title: pending.circleName,
+    body: i18n.t('push.joinRequestNews'),
+  };
 }
