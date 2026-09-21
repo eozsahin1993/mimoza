@@ -211,6 +211,41 @@
         }
       }
     },
+    "push.joinApproved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ accepted your request"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ katılma isteğini kabul etti"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ aceptó tu solicitud"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a accepté ta demande"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ hat deine Anfrage angenommen"
+          }
+        }
+      }
+    },
     "push.joinApprovedAnyCircle": {
       "extractionState": "manual",
       "localizations": {
@@ -242,6 +277,41 @@
           "stringUnit": {
             "state": "translated",
             "value": "Es gibt Neuigkeiten zu deiner Anfrage, einem Kreis beizutreten"
+          }
+        }
+      }
+    },
+    "push.joinApprovedNoName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your request was accepted"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Katılma isteğin kabul edildi"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu solicitud fue aceptada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta demande a été acceptée"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine Anfrage wurde angenommen"
           }
         }
       }

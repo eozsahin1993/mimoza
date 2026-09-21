@@ -1,4 +1,8 @@
-import { decrypt, encryptJSON } from '@/core/crypto/primitives';
+import { hexToBytes } from '@noble/curves/utils.js';
+
+import { decrypt, encryptJSON, openSealedBox, verify } from '@/core/crypto/primitives';
+import { deleteInviteJoinRequestKey, getPendingJoinKeypair, saveInviteJoinRequestKey } from '@/features/invite/keystore';
+import type { JoinApprovalEnvelope } from '@/features/invite/usecases/invite-payloads';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { getAllPendingJoinRequests, getInvitesWithPushRouting, setInvitePushRoutingId, type Invite } from '@/data/db';
 import { getAppSettings } from '@/core/services/settings';
@@ -40,8 +44,14 @@ async function registerPushForInviteKind(
   // Without permission, or with this kind switched off on this phone,
   // there's no device to add; the prefs row still claims the routing id.
   if (!(await wantsPush(category))) return;
-  // Only the prefs write above has to land. A device that fails to join is
-  // re-sent by the launch sweep, and mustn't cost the invite or request.
+  // Not awaited: only the claim above has to land before the id is shared.
+  // The platform token can take a long time or never come (the iOS
+  // simulator often never finishes registering with APNs), and waiting on
+  // it would hang the invite or request. sweepInvitePush re-sends it.
+  void addThisDevice(pushRoutingId, kind);
+}
+
+async function addThisDevice(pushRoutingId: string, kind: InviteKind): Promise<void> {
   try {
     const device = await getDevicePushToken();
     if (device) await putRoutingDevice(pushRoutingId, device);
@@ -70,6 +80,9 @@ export async function registerPushForInvite(inviteCode: string): Promise<string>
 
   const pushRoutingId = derivePushInviteRoutingId(masterSeed, inviteCode);
   await registerPushForInviteKind(pushRoutingId, inviteCode, 'invite', CATEGORY.invite);
+  await saveInviteJoinRequestKey(pushRoutingId, deriveJoinRequestKey(inviteCode)).catch((err) =>
+    console.error('Failed to save the join-request key for the iOS extension', err),
+  );
   return pushRoutingId;
 }
 
@@ -91,31 +104,43 @@ export async function unregisterPushForInvite(invite: Invite): Promise<void> {
   if (!invite.pushRoutingId) return;
 
   await deleteRouting(invite.pushRoutingId);
+  await deleteInviteJoinRequestKey(invite.pushRoutingId);
   await setInvitePushRoutingId(invite.code, null);
 }
 
 /**
- * Launch's pass over invites' push: removes it where the invite is
- * over, and re-sends this device's token for live ones, since a token can
- * rotate. One failing never stops the rest.
+ * The pass over the handshake's routings, on launch and when notifications
+ * are turned on: removes an invite's where the invite is over, and re-sends
+ * this device to live invites and pending requests. A first request usually
+ * comes before permission, so its routing has no device until this runs;
+ * it also covers a slow or failed token, and one that rotated. One failing
+ * never stops the rest.
  */
 export async function sweepInvitePush(): Promise<void> {
   const invites = await getInvitesWithPushRouting();
-  if (!invites.length) return;
+  const pendingRoutingIds = (await getAllPendingJoinRequests()).flatMap((request) => (request.pushRoutingId ? [request.pushRoutingId] : []));
+  if (!invites.length && !pendingRoutingIds.length) return;
 
-  const device = (await wantsPush(CATEGORY.invite)) ? await getDevicePushToken() : null;
+  const wantsRequests = await wantsPush(CATEGORY.invite);
+  const wantsAnswers = await wantsPush(CATEGORY.pending_request);
+  const device = wantsRequests || wantsAnswers ? await getDevicePushToken() : null;
   const now = Date.now();
 
   for (const invite of invites) {
     try {
       if (invite.revokedAt !== null || invite.expiresAt <= now) {
         await unregisterPushForInvite(invite);
-      } else if (device && invite.pushRoutingId) {
+      } else if (device && wantsRequests && invite.pushRoutingId) {
         await putRoutingDevice(invite.pushRoutingId, device);
       }
     } catch (err) {
       console.error(`Failed to tend push for the invite on circle ${invite.circleId}`, err);
     }
+  }
+
+  if (!device || !wantsAnswers) return;
+  for (const pushRoutingId of pendingRoutingIds) {
+    await putRoutingDevice(pushRoutingId, device).catch((err) => console.error('Failed to add this device to a pending request routing', err));
   }
 }
 
@@ -198,13 +223,33 @@ export async function notifyInviteCreator(
 }
 
 /**
- * Tells the requester there's news. No payload: their phone writes the
- * text from its own pending row, and the text claims nothing, so a push
- * from anyone else holding the code can't announce a false "you're in".
- * Opening the app does the real check.
+ * Tells the requester they're in, carrying the sealed approval that
+ * `putJoinApproval` wrote. It goes out empty if the approval won't fit a
+ * push; the phone then shows the kind's fixed line.
  */
-export async function notifyRequester(requesterRoutingId: string, inviteCode: string): Promise<void> {
-  await sendPush([requesterRoutingId], deriveInvitePushFanoutToken(inviteCode), InvitePushCategories.joinApproved, 0, new Uint8Array());
+export async function notifyRequester(requesterRoutingId: string, inviteCode: string, sealedApproval: Uint8Array): Promise<void> {
+  const payload = sealedApproval.length <= MAX_APPROVAL_PUSH_BYTES ? sealedApproval : new Uint8Array();
+  await sendPush([requesterRoutingId], deriveInvitePushFanoutToken(inviteCode), InvitePushCategories.joinApproved, 0, payload);
+}
+
+/** APNs and FCM cap a push at 4 KB, and base64 plus the relay's fields take a third of that. Each key rotation adds ~70 bytes. */
+const MAX_APPROVAL_PUSH_BYTES = 2500;
+
+/**
+ * Whether an approval push opens with this request's keypair and is signed
+ * by the invite's creator: the same check `checkPendingJoinRequest` makes.
+ * Anyone with the code can send this push, so an unchecked one claims nothing.
+ */
+export async function readJoinApprovalPush(payload: Uint8Array, requestId: string, createdByPublicKey: string): Promise<boolean> {
+  try {
+    const keypair = await getPendingJoinKeypair(requestId);
+    if (!keypair) return false;
+    const envelope = JSON.parse(new TextDecoder().decode(openSealedBox(payload, keypair))) as JoinApprovalEnvelope;
+    const approvalBytes = new TextEncoder().encode(JSON.stringify(envelope.approval));
+    return verify(hexToBytes(envelope.signature), approvalBytes, hexToBytes(createdByPublicKey));
+  } catch {
+    return false;
+  }
 }
 
 /** The requester's self-reported name from a request push, or null if it doesn't open. */

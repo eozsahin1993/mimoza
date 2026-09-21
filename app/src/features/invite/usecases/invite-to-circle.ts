@@ -26,6 +26,7 @@ import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/cir
 import { deleteJoinRequest, listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay';
 import { createInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { notifyRequester, registerPushForInvite, unregisterPushForInvite } from '@/features/invite/usecases/invite-push';
+import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -110,6 +111,8 @@ async function createInvite(circleId: string, createdByPublicKey: string): Promi
   };
   await insertInvite(invite);
   await writeInvitePreview(invite.code, circle.name, createdByPublicKey, pushRoutingId);
+  // The iOS extension finds the invite's circle in the snapshot to title its request push.
+  if (pushRoutingId) void refreshPushSnapshot();
   return invite;
 }
 
@@ -276,7 +279,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   await putJoinApproval(inviteTag, requesterId, sealed);
   // The payload type allows none; every request this app sends has one.
   if (pushRoutingId) {
-    notifyRequester(pushRoutingId, invite.code).catch((err) => console.error('Failed to notify the requester', err));
+    notifyRequester(pushRoutingId, invite.code, sealed).catch((err) => console.error('Failed to notify the requester', err));
   }
 
   // Only an admin may write `member_added`, so it is written here, by

@@ -513,9 +513,11 @@
     "joinRequest": "{{name}} möchte beitreten",
     "joinRequestAnyCircle": "Jemand möchte einem Kreis beitreten",
     "joinRequestNews": "Es gibt Neuigkeiten zu deiner Beitrittsanfrage",
+    "joinApproved": "{{name}} hat deine Anfrage angenommen",
+    "joinApprovedNoName": "Deine Anfrage wurde angenommen",
     "joinApprovedAnyCircle": "Es gibt Neuigkeiten zu deiner Anfrage, einem Kreis beizutreten",
     "channelGroup": "Kreise",
-    "invitesChannel": "Beitrittsanfragen"
+    "invitesChannel": "Einladungen"
   },
   "notifications": {
     "prompt": {

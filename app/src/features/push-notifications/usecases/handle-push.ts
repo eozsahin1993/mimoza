@@ -7,7 +7,7 @@ import { derivePushRoutingId } from '@/core/crypto/identity';
 import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { circleNotificationChannelId, INVITES_CHANNEL_ID } from '@/features/push-notifications/services/channels';
-import { readJoinRequestPush } from '@/features/invite/usecases/invite-push';
+import { readJoinApprovalPush, readJoinRequestPush } from '@/features/invite/usecases/invite-push';
 import { i18n } from '@/core/i18n/i18n';
 
 /**
@@ -42,7 +42,7 @@ export async function handlePush(data: PushData): Promise<PushNotification | nul
 
   // The join handshake's two pushes aren't circle entries (invite-push.ts).
   if (data.kind === 'invite') return describeJoinRequest(data.pushRoutingId, data.payload);
-  if (data.kind === 'pending_request') return describeJoinApproval(data.pushRoutingId);
+  if (data.kind === 'pending_request') return describeJoinApproval(data.pushRoutingId, data.payload);
 
   const circle = await circleForRoutingId(data.pushRoutingId);
   if (!circle) return null;
@@ -155,20 +155,22 @@ async function describeJoinRequest(pushRoutingId: string, payload?: string): Pro
 }
 
 /**
- * The requester's side: sent only when the request is approved. Written
- * from their own pending row, not the push, and it says there's news
- * rather than "you're in": anyone else holding the code could send the
- * same push, so it can't be trusted to mean approval. Opening the app
- * checks.
+ * "Emre accepted your request", under the circle's name, once the sealed
+ * approval opens and the creator's signature checks out. Anyone else
+ * holding the code can send this push too, so one that doesn't check out
+ * gets only the kind's fixed line.
  */
-async function describeJoinApproval(pushRoutingId: string): Promise<PushNotification | null> {
+async function describeJoinApproval(pushRoutingId: string, payload?: string): Promise<PushNotification | null> {
   const pending = await getPendingJoinRequestByPushRoutingId(pushRoutingId);
   if (!pending) return null;
 
-  return {
-    circleId: pending.circleId,
-    channelId: INVITES_CHANNEL_ID,
-    title: pending.circleName,
-    body: i18n.t('push.joinRequestNews'),
-  };
+  const approved = payload
+    ? await readJoinApprovalPush(new Uint8Array(Buffer.from(payload, 'base64')), pending.id, pending.createdByPublicKey)
+    : false;
+  const body = !approved
+    ? i18n.t('push.joinRequestNews')
+    : pending.createdByName
+      ? i18n.t('push.joinApproved', { name: pending.createdByName.trim().slice(0, MAX_REQUESTER_NAME) })
+      : i18n.t('push.joinApprovedNoName');
+  return { circleId: pending.circleId, channelId: INVITES_CHANNEL_ID, title: pending.circleName, body };
 }

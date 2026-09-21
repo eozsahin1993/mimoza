@@ -31,6 +31,7 @@ import { JoinRequestGoneError } from '@/core/services/relay-errors';
 import { getInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getBlob } from '@/core/services/blob-relay';
 import { notifyInviteCreator, registerPushForPendingRequest } from '@/features/invite/usecases/invite-push';
+import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 
 /**
  * Fetches the circle's cover straight from its fixed `cover` key, so a
@@ -156,6 +157,8 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
     status: 'pending',
     pushRoutingId: pushRegistered ? pushRoutingId : null,
   });
+  // The iOS extension reads the request from the snapshot to verify its approval push.
+  void refreshPushSnapshot();
 
   return { requestId };
 }

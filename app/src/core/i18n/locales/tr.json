@@ -513,9 +513,11 @@
     "joinRequest": "{{name}} çevrene katılmak istiyor",
     "joinRequestAnyCircle": "Biri çevrene katılmak istiyor",
     "joinRequestNews": "Katılma isteğinle ilgili bir gelişme var",
+    "joinApproved": "{{name}} katılma isteğini kabul etti",
+    "joinApprovedNoName": "Katılma isteğin kabul edildi",
     "joinApprovedAnyCircle": "Bir çevreye katılma isteğinle ilgili bir gelişme var",
     "channelGroup": "Çevreler",
-    "invitesChannel": "Katılma istekleri"
+    "invitesChannel": "Davetler"
   },
   "notifications": {
     "prompt": {

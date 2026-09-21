@@ -34,6 +34,8 @@ import { getBlob } from '@/core/services/blob-relay';
 import { i18n } from '@/core/i18n/i18n';
 import { updateAppSettings } from '@/core/services/settings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { bytesToHex } from '@noble/curves/utils.js';
+import { getSecret } from '@/core/services/keystore/store';
 
 const device = { pushToken: 'fcm-registration-token', platform: 'android' as const };
 
@@ -57,10 +59,16 @@ beforeEach(async () => {
   await saveMasterSeed(new Uint8Array(16).fill(3));
 });
 
+/** Lets the device row, added without being awaited, land. */
+function settle(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 /** A circle, its invite, and the preview a tapped link would read back. */
 async function makeCircleWithInvite(name: string) {
   const { id: circleId } = await createCircle({ name });
   const invite = await getOrCreateInvite(circleId);
+  await settle();
   const [, previewBlob] = (createInvitePreview as jest.Mock).mock.calls.at(-1);
   (getInvitePreview as jest.Mock).mockResolvedValue(previewBlob);
   const preview = JSON.parse(new TextDecoder().decode(decrypt(previewBlob, deriveInvitePreviewKey(invite.code)))) as InvitePreviewPayload;
@@ -132,13 +140,15 @@ describe('the creator', () => {
     expect(deletePushRouting).not.toHaveBeenCalled();
   });
 
-  test('the sweep removes a revoked invite\'s routing', async () => {
+  test('the sweep removes a revoked invite\'s routing, and its key for the iOS extension', async () => {
     const { invite } = await makeCircleWithInvite('Family Circle');
+    expect(await getSecret(`invite_join_request_key_${invite.pushRoutingId}`)).toBe(bytesToHex(deriveJoinRequestKey(invite.code)));
     await revokeInvite(invite.code);
 
     await sweepInvitePush();
 
     expect(deletePushRouting).toHaveBeenCalledWith(invite.pushRoutingId, expect.any(Uint8Array));
+    expect(await getSecret(`invite_join_request_key_${invite.pushRoutingId}`)).toBeNull();
   });
 });
 
@@ -175,6 +185,43 @@ describe('the requester', () => {
     expect(putJoinRequest).toHaveBeenCalledTimes(1);
   });
 
+  /** The iOS simulator can register with APNs forever; the request mustn't wait on it. */
+  test('a device token that never arrives doesn\'t hold the request up', async () => {
+    const { invite } = await makeCircleWithInvite('Family Circle');
+    (getDevicePushToken as jest.Mock).mockReturnValue(new Promise(() => {}));
+
+    await expect(requestToJoin(invite.code)).resolves.toHaveProperty('requestId');
+
+    expect(putJoinRequest).toHaveBeenCalledTimes(1);
+  });
+
+  /** A first request comes before permission; turning notifications on runs the sweep. */
+  test('a request made without permission gets this device once notifications are on', async () => {
+    const { invite } = await makeCircleWithInvite('Family Circle');
+    (getDevicePushToken as jest.Mock).mockResolvedValue(null);
+    await requestToJoin(invite.code);
+    await settle();
+    const pendingRoutingId = prefsCall('pending_request').routingId;
+    expect(putPushDevice).not.toHaveBeenCalledWith(pendingRoutingId, expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything());
+
+    (getDevicePushToken as jest.Mock).mockResolvedValue(device);
+    await sweepInvitePush();
+
+    expect(putPushDevice).toHaveBeenCalledWith(pendingRoutingId, expect.any(String), device.pushToken, device.platform, true, expect.any(Uint8Array));
+  });
+
+  test('the sweep leaves pending requests alone with answers switched off', async () => {
+    const { invite } = await makeCircleWithInvite('Family Circle');
+    await updateAppSettings({ invitePushMask: 1 << InvitePushCategories.joinRequest });
+    await requestToJoin(invite.code);
+    await settle();
+    const pendingRoutingId = prefsCall('pending_request').routingId;
+
+    await sweepInvitePush();
+
+    expect((putPushDevice as jest.Mock).mock.calls.map((args) => args[0])).not.toContain(pendingRoutingId);
+  });
+
   /** Push is best-effort: it never costs the request. */
   test('a request still goes out when push can\'t be registered', async () => {
     const { invite } = await makeCircleWithInvite('Family Circle');
@@ -187,7 +234,7 @@ describe('the requester', () => {
     expect((await getPendingJoinRequest(requestId))?.pushRoutingId).toBeNull();
   });
 
-  test('is told when the creator answers, with nothing in the push', async () => {
+  test('is told the creator accepted, carrying the approval the mailbox got', async () => {
     const { circleId, invite } = await makeCircleWithInvite('Family Circle');
     const { requestId } = await requestToJoin(invite.code);
     const [, , requestBlob] = (putJoinRequest as jest.Mock).mock.calls[0];
@@ -201,7 +248,12 @@ describe('the requester', () => {
     expect(routingIds).toEqual([prefsCall('pending_request').routingId]);
     expect(token).toEqual(deriveInvitePushFanoutToken(invite.code));
     expect(category).toBe(InvitePushCategories.joinApproved);
-    expect(payload).toHaveLength(0);
+    expect(payload).toEqual((putJoinApproval as jest.Mock).mock.calls[0][2]);
+
+    const pending = await getPendingJoinRequest(requestId);
+    const notification = await handlePush({ pushRoutingId: pending!.pushRoutingId!, kind: 'pending_request', payload: Buffer.from(payload).toString('base64') });
+    const accepted = pending!.createdByName ? i18n.t('push.joinApproved', { name: pending!.createdByName }) : i18n.t('push.joinApprovedNoName');
+    expect(notification).toMatchObject({ channelId: INVITES_CHANNEL_ID, title: 'Family Circle', body: accepted });
   });
 });
 
@@ -229,14 +281,16 @@ describe('receiving', () => {
     expect(notification?.body).toBe(i18n.t('push.joinRequest', { name: i18n.t('push.someone') }));
   });
 
-  test('news on a request is written from the pending row, and opens the pending screen', async () => {
+  /** Anyone with the code can send this push, so one that doesn't verify claims only news. */
+  test('an approval push that doesn\'t verify says only there\'s news, and opens the pending screen', async () => {
     const { invite } = await makeCircleWithInvite('Family Circle');
     const { requestId } = await requestToJoin(invite.code);
     const routingId = prefsCall('pending_request').routingId;
 
-    const notification = await handlePush({ pushRoutingId: routingId, kind: 'pending_request' });
-
-    expect(notification).toMatchObject({ channelId: INVITES_CHANNEL_ID, title: 'Family Circle', body: i18n.t('push.joinRequestNews') });
+    for (const payload of [undefined, Buffer.from('forged').toString('base64')]) {
+      const notification = await handlePush({ pushRoutingId: routingId, kind: 'pending_request', payload });
+      expect(notification).toMatchObject({ channelId: INVITES_CHANNEL_ID, title: 'Family Circle', body: i18n.t('push.joinRequestNews') });
+    }
     await expect(resolvePushDestination({ pushRoutingId: routingId, kind: 'pending_request' })).resolves.toEqual({ screen: 'pending', requestId });
   });
 

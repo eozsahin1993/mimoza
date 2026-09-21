@@ -513,9 +513,11 @@
     "joinRequest": "{{name}} veut rejoindre le cercle",
     "joinRequestAnyCircle": "Quelqu’un veut rejoindre un cercle",
     "joinRequestNews": "Du nouveau pour ta demande d’adhésion",
+    "joinApproved": "{{name}} a accepté ta demande",
+    "joinApprovedNoName": "Ta demande a été acceptée",
     "joinApprovedAnyCircle": "Du nouveau pour ta demande pour rejoindre un cercle",
     "channelGroup": "Cercles",
-    "invitesChannel": "Demandes d’adhésion"
+    "invitesChannel": "Invitations"
   },
   "notifications": {
     "prompt": {
