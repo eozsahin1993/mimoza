@@ -58,7 +58,13 @@
     "notifications": "Mitteilungen",
     "newCirclesRow": "Neue Kreise",
     "invitesRow": "Einladungen",
-    "notificationsFootnote": "Neue Kreise starten mit dieser Stufe, und jeder behält seine eigene Einstellung, sobald du drin bist. Einladungen umfasst Beitrittsanfragen und Antworten auf deine eigenen Anfragen, auf diesem Gerät. Mitteilungen entstehen auf deinem Gerät; kein Push-Server erfährt, was passiert ist."
+    "notificationsFootnote": "Diese Einstellungen gelten nur auf diesem Gerät. Mitteilungen kommen verschlüsselt an und entstehen auf deinem Gerät; Push-Server sehen nie Namen oder Nachrichten.",
+    "invitePushLevels": {
+      "all": "Beitrittsanfragen und Antworten",
+      "requests": "Nur Beitrittsanfragen",
+      "answers": "Nur Antworten auf meine Anfragen",
+      "off": "Aus"
+    }
   },
   "account": {
     "credits": {

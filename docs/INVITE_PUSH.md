@@ -101,24 +101,25 @@ The requester's push claims nothing: anyone with the code can read the
 request and learn its routing id, so a "You're in" would be forgeable.
 Opening the app does the real check.
 
-## Channel and switch
+## Channel and setting
 
 ```
 Android channel   one shared "invites" channel ("Join requests"), outside the
                   Circles group, created on launch; renamed with the app's
                   language. Muting it stops display.
-Account switch    Account → Notifications → Invites, per phone. One switch
-                  sets or clears both bits of invitePushMask; the bits stay
-                  separate underneath. A cleared bit deletes this phone's
-                  device row under that kind's routings; set puts it back.
-                  Stops delivery. The prefs row stays: it holds ownership.
+Account setting   Account → Notifications → Invites, per phone: join requests
+                  and answers (default), join requests only, answers only, or
+                  off. Each is a value of invitePushMask. A cleared bit deletes
+                  this phone's device row under that kind's routings; set puts
+                  it back. Stops delivery. The prefs row stays: it holds
+                  ownership.
 ```
 
 ## Failure
 
 | case | outcome |
 |---|---|
-| no permission, or the Invites switch off | prefs claimed, no device row; polling finds everything |
+| no permission, or that kind off in Invites | prefs claimed, no device row; polling finds everything |
 | registering push fails | the invite or request goes ahead without push |
 | a push fails to send | best-effort, never retried; polling covers it |
 | denied or withdrawn | no push; the pending routing expires on its own |

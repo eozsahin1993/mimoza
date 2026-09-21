@@ -58,7 +58,13 @@
     "notifications": "Notifications",
     "newCirclesRow": "Nouveaux cercles",
     "invitesRow": "Invitations",
-    "notificationsFootnote": "Les nouveaux cercles démarrent à ce niveau, et chacun garde son propre réglage une fois que tu y es. Invitations couvre les demandes pour rejoindre et les réponses à tes propres demandes, sur ce téléphone. Les notifications sont générées sur ton téléphone ; aucun serveur de notifications n’apprend ce qui s’est passé."
+    "notificationsFootnote": "Ces réglages ne concernent que ce téléphone. Les notifications arrivent chiffrées et sont générées sur ton téléphone ; les serveurs de notifications ne voient jamais de noms ni de messages.",
+    "invitePushLevels": {
+      "all": "Demandes pour rejoindre et réponses",
+      "requests": "Demandes pour rejoindre uniquement",
+      "answers": "Réponses à mes demandes uniquement",
+      "off": "Désactivées"
+    }
   },
   "account": {
     "credits": {

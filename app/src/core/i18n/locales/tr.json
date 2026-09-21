@@ -58,7 +58,13 @@
     "notifications": "Bildirimler",
     "newCirclesRow": "Yeni çevreler",
     "invitesRow": "Davetler",
-    "notificationsFootnote": "Yeni çevreler bu ayarla başlar; katıldıktan sonra her çevre kendi ayarını korur. Davetler, biri katılmak istediğinde ve kendi isteklerin yanıtlandığında gelen bildirimleri kapsar ve yalnızca bu telefonda geçerlidir. Bildirimler telefonunda oluşturulur; hiçbir bildirim sunucusuna ne olduğu söylenmez."
+    "notificationsFootnote": "Bu ayarlar yalnızca bu telefonda geçerli. Bildirimler şifreli gelir ve telefonunda oluşturulur; bildirim sunucuları isimleri ya da mesajları asla görmez.",
+    "invitePushLevels": {
+      "all": "Katılma istekleri ve yanıtlar",
+      "requests": "Yalnızca katılma istekleri",
+      "answers": "Yalnızca isteklerime gelen yanıtlar",
+      "off": "Kapalı"
+    }
   },
   "account": {
     "credits": {

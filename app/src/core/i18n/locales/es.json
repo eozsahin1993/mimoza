@@ -58,7 +58,13 @@
     "notifications": "Notificaciones",
     "newCirclesRow": "Círculos nuevos",
     "invitesRow": "Invitaciones",
-    "notificationsFootnote": "Los círculos nuevos empiezan con este nivel, y cada uno conserva su propio ajuste una vez dentro. Invitaciones incluye las solicitudes para unirse y las respuestas a tus propias solicitudes, en este teléfono. Las notificaciones se generan en tu teléfono; ningún servidor de notificaciones sabe qué ha pasado."
+    "notificationsFootnote": "Estos ajustes solo se aplican a este teléfono. Las notificaciones llegan cifradas y se generan en tu teléfono; los servidores de notificaciones nunca ven nombres ni mensajes.",
+    "invitePushLevels": {
+      "all": "Solicitudes para unirse y respuestas",
+      "requests": "Solo solicitudes para unirse",
+      "answers": "Solo respuestas a mis solicitudes",
+      "off": "Desactivadas"
+    }
   },
   "account": {
     "credits": {

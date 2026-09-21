@@ -10,6 +10,8 @@ import { createCircle } from '@/features/circle/usecases/create-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 import {
+  InvitePushLevels,
+  invitePushLevelForMask,
   PushLevels,
   circlePushPreferences,
   isPushStale,
@@ -20,7 +22,7 @@ import {
   setCircleSilenced,
   syncPushPreferences,
 } from '@/features/push-notifications/usecases/push-preferences';
-import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
+import { ALL_INVITE_PUSH, PushCategories } from '@/features/push-notifications/usecases/push-categories';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { addCircleKeyVersion, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { deletePushRouting, putPushPrefs } from '@/core/services/push-relay';
@@ -202,5 +204,18 @@ describe('after a key rotation', () => {
     await rotate(circleId);
 
     expect(await isPushStale(circleId)).toBe(false);
+  });
+});
+
+describe('invite levels', () => {
+  test('each level is its own mask, and every mask reads back as one', () => {
+    for (const level of InvitePushLevels) {
+      expect(invitePushLevelForMask(level.mask)).toBe(level.id);
+    }
+    expect(new Set(InvitePushLevels.map((level) => level.mask)).size).toBe(InvitePushLevels.length);
+  });
+
+  test('the default is both', () => {
+    expect(invitePushLevelForMask(ALL_INVITE_PUSH)).toBe('all');
   });
 });

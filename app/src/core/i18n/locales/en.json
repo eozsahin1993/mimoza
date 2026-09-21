@@ -58,7 +58,13 @@
     "notifications": "Notifications",
     "newCirclesRow": "New circles",
     "invitesRow": "Invites",
-    "notificationsFootnote": "New circles start at this level, and each keeps its own setting once you’re in it. Invites covers someone asking to join and answers to your own requests, on this phone. Notifications are generated on your phone; no push server is told what happened."
+    "notificationsFootnote": "These apply to this phone only. Notifications arrive encrypted and are written on your phone, so push servers never see names or messages.",
+    "invitePushLevels": {
+      "all": "Join requests and answers",
+      "requests": "Join requests only",
+      "answers": "Answers to my requests only",
+      "off": "Off"
+    }
   },
   "account": {
     "credits": {

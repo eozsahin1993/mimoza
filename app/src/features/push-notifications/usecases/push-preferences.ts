@@ -1,7 +1,7 @@
 import { getAppSettings } from '@/core/services/settings';
 import { getAllCircles, getCircle, setCirclePushCategoryMask, setCirclePushSilenced } from '@/data/db';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
-import { PushCategories, type PushCategory } from '@/features/push-notifications/usecases/push-categories';
+import { ALL_INVITE_PUSH, InvitePushCategories, PushCategories, type PushCategory } from '@/features/push-notifications/usecases/push-categories';
 import { silenceCircle, syncCirclePushPrefs } from '@/features/push-notifications/usecases/push-registration';
 
 /**
@@ -42,6 +42,25 @@ export const PushLevels = [
 const ALWAYS: readonly PushCategory[] = [PushCategories.memberJoined];
 
 export type PushLevelId = (typeof PushLevels)[number]['id'];
+
+/**
+ * The invite pushes a phone takes, as a picker like the circle ladder but
+ * not a ladder: the two categories are independent, so each alone is a
+ * choice. Stored as the mask (settings' invitePushMask), not the id.
+ */
+export const InvitePushLevels = [
+  { id: 'all', mask: ALL_INVITE_PUSH },
+  { id: 'requests', mask: 1 << InvitePushCategories.joinRequest },
+  { id: 'answers', mask: 1 << InvitePushCategories.joinApproved },
+  { id: 'off', mask: 0 },
+] as const;
+
+export type InvitePushLevelId = (typeof InvitePushLevels)[number]['id'];
+
+/** The level a stored mask is. Every mask of the two bits is one of the four. */
+export function invitePushLevelForMask(mask: number): InvitePushLevelId {
+  return InvitePushLevels.find((level) => level.mask === (mask & ALL_INVITE_PUSH))?.id ?? 'all';
+}
 
 /** The mask a newly created or joined circle starts with. */
 export async function defaultCircleMask(): Promise<number> {
