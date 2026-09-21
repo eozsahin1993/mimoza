@@ -18,12 +18,6 @@ import (
 	"mimoza-relay/internal/util/dynamoutil"
 )
 
-// DefaultInviteRetentionDays matches the client's existing INVITE_TTL_MS
-// (7 days). Eviction itself is DynamoDB's native TTL feature, not
-// application code — this value only controls what `expiresAt` gets
-// written as at write time.
-const DefaultInviteRetentionDays = 7
-
 const (
 	inviteSK        = "invite"
 	requestSKPrefix = "request#"
@@ -39,10 +33,9 @@ type Store struct {
 	retentionSeconds int64
 }
 
+// New takes the retention already resolved (config.InviteRetentionDays),
+// the same number push/dynamodb gets for invite addresses.
 func New(client *dynamodb.Client, tableName string, retentionDays int64) *Store {
-	if retentionDays <= 0 {
-		retentionDays = DefaultInviteRetentionDays
-	}
 	return &Store{client: client, tableName: tableName, retentionSeconds: retentionDays * 24 * 60 * 60}
 }
 

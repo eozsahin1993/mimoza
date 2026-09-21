@@ -19,7 +19,7 @@ type fanoutRequest struct {
 	// Which content-key version the payload is encrypted under. Already
 	// plaintext on every append, so it costs nothing to name here.
 	KeyVersion int64 `json:"keyVersion"`
-	// Base64 ciphertext plus the fixed placeholder. Forwarded untouched.
+	// Base64 ciphertext, forwarded untouched. Empty is allowed.
 	Payload string `json:"payload"`
 }
 
@@ -54,9 +54,12 @@ func (h *FanoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "pushFanoutToken must be non-empty base64")
 		return
 	}
+	// May be empty: a push the recipient reads from its own state (a
+	// pending request's) needs no ciphertext, and the kind's Alert covers
+	// the text.
 	payload, err := base64.StdEncoding.DecodeString(req.Payload)
-	if err != nil || len(payload) == 0 {
-		httputil.WriteError(w, http.StatusBadRequest, "payload must be non-empty base64")
+	if err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "payload must be base64")
 		return
 	}
 	if len(req.PushRoutingIDs) == 0 {

@@ -56,7 +56,7 @@ func TestSendPostsAnAlertWithMutableContent(t *testing.T) {
 	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
-	if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("ciphertext")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("ciphertext")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,7 +100,7 @@ func TestProviderTokenIsReusedAcrossSends(t *testing.T) {
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	for range 2 {
-		if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -123,11 +123,11 @@ func TestAnExpiredProviderTokenIsReminted(t *testing.T) {
 	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
-	if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
 		t.Fatal(err)
 	}
 	sender.tokens.expiresAt = time.Now().Add(-time.Hour)
-	if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,7 +145,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
-	err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x"))
+	err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -161,7 +161,7 @@ func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 		PrivateKey: "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 
-	err := New(key, "com.eozsahin.mimoza", false).Send(context.Background(), "device-token", "routing-1", 3, []byte("x"))
+	err := New(key, "com.eozsahin.mimoza", false).Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -186,3 +186,28 @@ func redirectTo(target string) http.RoundTripper {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+// An invite address's line shows when the device can't write its own; the
+// kind rides along so it can pick its own.
+func TestSendAttachesTheKindsLine(t *testing.T) {
+	var got map[string]any
+	apnsAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer apnsAPI.Close()
+
+	sender := New(testKey(t), "com.eozsahin.mimoza", false)
+	sender.Client.Transport = redirectTo(apnsAPI.URL)
+
+	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindInvite, 0, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+
+	if got["aps"].(map[string]any)["alert"] != push.KindInvite.Alert() {
+		t.Fatalf("expected the invite line, got %v", got["aps"])
+	}
+	if got["kind"] != string(push.KindInvite) {
+		t.Fatalf("expected the kind, got %v", got["kind"])
+	}
+}

@@ -46,7 +46,7 @@ func NewDispatcher(awsCfg aws.Config, parameterName, filePath, keyID, teamID, to
 			return
 		}
 
-		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, keyVersion, payload); err != nil {
+		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, delivery.Kind, keyVersion, payload); err != nil {
 			log.Printf("failed to deliver a push: %v", err)
 		}
 	}

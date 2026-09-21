@@ -30,8 +30,10 @@ type sendRequest struct {
 	APS aps `json:"aps"`
 	// See fcm.Sender.Send for why these three are safe to name.
 	PushRoutingID string `json:"pushRoutingId"`
-	KeyVersion    int64  `json:"keyVersion"`
-	Payload       string `json:"payload"`
+	// Lets the extension pick its own line without decrypting.
+	Kind       push.PushKind `json:"kind"`
+	KeyVersion int64         `json:"keyVersion"`
+	Payload    string        `json:"payload"`
 }
 
 type aps struct {
@@ -62,18 +64,19 @@ func (s *Sender) host() string {
 //
 // mutable-content, never content-available: a silent push is budgeted,
 // deprioritized in Low Power Mode, and dropped after a force-quit. The
-// alert is the fixed placeholder — the
+// alert is the kind's fixed line — the
 // Notification Service Extension rewrites it after decrypting, since the
 // relay cannot compose real text from ciphertext it can't read.
-func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, keyVersion int64, payload []byte) error {
+func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, kind push.PushKind, keyVersion int64, payload []byte) error {
 	token, err := s.tokens.providerToken()
 	if err != nil {
 		return err
 	}
 
 	body, err := json.Marshal(sendRequest{
-		APS:           aps{Alert: push.Placeholder, MutableContent: 1},
+		APS:           aps{Alert: kind.Alert(), MutableContent: 1},
 		PushRoutingID: pushRoutingID,
+		Kind:          kind,
 		KeyVersion:    keyVersion,
 		Payload:       base64.StdEncoding.EncodeToString(payload),
 	})

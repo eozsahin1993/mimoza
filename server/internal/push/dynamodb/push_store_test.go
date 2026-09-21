@@ -17,7 +17,7 @@ func newStore(t *testing.T) push.Store {
 var ownerHash = []byte("thirty-two-bytes-of-owner-hash!!")
 
 func samplePrefs() push.Prefs {
-	return push.Prefs{PushFanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), OwnerHash: ownerHash, CategoryMask: 0b101, KeyVersion: 3}
+	return push.Prefs{Kind: push.KindCircle, PushFanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), OwnerHash: ownerHash, CategoryMask: 0b101, KeyVersion: 3}
 }
 
 func TestPrefsRoundTrip(t *testing.T) {
@@ -59,7 +59,7 @@ func TestPutPrefsReplaces(t *testing.T) {
 	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
-	rotated := push.Prefs{PushFanoutHash: []byte("a-completely-different-hash-here"), OwnerHash: ownerHash, CategoryMask: 0b1, KeyVersion: 4}
+	rotated := push.Prefs{Kind: push.KindCircle, PushFanoutHash: []byte("a-completely-different-hash-here"), OwnerHash: ownerHash, CategoryMask: 0b1, KeyVersion: 4}
 	if err := store.PutPrefs(ctx, pushRoutingID, rotated); err != nil {
 		t.Fatal(err)
 	}
@@ -292,5 +292,90 @@ func TestPutPrefsRefusesAnotherOwner(t *testing.T) {
 	}
 	if string(got.PushFanoutHash) != string(samplePrefs().PushFanoutHash) || string(got.OwnerHash) != string(ownerHash) {
 		t.Fatal("the owner's prefs were replaced")
+	}
+}
+
+func hasExpiry(t *testing.T, pk, sk string) bool {
+	t.Helper()
+	item, err := testsupport.RawPushItem(t, pk, sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item == nil {
+		t.Fatalf("no item at %s/%s", pk, sk)
+	}
+	_, ok := item["expiresAt"]
+	return ok
+}
+
+func TestKindRoundTrips(t *testing.T) {
+	store := newStore(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	ctx := context.Background()
+	prefs := samplePrefs()
+	prefs.Kind = push.KindInvite
+
+	if err := store.PutPrefs(ctx, pushRoutingID, prefs); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetPrefs(ctx, pushRoutingID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind != push.KindInvite {
+		t.Fatalf("expected kind invite, got %q", got.Kind)
+	}
+}
+
+// An invite or pending address a phone abandons must still go away.
+func TestTemporaryKindsExpireAndCirclesDont(t *testing.T) {
+	store := newStore(t)
+	ctx := context.Background()
+
+	for kind, expires := range map[push.PushKind]bool{push.KindInvite: true, push.KindPendingRequest: true, push.KindCircle: false} {
+		pushRoutingID := testsupport.UniqueInviteTag(t)
+		prefs := samplePrefs()
+		prefs.Kind = kind
+		if err := store.PutPrefs(ctx, pushRoutingID, prefs); err != nil {
+			t.Fatal(err)
+		}
+		device := push.Device{DeviceID: "d1", PushToken: []byte("t"), Platform: "ios", Enabled: true, Temporary: kind.Temporary()}
+		if err := store.PutDevice(ctx, pushRoutingID, device); err != nil {
+			t.Fatal(err)
+		}
+
+		if hasExpiry(t, pushRoutingID, "prefs") != expires || hasExpiry(t, pushRoutingID, "device#d1") != expires {
+			t.Fatalf("%s: expected expiry %v on prefs and device", kind, expires)
+		}
+	}
+}
+
+// Joining keeps the requester's routing id and re-registers it as a circle.
+// Both writes replace the whole row, so neither keeps the pending expiry.
+func TestBecomingACircleClearsTheExpiry(t *testing.T) {
+	store := newStore(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	ctx := context.Background()
+
+	pending := samplePrefs()
+	pending.Kind = push.KindPendingRequest
+	if err := store.PutPrefs(ctx, pushRoutingID, pending); err != nil {
+		t.Fatal(err)
+	}
+	device := push.Device{DeviceID: "d1", PushToken: []byte("t"), Platform: "android", Enabled: true, Temporary: true}
+	if err := store.PutDevice(ctx, pushRoutingID, device); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
+		t.Fatal(err)
+	}
+	device.Temporary = false
+	if err := store.PutDevice(ctx, pushRoutingID, device); err != nil {
+		t.Fatal(err)
+	}
+
+	if hasExpiry(t, pushRoutingID, "prefs") || hasExpiry(t, pushRoutingID, "device#d1") {
+		t.Fatal("a circle address kept the pending expiry")
 	}
 }

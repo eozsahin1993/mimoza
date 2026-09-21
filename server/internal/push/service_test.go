@@ -316,3 +316,24 @@ func (r *recordingPrefsStore) PutPrefs(_ context.Context, _ string, prefs Prefs)
 	r.prefs = prefs
 	return nil
 }
+
+// The line on a lock screen comes from the recipient's row, not the sender.
+func TestFanout_DeliveryCarriesTheAddressKind(t *testing.T) {
+	store := &fakeStore{
+		prefs: map[string]Prefs{
+			"invite-address": {Kind: KindInvite, PushFanoutHash: PushFanoutHash([]byte(token), "invite-address"), CategoryMask: 0b1},
+		},
+		devices: map[string][]Device{
+			"invite-address": {{DeviceID: "d1", PushToken: []byte("t1"), Platform: "ios", Enabled: true}},
+		},
+	}
+	service := &Service{PushStore: store, RecipientLimit: &countingLimit{allow: true}}
+
+	result, err := service.Fanout(context.Background(), []string{"invite-address"}, []byte(token), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Deliveries) != 1 || result.Deliveries[0].Kind != KindInvite {
+		t.Fatalf("expected one delivery of kind invite, got %+v", result.Deliveries)
+	}
+}
