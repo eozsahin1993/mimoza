@@ -194,9 +194,12 @@ def distribute_to_testers(config)
   )
 end
 
-# Play rejects a repeat, and a failed upload must not burn the number.
+# Play rejects a repeat, and a failed upload must not burn the number — so
+# ask it rather than counting locally. Staging has no Play app to ask and
+# App Distribution accepts anything, so the run number stands in: builds
+# there only need to be distinguishable from each other.
 def next_version_code(package_name)
-  return '1' if ENV['PLAY_JSON_KEY'].nil?
+  return ENV['GITHUB_RUN_NUMBER'] || Time.now.to_i.to_s if ENV['PLAY_JSON_KEY'].nil?
 
   codes = google_play_track_version_codes(
     package_name: package_name,
