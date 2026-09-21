@@ -3,12 +3,16 @@ package invite
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 
+	"mimoza-relay/internal/invite"
 	"mimoza-relay/internal/util/httputil"
 )
 
-type putInviteRequest struct {
+type createInviteRequest struct {
+	// InviteTag is sha256("invite-tag" || code), computed client-side.
+	InviteTag string `json:"inviteTag"`
 	// EncryptedPreview is base64-encoded ciphertext (the circle's current
 	// name and a small cover-picture thumbnail, encrypted client-side with
 	// HKDF(invite_code, "invite-preview")). This handler never looks
@@ -16,20 +20,24 @@ type putInviteRequest struct {
 	EncryptedPreview string `json:"encryptedPreview"`
 }
 
-type putInviteResponse struct {
+type createInviteResponse struct {
 	OK bool `json:"ok"`
 }
 
-type PutInviteHandler struct {
+type CreateInviteHandler struct {
 	Service *Service
 }
 
-func (h *PutInviteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	inviteTag := r.PathValue("inviteTag")
-
-	var req putInviteRequest
+func (h *CreateInviteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var req createInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	inviteTag := req.InviteTag
+	if inviteTag == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "inviteTag is required")
 		return
 	}
 
@@ -43,12 +51,17 @@ func (h *PutInviteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Service.CreateInvite(r.Context(), inviteTag, encryptedPreview); err != nil {
+	err = h.Service.CreateInvite(r.Context(), inviteTag, encryptedPreview)
+	if errors.Is(err, invite.ErrInviteExists) {
+		httputil.WriteError(w, http.StatusConflict, "invite already exists")
+		return
+	}
+	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create invite")
 		return
 	}
 
-	httputil.WriteJSON(w, http.StatusOK, putInviteResponse{OK: true})
+	httputil.WriteJSON(w, http.StatusOK, createInviteResponse{OK: true})
 }
 
 type getInviteResponse struct {

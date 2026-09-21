@@ -28,7 +28,7 @@ import {
   putJoinRequest,
 } from '@/core/services/mailbox-relay';
 import { JoinRequestGoneError } from '@/core/services/relay-errors';
-import { getInvitePreview, putInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { getInvitePreview, createInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle, fetchEntries } from '@/core/services/log-relay';
@@ -58,10 +58,10 @@ beforeEach(() => {
  */
 async function makeCircleWithInvite(name: string) {
   const { id: circleId } = await createCircle({ name });
-  (putInvitePreview as jest.Mock).mockResolvedValue(undefined);
+  (createInvitePreview as jest.Mock).mockResolvedValue(undefined);
   const invite = await getOrCreateInvite(circleId);
 
-  const [, previewBlob] = (putInvitePreview as jest.Mock).mock.calls[0];
+  const [, previewBlob] = (createInvitePreview as jest.Mock).mock.calls[0];
   (getInvitePreview as jest.Mock).mockResolvedValue(previewBlob);
 
   return { circleId, invite };

@@ -27,7 +27,7 @@ import { encrypt, encryptJSON, generateEphemeralKeypair, generateIdentity, gener
 import { deriveAuthorityKeyProofMessage } from '@/core/crypto/signed-messages';
 import { deriveJoinRequestKey } from '@/features/invite/crypto';
 import { listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay';
-import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { createInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { saveAuthToken } from '@/core/services/keystore/auth-token';
@@ -60,7 +60,7 @@ beforeEach(() => {
   (uploadBlob as jest.Mock).mockResolvedValue(undefined);
   (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
   (fetchEpochs as jest.Mock).mockResolvedValue([]);
-  (putInvitePreview as jest.Mock).mockResolvedValue(undefined);
+  (createInvitePreview as jest.Mock).mockResolvedValue(undefined);
 });
 
 /**

@@ -24,7 +24,7 @@ import { encryptJSON, generateEphemeralKeypair } from '@/core/crypto/primitives'
 import { deriveInviteTag, deriveJoinRequestKey } from '@/features/invite/crypto';
 import { bytesToHex } from '@noble/curves/utils.js';
 import { deleteJoinRequest, listJoinRequests } from '@/core/services/mailbox-relay';
-import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { createInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
@@ -35,7 +35,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   (drainOutbox as jest.Mock).mockResolvedValue(undefined);
-  (putInvitePreview as jest.Mock).mockResolvedValue(undefined);
+  (createInvitePreview as jest.Mock).mockResolvedValue(undefined);
   (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
 });
@@ -45,13 +45,13 @@ test('getOrCreateInvite writes the server-side preview row alongside the local i
 
   const invite = await getOrCreateInvite(circleId);
 
-  expect(putInvitePreview).toHaveBeenCalledWith(expect.any(String), expect.any(Uint8Array));
+  expect(createInvitePreview).toHaveBeenCalledWith(expect.any(String), expect.any(Uint8Array));
   expect(invite.circleId).toBe(circleId);
 });
 
 test('a failed preview write surfaces as a rejection, not a silently-broken invite', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
-  (putInvitePreview as jest.Mock).mockRejectedValue(new Error('offline'));
+  (createInvitePreview as jest.Mock).mockRejectedValue(new Error('offline'));
 
   await expect(getOrCreateInvite(circleId)).rejects.toThrow('offline');
 });

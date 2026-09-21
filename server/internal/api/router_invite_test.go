@@ -60,10 +60,10 @@ func TestEndToEnd_Invite_FullRoundTrip(t *testing.T) {
 	requesterID := "requester-1"
 
 	preview := base64.StdEncoding.EncodeToString([]byte("pretend-encrypted-preview"))
-	putInviteResp := authedRequest(t, http.MethodPut, server.URL+"/v1/invites/"+inviteTag, token, `{"encryptedPreview":"`+preview+`"}`)
-	defer putInviteResp.Body.Close()
-	if putInviteResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from PUT invite, got %d", putInviteResp.StatusCode)
+	createInviteResp := authedRequest(t, http.MethodPost, server.URL+"/v1/invites", token, `{"inviteTag":"`+inviteTag+`","encryptedPreview":"`+preview+`"}`)
+	defer createInviteResp.Body.Close()
+	if createInviteResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from POST invite, got %d", createInviteResp.StatusCode)
 	}
 
 	getInviteResp := authedRequest(t, http.MethodGet, server.URL+"/v1/invites/"+inviteTag, token, "")

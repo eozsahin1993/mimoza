@@ -6,7 +6,7 @@ import "net/http"
 // aggregating router in internal/api, which decides what version prefix
 // (if any) mux itself is mounted under.
 func Register(mux *http.ServeMux, service *Service) {
-	mux.Handle("PUT /invites/{inviteTag}", &PutInviteHandler{Service: service})
+	mux.Handle("POST /invites", &CreateInviteHandler{Service: service})
 	mux.Handle("GET /invites/{inviteTag}", &GetInviteHandler{Service: service})
 
 	mux.Handle("PUT /invites/{inviteTag}/requests/{requesterId}", &PutRequestHandler{Service: service})

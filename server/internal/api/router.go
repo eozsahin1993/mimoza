@@ -141,7 +141,11 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// some authenticated session is.
 	invitesMux := http.NewServeMux()
 	invitehttp.Register(invitesMux, &invitehttp.Service{InviteStore: deps.Invite})
-	mux.Handle("/invites/", auth.RequireSession(deps.Auth, httputil.LogRoutes(invitesMux)))
+	invitesHandler := auth.RequireSession(deps.Auth, httputil.LogRoutes(invitesMux))
+	mux.Handle("/invites/", invitesHandler)
+	// POST /invites has no trailing slash, and "/invites/" alone would
+	// answer it with a redirect, which a client re-sends as a GET.
+	mux.Handle("/invites", invitesHandler)
 
 	// Not circle-scoped in the path (it spans however many circles a
 	// device is in, in one call) — its own sub-mux rather than nested

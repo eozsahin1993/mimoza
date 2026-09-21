@@ -21,6 +21,12 @@ import (
 // "nothing to approve" from a genuine storage failure.
 var ErrJoinRequestNotFound = errors.New("invite: join request not found")
 
+// ErrInviteExists is what CreateInvite returns when inviteTag already has
+// an invite row. The tag is derived from the code, so anyone holding the
+// code could otherwise overwrite the preview, including its
+// createdByPublicKey, and sign approvals that verify against it.
+var ErrInviteExists = errors.New("invite: invite already exists")
+
 // JoinRequest is one requester's row under an invite — created by the
 // requester, later updated in place by the invite's creator once approved.
 type JoinRequest struct {
@@ -41,6 +47,7 @@ type Store interface {
 	// what the row *is* (the invite's existence, server-side), not
 	// "PutPreview" — the fact that its content happens to be an encrypted
 	// preview payload (name + thumbnail) is a client-side encoding detail.
+	// Create-only: ErrInviteExists if the row is already there.
 	CreateInvite(ctx context.Context, inviteTag string, encryptedPreview []byte) error
 	// GetInvite returns nil, nil if inviteTag has no invite row (never
 	// created, or aged out under TTL).

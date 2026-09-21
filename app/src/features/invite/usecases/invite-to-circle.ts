@@ -24,7 +24,7 @@ import { bytesToDataUri, compressToThumbnail, parsePictureThumbnail } from '@/co
 import { pullMeta } from '@/core/sync/pull-log';
 import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { deleteJoinRequest, listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay';
-import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { createInvitePreview } from '@/features/invite/services/invite-preview-relay';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -80,7 +80,7 @@ async function writeInvitePreview(code: string, circleName: string, createdByPub
 
   const payload: InvitePreviewPayload = { name: circleName, createdByName: profile?.name ?? '', createdByPublicKey, createdByPicture };
   const key = deriveInvitePreviewKey(code);
-  await putInvitePreview(deriveInviteTag(code), encryptJSON(payload, key));
+  await createInvitePreview(deriveInviteTag(code), encryptJSON(payload, key));
 }
 
 async function createInvite(circleId: string, createdByPublicKey: string): Promise<Invite> {

@@ -49,8 +49,7 @@ func New(client *dynamodb.Client, tableName string, retentionDays int64) *Store 
 var _ invite.Store = (*Store)(nil)
 
 // CreateInvite is the one proactive server write in the whole invite
-// flow — a plain overwrite, not conditional: it's only ever called once,
-// at invite-creation time, by the invite's own creator.
+// flow, made once at invite-creation time.
 func (s *Store) CreateInvite(ctx context.Context, inviteTag string, encryptedPreview []byte) error {
 	expiresAt := dynamoutil.NowMillis()/1000 + s.retentionSeconds
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
@@ -61,7 +60,12 @@ func (s *Store) CreateInvite(ctx context.Context, inviteTag string, encryptedPre
 			"encryptedPreview": &types.AttributeValueMemberB{Value: encryptedPreview},
 			"expiresAt":        &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
 		},
+		ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", dynamoutil.PKAttr)),
 	})
+	var condFailed *types.ConditionalCheckFailedException
+	if errors.As(err, &condFailed) {
+		return invite.ErrInviteExists
+	}
 	return err
 }
 

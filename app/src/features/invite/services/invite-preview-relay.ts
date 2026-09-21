@@ -2,12 +2,12 @@ import { Buffer } from 'buffer';
 
 import { authorizedFetch } from '@/core/services/relay';
 
-/** Writes an invite's preview row — PUT /v1/invites/{inviteTag}. */
-export async function putInvitePreview(inviteTag: string, encryptedPreview: Uint8Array): Promise<void> {
-  const response = await authorizedFetch(`/v1/invites/${inviteTag}`, {
-    method: 'PUT',
+/** Creates an invite's preview row — POST /v1/invites. Create-only: a tag that already has one answers 409. */
+export async function createInvitePreview(inviteTag: string, encryptedPreview: Uint8Array): Promise<void> {
+  const response = await authorizedFetch('/v1/invites', {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ encryptedPreview: Buffer.from(encryptedPreview).toString('base64') }),
+    body: JSON.stringify({ inviteTag, encryptedPreview: Buffer.from(encryptedPreview).toString('base64') }),
   });
   if (!response.ok) {
     throw new Error(`Failed to write invite preview: ${response.status}`);

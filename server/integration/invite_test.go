@@ -31,7 +31,7 @@ func requestPath(tag, requester string) string {
 // createInvite mints an invite and returns its tag.
 func (d device) createInvite() string {
 	tag := harness.Suffix()
-	d.Put(invitePath(tag), harness.Body{"encryptedPreview": harness.Ciphertext()}).Expect(http.StatusOK)
+	d.Post("/v1/invites", harness.Body{"inviteTag": tag, "encryptedPreview": harness.Ciphertext()}).Expect(http.StatusOK)
 	return tag
 }
 
@@ -82,6 +82,22 @@ func TestInviteIsReadableByWhoeverHoldsTheTag(t *testing.T) {
 	signIn(r).readInvite(tag).Expect(http.StatusOK).Decode(&preview)
 
 	harness.AssertTrue(t, preview.EncryptedPreview != "", "the invite came back with no preview")
+}
+
+func TestAnInviteCannotBeOverwritten(t *testing.T) {
+	r := harness.Start(t)
+	creator := signIn(r)
+	tag := creator.createInvite()
+	var original struct{ EncryptedPreview string }
+	creator.readInvite(tag).Expect(http.StatusOK).Decode(&original)
+
+	// Someone else holding the code knows the tag too. Replacing the
+	// preview would let them swap in their own createdByPublicKey.
+	signIn(r).Post("/v1/invites", harness.Body{"inviteTag": tag, "encryptedPreview": harness.Ciphertext()}).Expect(http.StatusConflict)
+
+	var after struct{ EncryptedPreview string }
+	creator.readInvite(tag).Expect(http.StatusOK).Decode(&after)
+	harness.AssertTrue(t, after.EncryptedPreview == original.EncryptedPreview, "the preview was replaced")
 }
 
 func TestAnUnknownInviteTagIsNotFound(t *testing.T) {
@@ -240,7 +256,6 @@ func TestAMissingOrMalformedFieldIsRejected(t *testing.T) {
 		path  string
 		field string
 	}{
-		{"invite", invitePath(tag), "encryptedPreview"},
 		{"request", requestPath(tag, harness.Suffix()), "encryptedRequest"},
 	}
 
@@ -252,4 +267,14 @@ func TestAMissingOrMalformedFieldIsRejected(t *testing.T) {
 			d.Put(c.path, harness.Body{c.field: "not base64!"}).Expect(http.StatusBadRequest)
 		})
 	}
+
+	t.Run("invite preview not base64", func(t *testing.T) {
+		d.Post("/v1/invites", harness.Body{"inviteTag": harness.Suffix(), "encryptedPreview": "not base64!"}).Expect(http.StatusBadRequest)
+	})
+	t.Run("invite tag missing", func(t *testing.T) {
+		d.Post("/v1/invites", harness.Body{"encryptedPreview": harness.Ciphertext()}).Expect(http.StatusBadRequest)
+	})
+	t.Run("invite preview missing", func(t *testing.T) {
+		d.Post("/v1/invites", harness.Body{"inviteTag": harness.Suffix()}).Expect(http.StatusBadRequest)
+	})
 }

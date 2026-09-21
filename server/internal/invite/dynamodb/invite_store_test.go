@@ -69,6 +69,30 @@ func TestInviteStore_CreateInviteThenGetInvite_RoundTrips(t *testing.T) {
 	}
 }
 
+// Anyone holding the code can compute the tag, so a second write must not
+// replace the creator's preview.
+func TestInviteStore_CreateInvite_RefusesToOverwrite(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewInviteStore(t, 0)
+	inviteTag := testsupport.UniqueInviteTag(t)
+
+	if err := store.CreateInvite(ctx, inviteTag, []byte("creator-preview")); err != nil {
+		t.Fatal(err)
+	}
+	err := store.CreateInvite(ctx, inviteTag, []byte("forged-preview"))
+	if !errors.Is(err, invite.ErrInviteExists) {
+		t.Fatalf("expected ErrInviteExists, got %v", err)
+	}
+
+	got, err := store.GetInvite(ctx, inviteTag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "creator-preview" {
+		t.Fatalf("expected the creator's preview to survive, got %q", got)
+	}
+}
+
 func TestInviteStore_GetInvite_ReturnsNilForAnUnknownTag(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewInviteStore(t, 0)
