@@ -26,10 +26,16 @@ function iosUrlScheme() {
  * server/.env.example and docs/INFRASTRUCTURE.md.
  */
 const ENVIRONMENTS = {
-  dev: {},
-  production: { channel: 'production' },
+  dev: {
+    googleServicesFile: './google-services.dev.json'
+  },
+  production: {
+    channel: 'production', 
+    googleServicesFile: './google-services.prod.json' 
+  },
   staging: {
     channel: 'staging',
+    googleServicesFile: './google-services.staging.json',
     nameSuffix: ' Staging',
     idSuffix: '.staging',
     scheme: 'mimoza-staging',
@@ -45,6 +51,8 @@ module.exports = ({ config }) => {
     throw new Error(`APP_ENV=${name} is not an environment (${Object.keys(ENVIRONMENTS).join(', ')})`);
   }
   requireEnvironment(name, env);
+
+  config = { ...config, android: { ...config.android, googleServicesFile: env.googleServicesFile } };
 
   if (!env.idSuffix) return withBuildNumber(withGoogleScheme(withEnv(withPushEnvironment(config), name, env)));
 
@@ -72,7 +80,6 @@ module.exports = ({ config }) => {
         foregroundImage: env.androidForeground ?? config.android.adaptiveIcon.foregroundImage,
       },
       package: `${config.android.package}${env.idSuffix}`,
-      googleServicesFile: './google-services.staging.json',
     },
   }, name, env)));
 };
