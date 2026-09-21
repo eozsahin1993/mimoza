@@ -199,14 +199,14 @@ end
 # App Distribution accepts anything, so the run number stands in: builds
 # there only need to be distinguishable from each other.
 def next_version_code(package_name)
-  return ENV['GITHUB_RUN_NUMBER'] || Time.now.to_i.to_s if ENV['PLAY_JSON_KEY'].nil?
+  return (run_number.positive? ? run_number : Time.now.to_i).to_s if ENV['PLAY_JSON_KEY'].nil?
 
   codes = google_play_track_version_codes(
     package_name: package_name,
     track: 'internal',
     json_key: ENV.fetch('PLAY_JSON_KEY'),
   )
-  ((codes.max || 0) + 1).to_s
+  [run_number, (codes.max || 0) + 1].max.to_s
 rescue StandardError => e
   UI.important("Could not read Play version codes (#{e.message}); starting at 1.")
   '1'
@@ -254,9 +254,9 @@ def prebuild_android(env_file, build_number)
   end
 end
 
-# Asked of Apple rather than derived from the run: a re-run reuses
-# github.run_number, so a build that failed at upload would be rejected as
-# a duplicate on exactly the retry you wanted.
+# The run number, so one number means the same build on both platforms —
+# but never below what the store already has. A re-run repeats the run
+# number, and Apple rejects a duplicate on exactly the retry you wanted.
 def next_build_number(app_identifier)
   version = JSON.parse(File.read(File.join(app_root, 'app.json')))['expo']['version']
   latest = latest_testflight_build_number(
@@ -264,7 +264,13 @@ def next_build_number(app_identifier)
     version: version,
     initial_build_number: 0,
   )
-  (latest.to_i + 1).to_s
+  [run_number, latest.to_i + 1].max.to_s
+end
+
+# Zero locally, so a local build takes whatever the store says is next and
+# leaves the shared numbering to CI.
+def run_number
+  ENV['GITHUB_RUN_NUMBER'].to_i
 end
 
 def sign_manually(config)
