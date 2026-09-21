@@ -58,11 +58,11 @@
     "notifications": "Notifications",
     "newCirclesRow": "Nouveaux cercles",
     "invitesRow": "Invitations",
-    "notificationsFootnote": "Ces réglages ne concernent que ce téléphone. Les notifications arrivent chiffrées et sont générées sur ton téléphone ; les serveurs de notifications ne voient jamais de noms ni de messages.",
+    "notificationsFootnote": "Ces réglages ne valent que pour ce téléphone. Les notifications arrivent chiffrées et sont préparées ici même : aucun serveur de notifications ne voit jamais de nom ni de message.",
     "invitePushLevels": {
       "all": "Demandes pour rejoindre et réponses",
       "requests": "Demandes pour rejoindre uniquement",
-      "answers": "Réponses à mes demandes uniquement",
+      "answers": "Réponses à tes demandes uniquement",
       "off": "Désactivées"
     }
   },

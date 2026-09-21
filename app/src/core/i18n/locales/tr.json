@@ -58,11 +58,11 @@
     "notifications": "Bildirimler",
     "newCirclesRow": "Yeni çevreler",
     "invitesRow": "Davetler",
-    "notificationsFootnote": "Bu ayarlar yalnızca bu telefonda geçerli. Bildirimler şifreli gelir ve telefonunda oluşturulur; bildirim sunucuları isimleri ya da mesajları asla görmez.",
+    "notificationsFootnote": "Bu ayarlar sadece bu telefon için. Bildirimler şifreli gelir ve burada, telefonunda hazırlanır; hiçbir bildirim sunucusu bir isim ya da mesaj görmez.",
     "invitePushLevels": {
       "all": "Katılma istekleri ve yanıtlar",
-      "requests": "Yalnızca katılma istekleri",
-      "answers": "Yalnızca isteklerime gelen yanıtlar",
+      "requests": "Sadece katılma istekleri",
+      "answers": "Sadece isteklerine gelen yanıtlar",
       "off": "Kapalı"
     }
   },

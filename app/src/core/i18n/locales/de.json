@@ -58,11 +58,11 @@
     "notifications": "Mitteilungen",
     "newCirclesRow": "Neue Kreise",
     "invitesRow": "Einladungen",
-    "notificationsFootnote": "Diese Einstellungen gelten nur auf diesem Gerät. Mitteilungen kommen verschlüsselt an und entstehen auf deinem Gerät; Push-Server sehen nie Namen oder Nachrichten.",
+    "notificationsFootnote": "Diese Einstellungen gelten nur für dieses Gerät. Mitteilungen kommen verschlüsselt an und entstehen erst hier bei dir. Kein Push-Server sieht je einen Namen oder eine Nachricht.",
     "invitePushLevels": {
       "all": "Beitrittsanfragen und Antworten",
       "requests": "Nur Beitrittsanfragen",
-      "answers": "Nur Antworten auf meine Anfragen",
+      "answers": "Nur Antworten auf deine Anfragen",
       "off": "Aus"
     }
   },

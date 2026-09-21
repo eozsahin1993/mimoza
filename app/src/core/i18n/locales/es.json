@@ -58,11 +58,11 @@
     "notifications": "Notificaciones",
     "newCirclesRow": "Círculos nuevos",
     "invitesRow": "Invitaciones",
-    "notificationsFootnote": "Estos ajustes solo se aplican a este teléfono. Las notificaciones llegan cifradas y se generan en tu teléfono; los servidores de notificaciones nunca ven nombres ni mensajes.",
+    "notificationsFootnote": "Estos ajustes son solo para este teléfono. Las notificaciones llegan cifradas y se preparan aquí mismo, así que ningún servidor de notificaciones ve nunca un nombre ni un mensaje.",
     "invitePushLevels": {
       "all": "Solicitudes para unirse y respuestas",
       "requests": "Solo solicitudes para unirse",
-      "answers": "Solo respuestas a mis solicitudes",
+      "answers": "Solo respuestas a tus solicitudes",
       "off": "Desactivadas"
     }
   },

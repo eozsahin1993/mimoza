@@ -58,11 +58,11 @@
     "notifications": "Notifications",
     "newCirclesRow": "New circles",
     "invitesRow": "Invites",
-    "notificationsFootnote": "These apply to this phone only. Notifications arrive encrypted and are written on your phone, so push servers never see names or messages.",
+    "notificationsFootnote": "These are just for this phone. Notifications arrive encrypted and are put together right here, so no push server ever sees a name or a message.",
     "invitePushLevels": {
-      "all": "Join requests and answers",
-      "requests": "Join requests only",
-      "answers": "Answers to my requests only",
+      "all": "Requests to join and answers",
+      "requests": "Requests to join only",
+      "answers": "Answers to your requests only",
       "off": "Off"
     }
   },
