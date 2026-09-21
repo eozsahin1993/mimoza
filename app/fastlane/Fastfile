@@ -229,7 +229,11 @@ def fetch_keystore
 end
 
 def load_env(env_file)
-  File.readlines(File.join(app_root, env_file)).each do |line|
+  path = File.join(app_root, env_file)
+  # CI has no .env files and passes the same variables directly.
+  return unless File.exist?(path)
+
+  File.readlines(path).each do |line|
     key, value = line.strip.split('=', 2)
     next if value.nil? || key.start_with?('#')
 
