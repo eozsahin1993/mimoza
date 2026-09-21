@@ -1,3 +1,4 @@
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { useLocales } from 'expo-localization';
 import { router, useFocusEffect } from 'expo-router';
@@ -36,6 +37,22 @@ const DELETION_POLL_MS = 2_000;
 
 /** From app.json's "version" — Constants.expoConfig is only ever missing in a context this screen doesn't run in. */
 const appVersion = Constants.expoConfig?.version ?? 'Unknown';
+
+/**
+ * What someone is actually running, as two numbers they can read out: the
+ * build that shipped the native app, and the CI run that published the
+ * JavaScript on top of it. They differ once an update lands, which is the
+ * only way to tell an updated app from a fresh install of the same build.
+ *
+ * The build number comes from the binary rather than the config — after an
+ * update the config is the one the update was exported with.
+ */
+function buildLabel(): string {
+  const native = Application.nativeBuildVersion;
+  const js = (Constants.expoConfig?.extra as { jsBuild?: string } | undefined)?.jsBuild;
+  if (!native) return '';
+  return js && js !== native ? ` (${native}-${js})` : ` (${native})`;
+}
 
 export default function AccountScreen() {
   const { t } = useTranslation();
@@ -349,7 +366,7 @@ export default function AccountScreen() {
           <View style={styles.version}>
             <Wordmark size={21} />
             <ThemedText type="labelSmall" themeColor="faint">
-              v{appVersion}
+              v{appVersion}{buildLabel()}
             </ThemedText>
           </View>
 

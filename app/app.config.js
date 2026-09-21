@@ -160,6 +160,11 @@ function withEnv(config, name, env) {
     extra: {
       ...config.extra,
       appEnv: name,
+      // Which CI run produced this JavaScript. Captured when the bundle is
+      // exported, so an update carries the run that published it while the
+      // binary carries the run that built it — the two differ once an
+      // update lands, which is the point.
+      jsBuild: process.env.GITHUB_RUN_NUMBER ?? null,
       ...(projectId ? { eas: { ...config.extra?.eas, projectId } } : {}),
     },
     ...(projectId && env.channel

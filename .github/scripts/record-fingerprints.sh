@@ -26,7 +26,9 @@ git diff --quiet && { echo "unchanged"; exit 0; }
 
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
-git commit -qam "chore: record the fingerprints these builds shipped from"
+# [skip ci] belt and braces: this file sits outside the paths the deploy
+# workflow watches, so it would not re-trigger anyway.
+git commit -qam "chore: record the fingerprints these builds shipped from [skip ci]"
 # Another merge may have landed during the twenty minutes this took.
 git pull --rebase --quiet origin "$(git rev-parse --abbrev-ref HEAD)"
 git push --quiet

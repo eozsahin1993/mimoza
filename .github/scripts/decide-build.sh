@@ -15,8 +15,11 @@ is_release=${IS_RELEASE:-false}
 message=$(git log -1 --pretty=%B)
 
 for platform in ios android; do
+  # Accumulated rather than parsed per chunk: the fingerprint is ~65KB of
+  # JSON, so stdin arrives in several pieces and the first one is not
+  # valid JSON on its own.
   hash=$(npx expo-updates fingerprint:generate --platform "$platform" |
-    node -e 'process.stdin.on("data", d => process.stdout.write(JSON.parse(d).hash))')
+    node -e 'let out = ""; process.stdin.on("data", d => out += d).on("end", () => process.stdout.write(JSON.parse(out).hash))')
   echo "$platform-fingerprint=$hash" >> "$GITHUB_OUTPUT"
 
   if [ "$is_release" = true ] || [ "$force" = both ] || [ "$force" = "$platform" ] || [[ "$message" == *"[build]"* ]]; then
