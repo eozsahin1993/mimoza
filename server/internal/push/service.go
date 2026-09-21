@@ -23,24 +23,58 @@ type Service struct {
 // ErrTooManyTargets is returned when a send exceeds MaxFanoutTargets.
 var ErrTooManyTargets = errors.New("push: too many fanout targets")
 
-func (s *Service) PutPrefs(ctx context.Context, pushRoutingID string, prefs Prefs) error {
+// Every write below takes the caller's owner token. PutPrefs is the one
+// that can claim a row; the rest require it already claimed by the same
+// token. Checking before writing is safe because an OwnerHash, once set,
+// never changes.
+
+func (s *Service) PutPrefs(ctx context.Context, pushRoutingID string, prefs Prefs, ownerToken []byte) error {
+	prefs.OwnerHash = OwnerHash(ownerToken, pushRoutingID)
 	return s.PushStore.PutPrefs(ctx, pushRoutingID, prefs)
 }
 
-func (s *Service) SetSilenced(ctx context.Context, pushRoutingID string, silenced bool) error {
+func (s *Service) SetSilenced(ctx context.Context, pushRoutingID string, silenced bool, ownerToken []byte) error {
+	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil {
+		return err
+	}
 	return s.PushStore.SetSilenced(ctx, pushRoutingID, silenced)
 }
 
-func (s *Service) PutDevice(ctx context.Context, pushRoutingID string, device Device) error {
+// PutDevice needs the prefs row to exist: a device can't claim an address,
+// only join one its owner already holds.
+func (s *Service) PutDevice(ctx context.Context, pushRoutingID string, device Device, ownerToken []byte) error {
+	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil {
+		return err
+	}
 	return s.PushStore.PutDevice(ctx, pushRoutingID, device)
 }
 
-func (s *Service) DeleteDevice(ctx context.Context, pushRoutingID, deviceID string) error {
+// DeleteDevice and DeleteRouting go ahead when there is no prefs row:
+// nothing is left to protect, and the device rows are already unreachable.
+func (s *Service) DeleteDevice(ctx context.Context, pushRoutingID, deviceID string, ownerToken []byte) error {
+	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil && !errors.Is(err, ErrPushRoutingNotFound) {
+		return err
+	}
 	return s.PushStore.DeleteDevice(ctx, pushRoutingID, deviceID)
 }
 
-func (s *Service) DeleteRouting(ctx context.Context, pushRoutingID string) error {
+func (s *Service) DeleteRouting(ctx context.Context, pushRoutingID string, ownerToken []byte) error {
+	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil && !errors.Is(err, ErrPushRoutingNotFound) {
+		return err
+	}
 	return s.PushStore.DeleteRouting(ctx, pushRoutingID)
+}
+
+func (s *Service) authorize(ctx context.Context, pushRoutingID string, ownerToken []byte) error {
+	prefs, err := s.PushStore.GetPrefs(ctx, pushRoutingID)
+	if err != nil {
+		return err
+	}
+	// Constant time, as for the fanout hash.
+	if len(prefs.OwnerHash) == 0 || !hmac.Equal(prefs.OwnerHash, OwnerHash(ownerToken, pushRoutingID)) {
+		return ErrNotOwner
+	}
+	return nil
 }
 
 // Placeholder is what a device shows when it cannot decrypt a payload — the

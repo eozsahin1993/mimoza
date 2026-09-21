@@ -81,10 +81,12 @@ already uses:
 
 ```
 pk = routingId
-sk = "prefs"             -> { pushFanoutHash, categoryMask, keyVersion, silenced }
+sk = "prefs"             -> { pushFanoutHash, ownerHash, categoryMask, keyVersion, silenced }
 sk = "device#<deviceId>" -> { pushToken, platform, enabled }
 
-pushFanoutHash = sha256(fanoutToken || routingId)
+pushFanoutHash = sha256(fanoutToken || routingId)    who can send
+ownerHash      = sha256(ownerToken  || routingId)    who can change the rows
+ownerToken     = HKDF(masterSeed, "push-owner" || routingId)
 ```
 
 **The hash is salted by `routingId` on purpose.** Storing the bare
@@ -97,9 +99,16 @@ knows which routing ID it is checking.
 **Deliberately absent: `accountId`, `circleId`, `syncId`, and any list of
 which routing IDs belong together.** Registration requires a session but
 writes no account link — and, unlike the circle routes, consumes no
-per-account budget. Nothing else needs one: knowing a
-`routingId` is itself the authorization to manage that row, since only the
-seed produces it.
+per-account budget. Nothing else needs one: the owner token is the
+authorization to manage the rows.
+
+**Knowing a routing id is not enough to change it.** Routing ids are
+shared on purpose (every member reads them from the roster), so every
+write (`PUT`/`DELETE` on prefs, devices, silenced) carries the owner
+token in a `Push-Owner` header, and the relay compares its hash in
+constant time. The first `PUT` of a prefs row claims it, atomically; a
+mismatch is 403. The owner token derives from the seed, so every device
+on the account produces the same one and nobody else can.
 
 Push tokens are **not** encrypted at rest beyond DynamoDB's own SSE. The
 client base64s the platform token and the relay stores those bytes as it

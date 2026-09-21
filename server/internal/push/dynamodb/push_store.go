@@ -47,11 +47,21 @@ func (s *Store) PutPrefs(ctx context.Context, pushRoutingID string, prefs push.P
 			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
 			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: prefsSK},
 			"pushFanoutHash":  &types.AttributeValueMemberB{Value: prefs.PushFanoutHash},
+			"ownerHash":       &types.AttributeValueMemberB{Value: prefs.OwnerHash},
 			"categoryMask":    &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.CategoryMask, 10)},
 			"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.KeyVersion, 10)},
 			"silenced":        &types.AttributeValueMemberBOOL{Value: prefs.Silenced},
 		},
+		// A new row, or the same owner.
+		ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s) OR ownerHash = :owner", dynamoutil.PKAttr)),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":owner": &types.AttributeValueMemberB{Value: prefs.OwnerHash},
+		},
 	})
+	var condFailed *types.ConditionalCheckFailedException
+	if errors.As(err, &condFailed) {
+		return push.ErrNotOwner
+	}
 	if err != nil {
 		return fmt.Errorf("put push prefs: %w", err)
 	}
@@ -88,8 +98,13 @@ func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*push.Prefs
 		return nil, fmt.Errorf("push prefs row for %q: %w", pushRoutingID, err)
 	}
 
+	// Not required like pushFanoutHash: a send never reads it, and an
+	// empty one authorizes no write (see Service.authorize).
+	ownerHash, _ := dynamoutil.AttrBytes(out.Item, "ownerHash")
+
 	prefs := push.Prefs{
 		PushFanoutHash: pushFanoutHash,
+		OwnerHash:      ownerHash,
 		CategoryMask:   categoryMask,
 		KeyVersion:     keyVersion,
 		Silenced:       dynamoutil.AttrBool(out.Item, "silenced"),

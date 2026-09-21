@@ -41,12 +41,46 @@ type okResponse struct {
 	OK bool `json:"ok"`
 }
 
+// OwnerHeader carries the owner token, base64, on every write to a routing
+// id: HKDF(seed, "push-owner" || routingId), so only the owner's own
+// devices can produce it. A header rather than a body field so the
+// DELETEs, which have no body, carry it the same way.
+const OwnerHeader = "Push-Owner"
+
+// ownerToken reads OwnerHeader, writing the 400 itself when it's unusable.
+func ownerToken(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	token, err := base64.StdEncoding.DecodeString(r.Header.Get(OwnerHeader))
+	if err != nil || len(token) != 32 {
+		httputil.WriteError(w, http.StatusBadRequest, OwnerHeader+" must be 32 base64-encoded bytes")
+		return nil, false
+	}
+	return token, true
+}
+
+// writeOwnershipError answers the two errors every guarded write shares,
+// reporting whether it did.
+func writeOwnershipError(w http.ResponseWriter, err error) bool {
+	switch {
+	case errors.Is(err, push.ErrNotOwner):
+		httputil.WriteError(w, http.StatusForbidden, "not the owner of this routing id")
+	case errors.Is(err, push.ErrPushRoutingNotFound):
+		httputil.WriteError(w, http.StatusNotFound, "this routing id is not registered")
+	default:
+		return false
+	}
+	return true
+}
+
 type PutPrefsHandler struct {
 	Service *push.Service
 }
 
 func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	pushRoutingID := r.PathValue("pushRoutingId")
+	owner, ok := ownerToken(w, r)
+	if !ok {
+		return
+	}
 
 	var req putPrefsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -72,7 +106,11 @@ func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prefs := push.Prefs{PushFanoutHash: pushFanoutHash, CategoryMask: categoryMask, KeyVersion: req.KeyVersion}
-	if err := h.Service.PutPrefs(r.Context(), pushRoutingID, prefs); err != nil {
+	err = h.Service.PutPrefs(r.Context(), pushRoutingID, prefs, owner)
+	if writeOwnershipError(w, err) {
+		return
+	}
+	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to store push preferences")
 		return
 	}
@@ -81,7 +119,8 @@ func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type putDeviceRequest struct {
-	// Base64, already encrypted client-side.
+	// Base64 of the platform token as-is: the relay has to hand APNs/FCM
+	// the real token, so it isn't encrypted beyond storage at rest.
 	PushToken string `json:"pushToken"`
 	Platform  string `json:"platform"`
 	Enabled   bool   `json:"enabled"`
@@ -94,6 +133,10 @@ type PutDeviceHandler struct {
 func (h *PutDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	pushRoutingID := r.PathValue("pushRoutingId")
 	deviceID := r.PathValue("deviceId")
+	owner, ok := ownerToken(w, r)
+	if !ok {
+		return
+	}
 
 	var req putDeviceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -125,7 +168,11 @@ func (h *PutDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Platform:  req.Platform,
 		Enabled:   req.Enabled,
 	}
-	if err := h.Service.PutDevice(r.Context(), pushRoutingID, device); err != nil {
+	err = h.Service.PutDevice(r.Context(), pushRoutingID, device, owner)
+	if writeOwnershipError(w, err) {
+		return
+	}
+	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to store push device")
 		return
 	}
@@ -144,15 +191,19 @@ type SetSilencedHandler struct {
 }
 
 func (h *SetSilencedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	owner, ok := ownerToken(w, r)
+	if !ok {
+		return
+	}
+
 	var req setSilencedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	err := h.Service.SetSilenced(r.Context(), r.PathValue("pushRoutingId"), req.Silenced)
-	if errors.Is(err, push.ErrPushRoutingNotFound) {
-		httputil.WriteError(w, http.StatusNotFound, "this routing id is not registered")
+	err := h.Service.SetSilenced(r.Context(), r.PathValue("pushRoutingId"), req.Silenced, owner)
+	if writeOwnershipError(w, err) {
 		return
 	}
 	if err != nil {
@@ -168,7 +219,15 @@ type DeleteDeviceHandler struct {
 }
 
 func (h *DeleteDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := h.Service.DeleteDevice(r.Context(), r.PathValue("pushRoutingId"), r.PathValue("deviceId")); err != nil {
+	owner, ok := ownerToken(w, r)
+	if !ok {
+		return
+	}
+	err := h.Service.DeleteDevice(r.Context(), r.PathValue("pushRoutingId"), r.PathValue("deviceId"), owner)
+	if writeOwnershipError(w, err) {
+		return
+	}
+	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to remove push device")
 		return
 	}
@@ -181,7 +240,15 @@ type DeleteRoutingHandler struct {
 }
 
 func (h *DeleteRoutingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := h.Service.DeleteRouting(r.Context(), r.PathValue("pushRoutingId")); err != nil {
+	owner, ok := ownerToken(w, r)
+	if !ok {
+		return
+	}
+	err := h.Service.DeleteRouting(r.Context(), r.PathValue("pushRoutingId"), owner)
+	if writeOwnershipError(w, err) {
+		return
+	}
+	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to remove push routing")
 		return
 	}

@@ -12,7 +12,9 @@ type fakeStore struct {
 	devices map[string][]Device
 	// Proves a rejected target never reached the second read.
 	listCalls int
-	err       error
+	// Proves a refused write never reached the store.
+	writes int
+	err    error
 }
 
 func (f *fakeStore) PutPrefs(context.Context, string, Prefs) error { return nil }
@@ -28,17 +30,17 @@ func (f *fakeStore) GetPrefs(_ context.Context, pushRoutingID string) (*Prefs, e
 	return &prefs, nil
 }
 
-func (f *fakeStore) SetSilenced(context.Context, string, bool) error { return nil }
+func (f *fakeStore) SetSilenced(context.Context, string, bool) error { f.writes++; return nil }
 
-func (f *fakeStore) PutDevice(context.Context, string, Device) error { return nil }
+func (f *fakeStore) PutDevice(context.Context, string, Device) error { f.writes++; return nil }
 
 func (f *fakeStore) ListDevices(_ context.Context, pushRoutingID string) ([]Device, error) {
 	f.listCalls++
 	return f.devices[pushRoutingID], nil
 }
 
-func (f *fakeStore) DeleteDevice(context.Context, string, string) error { return nil }
-func (f *fakeStore) DeleteRouting(context.Context, string) error        { return nil }
+func (f *fakeStore) DeleteDevice(context.Context, string, string) error { f.writes++; return nil }
+func (f *fakeStore) DeleteRouting(context.Context, string) error        { f.writes++; return nil }
 
 // countingLimit records its keys, to assert budget is charged only after
 // verification.
@@ -224,4 +226,93 @@ func TestFanout_StorageFailureIsFatal(t *testing.T) {
 	if _, err := service.Fanout(context.Background(), []string{"routing-a"}, []byte(token), 0); err == nil {
 		t.Fatal("a storage failure must not be reported as a silently skipped target")
 	}
+}
+
+var ownerToken = []byte("the-owners-32-byte-owner-token!!")
+
+func ownedService(t *testing.T) (*Service, *fakeStore) {
+	t.Helper()
+	store := &fakeStore{prefs: map[string]Prefs{
+		"owned": {OwnerHash: OwnerHash(ownerToken, "owned")},
+	}}
+	return &Service{PushStore: store}, store
+}
+
+func TestOwnership_TheOwnerCanWrite(t *testing.T) {
+	service, store := ownedService(t)
+	ctx := context.Background()
+
+	for name, write := range map[string]func() error{
+		"device":   func() error { return service.PutDevice(ctx, "owned", Device{DeviceID: "d"}, ownerToken) },
+		"silenced": func() error { return service.SetSilenced(ctx, "owned", true, ownerToken) },
+		"delete":   func() error { return service.DeleteDevice(ctx, "owned", "d", ownerToken) },
+		"routing":  func() error { return service.DeleteRouting(ctx, "owned", ownerToken) },
+	} {
+		if err := write(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	if store.writes != 4 {
+		t.Fatalf("expected 4 writes, got %d", store.writes)
+	}
+}
+
+// Every member knows every routing id in their circle; only the owner's
+// token may change one.
+func TestOwnership_AnotherTokenIsRefused(t *testing.T) {
+	service, store := ownedService(t)
+	ctx := context.Background()
+	other := []byte("somebody-elses-owner-token-32byt")
+
+	for name, write := range map[string]func() error{
+		"device":   func() error { return service.PutDevice(ctx, "owned", Device{DeviceID: "d"}, other) },
+		"silenced": func() error { return service.SetSilenced(ctx, "owned", true, other) },
+		"delete":   func() error { return service.DeleteDevice(ctx, "owned", "d", other) },
+		"routing":  func() error { return service.DeleteRouting(ctx, "owned", other) },
+	} {
+		if err := write(); !errors.Is(err, ErrNotOwner) {
+			t.Fatalf("%s: expected ErrNotOwner, got %v", name, err)
+		}
+	}
+	if store.writes != 0 {
+		t.Fatalf("a refused write reached the store %d times", store.writes)
+	}
+}
+
+// With no prefs row there's nothing to protect, and deletes stay idempotent.
+func TestOwnership_DeletesWithoutPrefsGoAhead(t *testing.T) {
+	service, store := ownedService(t)
+	ctx := context.Background()
+
+	if err := service.DeleteRouting(ctx, "never-registered", ownerToken); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.DeleteDevice(ctx, "never-registered", "d", ownerToken); err != nil {
+		t.Fatal(err)
+	}
+	if store.writes != 2 {
+		t.Fatalf("expected both deletes to reach the store, got %d", store.writes)
+	}
+}
+
+func TestOwnership_PutPrefsStampsTheOwnerHash(t *testing.T) {
+	recorder := &recordingPrefsStore{}
+	service := &Service{PushStore: recorder}
+
+	if err := service.PutPrefs(context.Background(), "owned", Prefs{}, ownerToken); err != nil {
+		t.Fatal(err)
+	}
+	if string(recorder.prefs.OwnerHash) != string(OwnerHash(ownerToken, "owned")) {
+		t.Fatal("PutPrefs didn't pass the owner hash to the store")
+	}
+}
+
+type recordingPrefsStore struct {
+	fakeStore
+	prefs Prefs
+}
+
+func (r *recordingPrefsStore) PutPrefs(_ context.Context, _ string, prefs Prefs) error {
+	r.prefs = prefs
+	return nil
 }

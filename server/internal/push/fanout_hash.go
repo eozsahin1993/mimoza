@@ -11,8 +11,19 @@ import "crypto/sha256"
 //
 // Clients compute this too, so the concatenation order is contract.
 func PushFanoutHash(pushFanoutToken []byte, pushRoutingID string) []byte {
+	return saltedHash(pushFanoutToken, pushRoutingID)
+}
+
+// OwnerHash is sha256(ownerToken || pushRoutingId), the prefs row's lock on
+// writes. The token derives from the owner's seed, so unlike the routing id
+// it is never shared with other members.
+func OwnerHash(ownerToken []byte, pushRoutingID string) []byte {
+	return saltedHash(ownerToken, pushRoutingID)
+}
+
+func saltedHash(token []byte, pushRoutingID string) []byte {
 	sum := sha256.New()
-	sum.Write(pushFanoutToken)
+	sum.Write(token)
 	sum.Write([]byte(pushRoutingID))
 	return sum.Sum(nil)
 }

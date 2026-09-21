@@ -22,6 +22,11 @@ import (
 // storage failure so a send to a stale id skips rather than fails.
 var ErrPushRoutingNotFound = errors.New("push: routing id not registered")
 
+// ErrNotOwner means a write presented an owner token that doesn't match the
+// row's OwnerHash. Routing ids are shared on purpose (every member reads
+// them from the roster), so knowing one must not be enough to change it.
+var ErrNotOwner = errors.New("push: not the owner of this routing id")
+
 // MaxCategory is what CategoryMask's bitmask encoding fits. Nothing here
 // knows what any category means.
 const MaxCategory = 62
@@ -29,6 +34,8 @@ const MaxCategory = 62
 // Prefs is one routing id's control row.
 type Prefs struct {
 	PushFanoutHash []byte
+	// Who may change this row and its devices; see OwnerHash.
+	OwnerHash []byte
 	// Enabled-bits, not disabled: a row written before a category existed
 	// has that bit unset, so a new category stays off until the device
 	// re-registers rather than switching itself on for everyone.
@@ -54,6 +61,9 @@ type Device struct {
 // Store persists one prefs row per routing id, plus a device row per
 // device wanting delivery under it.
 type Store interface {
+	// PutPrefs writes prefs.OwnerHash along with the rest. A new row is
+	// claimed; an existing one owned by a different hash returns
+	// ErrNotOwner — atomically, so two first writes can't both win.
 	PutPrefs(ctx context.Context, pushRoutingID string, prefs Prefs) error
 	// SetSilenced flips just that flag, leaving the hash and categories
 	// alone — no re-derivation, and unsilencing needs no content key.

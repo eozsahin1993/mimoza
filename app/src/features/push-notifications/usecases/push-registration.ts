@@ -6,7 +6,7 @@ import { type PushCategory } from '@/features/push-notifications/usecases/push-c
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { generateUUID } from '@/core/crypto/primitives';
 import { derivePushRoutingId } from '@/core/crypto/identity';
-import { derivePushDeviceId, derivePushFanoutHash, derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { derivePushDeviceId, derivePushFanoutHash, derivePushFanoutToken, derivePushOwnerToken } from '@/features/push-notifications/crypto';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { getPushDeviceSecret } from '@/features/push-notifications/keystore';
@@ -48,7 +48,7 @@ export async function syncCirclePushPrefs(circleId: string, categories: PushCate
   const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
   const pushFanoutHash = derivePushFanoutHash(derivePushFanoutToken(current.key), pushRoutingId);
 
-  await putPushPrefs(pushRoutingId, pushFanoutHash, categories, current.version);
+  await putPushPrefs(pushRoutingId, pushFanoutHash, categories, current.version, derivePushOwnerToken(masterSeed, pushRoutingId));
   await setCirclePushKeyVersion(circleId, current.version);
 }
 
@@ -61,7 +61,8 @@ export async function registerPushForCircle(circleId: string, registration: Push
 
   const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
   const deviceId = derivePushDeviceId(await getPushDeviceSecret(), pushRoutingId);
-  await putPushDevice(pushRoutingId, deviceId, registration.pushToken, registration.platform, true);
+  const ownerToken = derivePushOwnerToken(masterSeed, pushRoutingId);
+  await putPushDevice(pushRoutingId, deviceId, registration.pushToken, registration.platform, true, ownerToken);
   await publishPushRoutingId(circleId, pushRoutingId);
 }
 
@@ -107,7 +108,8 @@ export async function unregisterDeviceForCircle(circleId: string): Promise<void>
   if (!masterSeed) return;
 
   const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
-  await deletePushDevice(pushRoutingId, derivePushDeviceId(await getPushDeviceSecret(), pushRoutingId));
+  const deviceId = derivePushDeviceId(await getPushDeviceSecret(), pushRoutingId);
+  await deletePushDevice(pushRoutingId, deviceId, derivePushOwnerToken(masterSeed, pushRoutingId));
 }
 
 /**
@@ -121,5 +123,6 @@ export async function silenceCircle(circleId: string): Promise<void> {
   const masterSeed = await getMasterSeed();
   if (!masterSeed) return;
 
-  await deletePushRouting(derivePushRoutingId(masterSeed, circleId));
+  const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
+  await deletePushRouting(pushRoutingId, derivePushOwnerToken(masterSeed, pushRoutingId));
 }

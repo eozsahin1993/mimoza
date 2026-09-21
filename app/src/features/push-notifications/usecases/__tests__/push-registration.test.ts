@@ -23,7 +23,7 @@ import {
   unregisterDeviceForCircle,
 } from '@/features/push-notifications/usecases/push-registration';
 import { derivePushRoutingId } from '@/core/crypto/identity';
-import { derivePushFanoutHash, derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { derivePushFanoutHash, derivePushFanoutToken, derivePushOwnerToken } from '@/features/push-notifications/crypto';
 import { deleteCircleKeys, getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/features/push-notifications/services/relay';
@@ -63,17 +63,30 @@ test('registers prefs and this device against the derived routing id', async () 
   await registerPushForCircle(circleId, registration);
 
   const pushRoutingId = derivePushRoutingId(seed, circleId);
-  const [prefsRoutingId, fanoutHash, categories, keyVersion] = (putPushPrefs as jest.Mock).mock.calls[0];
+  const ownerToken = derivePushOwnerToken(seed, pushRoutingId);
+  const [prefsRoutingId, fanoutHash, categories, keyVersion, prefsOwner] = (putPushPrefs as jest.Mock).mock.calls[0];
   expect(prefsRoutingId).toBe(pushRoutingId);
   expect(fanoutHash).toEqual(derivePushFanoutHash(derivePushFanoutToken(current.key), pushRoutingId));
   expect(categories).toEqual([0, 1]);
   expect(keyVersion).toBe(current.version);
+  expect(prefsOwner).toEqual(ownerToken);
 
-  const [deviceRoutingId, , pushToken, platform, enabled] = (putPushDevice as jest.Mock).mock.calls[0];
+  const [deviceRoutingId, , pushToken, platform, enabled, deviceOwner] = (putPushDevice as jest.Mock).mock.calls[0];
   expect(deviceRoutingId).toBe(pushRoutingId);
   expect(pushToken).toEqual(registration.pushToken);
   expect(platform).toBe('android');
   expect(enabled).toBe(true);
+  expect(deviceOwner).toEqual(ownerToken);
+});
+
+/** Same seed, same routing id: every device on the account can prove it owns the row. */
+test('the owner token is per routing id and never the routing id itself', () => {
+  const seed = new Uint8Array(16).fill(7);
+  const first = derivePushOwnerToken(seed, 'a'.repeat(64));
+
+  expect(derivePushOwnerToken(seed, 'a'.repeat(64))).toEqual(first);
+  expect(derivePushOwnerToken(seed, 'b'.repeat(64))).not.toEqual(first);
+  expect(bytesToHex(first)).not.toBe('a'.repeat(64));
 });
 
 /** The relay never sees the token itself, only a hash it can compare. */
@@ -145,7 +158,9 @@ test('silencing a circle removes the routing id outright', async () => {
 
   await silenceCircle(circleId);
 
-  expect(deletePushRouting).toHaveBeenCalledWith(derivePushRoutingId((await getMasterSeed())!, circleId));
+  const seed = (await getMasterSeed())!;
+  const pushRoutingId = derivePushRoutingId(seed, circleId);
+  expect(deletePushRouting).toHaveBeenCalledWith(pushRoutingId, derivePushOwnerToken(seed, pushRoutingId));
 });
 
 describe('signing out', () => {

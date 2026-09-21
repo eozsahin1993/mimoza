@@ -14,8 +14,10 @@ func newStore(t *testing.T) push.Store {
 	return testsupport.NewPushStore(t)
 }
 
+var ownerHash = []byte("thirty-two-bytes-of-owner-hash!!")
+
 func samplePrefs() push.Prefs {
-	return push.Prefs{PushFanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), CategoryMask: 0b101, KeyVersion: 3}
+	return push.Prefs{PushFanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), OwnerHash: ownerHash, CategoryMask: 0b101, KeyVersion: 3}
 }
 
 func TestPrefsRoundTrip(t *testing.T) {
@@ -57,7 +59,7 @@ func TestPutPrefsReplaces(t *testing.T) {
 	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
-	rotated := push.Prefs{PushFanoutHash: []byte("a-completely-different-hash-here"), CategoryMask: 0b1, KeyVersion: 4}
+	rotated := push.Prefs{PushFanoutHash: []byte("a-completely-different-hash-here"), OwnerHash: ownerHash, CategoryMask: 0b1, KeyVersion: 4}
 	if err := store.PutPrefs(ctx, pushRoutingID, rotated); err != nil {
 		t.Fatal(err)
 	}
@@ -266,5 +268,29 @@ func TestPutDeviceLeavesPrefsAlone(t *testing.T) {
 	}
 	if got.CategoryMask != 0b101 {
 		t.Fatalf("expected the mask untouched, got %b", got.CategoryMask)
+	}
+}
+
+// Knowing a routing id, as every member does, must not be enough to
+// rewrite its prefs.
+func TestPutPrefsRefusesAnotherOwner(t *testing.T) {
+	store := newStore(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	ctx := context.Background()
+
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
+		t.Fatal(err)
+	}
+	hijack := push.Prefs{PushFanoutHash: []byte("an-attackers-fanout-hash-32bytes"), OwnerHash: []byte("an-attackers-owner-hash-32-bytes")}
+	if err := store.PutPrefs(ctx, pushRoutingID, hijack); !errors.Is(err, push.ErrNotOwner) {
+		t.Fatalf("expected ErrNotOwner, got %v", err)
+	}
+
+	got, err := store.GetPrefs(ctx, pushRoutingID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got.PushFanoutHash) != string(samplePrefs().PushFanoutHash) || string(got.OwnerHash) != string(ownerHash) {
+		t.Fatal("the owner's prefs were replaced")
 	}
 }

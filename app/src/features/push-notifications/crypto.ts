@@ -4,6 +4,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 const PUSH_DEVICE_DOMAIN = new TextEncoder().encode('push-device');
 const PUSH_FANOUT_DOMAIN = new TextEncoder().encode('push-fanout');
+const PUSH_OWNER_DOMAIN = new TextEncoder().encode('push-owner');
 
 /**
  * This device's id under one routing id, hex.
@@ -35,4 +36,14 @@ export function derivePushFanoutToken(contentKey: Uint8Array): Uint8Array {
  */
 export function derivePushFanoutHash(fanoutToken: Uint8Array, pushRoutingId: string): Uint8Array {
   return sha256(concatBytes(fanoutToken, new TextEncoder().encode(pushRoutingId)));
+}
+
+/**
+ * Proves to the relay that a write to a routing id comes from its owner —
+ * `HKDF(masterSeed, "push-owner" || pushRoutingId)`. The routing id itself
+ * is shared through the roster, so it can't be what authorizes; this is
+ * never shared, and every device on the account derives the same one.
+ */
+export function derivePushOwnerToken(masterSeed: Uint8Array, pushRoutingId: string): Uint8Array {
+  return hkdf(sha256, masterSeed, undefined, concatBytes(PUSH_OWNER_DOMAIN, new TextEncoder().encode(pushRoutingId)), 32);
 }
