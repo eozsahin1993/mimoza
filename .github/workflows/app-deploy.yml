@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.context.outputs.environment }}
     concurrency:
-      group: ship-android-${{ needs.context.outputs.environment }}
+      group: ship-android-${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
       cancel-in-progress: false
     defaults:
       run:
@@ -177,7 +177,7 @@ jobs:
     # Two at once would claim the same build number, and the second upload
     # is rejected after ten minutes of work.
     concurrency:
-      group: ship-app-${{ needs.context.outputs.environment }}
+      group: ship-app-${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
       cancel-in-progress: false
     defaults:
       run:
