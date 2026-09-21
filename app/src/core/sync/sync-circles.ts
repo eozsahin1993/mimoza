@@ -2,6 +2,7 @@ import { getAllCircles, getCircle, getPendingOutboxEntries } from '@/data/db';
 import { finishAccountDeletionIfPending } from '@/features/account/usecases/delete-account';
 import { finishPendingDepartures } from '@/features/circle/usecases/leave-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
+import { isPushStale, resyncPushIfStale } from '@/features/push-notifications/usecases/push-preferences';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 import { fetchEpochs } from '@/core/services/log-relay';
 import { timed } from '@/core/utils/timing';
@@ -25,6 +26,11 @@ export async function syncCircle(circleId: string): Promise<void> {
   // this device's own removal. Both leave nothing for the rest of the pass
   // to push to or pull from.
   if (!(await getCircle(circleId))) return;
+
+  // Straight after meta, since that's where a rotation lands: until the
+  // relay has the new key's hash, this circle's notifications don't reach
+  // this account. A failure is retried next pass, not the pass's problem.
+  await resyncPushIfStale(circleId).catch((err) => console.error(`Failed to re-sync notifications for circle ${circleId}`, err));
 
   await timed('sync.push', () => drainOutbox(circleId));
   await timed('sync.content', () => pullContent(circleId));
@@ -108,7 +114,10 @@ export async function syncStaleCircles(): Promise<void> {
       const epochs = remoteBySyncId.get(circle.syncId);
       const hasNewContent = epochs !== undefined && (epochs.metaEpoch > circle.metaCursor || epochs.contentEpoch > circle.contentCursor);
       const hasPendingPush = (await getPendingOutboxEntries(circle.id)).length > 0;
-      if (!hasNewContent && !hasPendingPush) return;
+      // Same reasoning for the notification hash: a re-sync that failed
+      // has no relay-side change to wake it up again.
+      const notificationsStale = await isPushStale(circle.id);
+      if (!hasNewContent && !hasPendingPush && !notificationsStale) return;
 
       try {
         await syncCircle(circle.id);

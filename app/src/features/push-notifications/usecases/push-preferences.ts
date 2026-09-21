@@ -1,5 +1,6 @@
 import { getAppSettings } from '@/core/services/settings';
 import { getAllCircles, getCircle, setCirclePushCategoryMask, setCirclePushSilenced } from '@/data/db';
+import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { PushCategories, type PushCategory } from '@/features/push-notifications/usecases/push-categories';
 import { silenceCircle, syncCirclePushPrefs } from '@/features/push-notifications/usecases/push-registration';
 
@@ -103,6 +104,34 @@ export async function setCircleSilenced(circleId: string, silenced: boolean): Pr
     return;
   }
   await syncCirclePushPrefs(circleId, categoriesFromMask((await getCircle(circleId))?.pushCategoryMask ?? 0));
+}
+
+/**
+ * Whether the relay's hash for this circle lags the current content key —
+ * a rotation this device has applied but not yet told the relay about.
+ * Local reads only, so the scheduler can ask it of every circle.
+ */
+export async function isPushStale(circleId: string): Promise<boolean> {
+  const circle = await getCircle(circleId);
+  if (!circle || circle.pushSilenced || circle.pushKeyVersion === null) return false;
+  const current = await getCurrentContentKey(circleId);
+  return current !== null && current.version !== circle.pushKeyVersion;
+}
+
+/**
+ * Re-writes the hash after a rotation. Until it lands, every sender who
+ * has the new key is skipped for this account, and the removed member,
+ * who still has the old one, isn't.
+ *
+ * Retried by the sync pass rather than the outbox: this is a relay PUT,
+ * not a log entry, and `pushKeyVersion` lagging is its own durable
+ * record that it's still to do.
+ */
+export async function resyncPushIfStale(circleId: string): Promise<void> {
+  if (!(await isPushStale(circleId))) return;
+  const circle = await getCircle(circleId);
+  if (!circle) return;
+  await syncCirclePushPrefs(circleId, categoriesFromMask(circle.pushCategoryMask));
 }
 
 /**

@@ -29,6 +29,14 @@ export const circles = sqliteTable('circles', {
   pushCategoryMask: integer('push_category_mask').notNull().default(15),
   /** Silenced outright, independent of the mask, so the categories survive being switched back on. */
   pushSilenced: integer('push_silenced', { mode: 'boolean' }).notNull().default(false),
+  /**
+   * The content-key version the relay's fanout hash was last written for.
+   * The hash follows the current key, so this lagging after a rotation
+   * means senders' tokens no longer match it and the circle has gone
+   * quiet — see `resyncPushIfStale`. Null until this device first
+   * registers, so a circle nobody enabled push for is never written.
+   */
+  pushKeyVersion: integer('push_key_version'),
   /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */
   leftAt: integer('left_at'),
   /**

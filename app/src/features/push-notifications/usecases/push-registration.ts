@@ -1,6 +1,6 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircleMembers, insertOutboxEntry, OutboxStatuses, setMemberPushRoutingId } from '@/data/db';
+import { getCircleMembers, insertOutboxEntry, OutboxStatuses, setCirclePushKeyVersion, setMemberPushRoutingId } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { type PushCategory } from '@/features/push-notifications/usecases/push-categories';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
@@ -38,7 +38,7 @@ export type PushRegistration = {
  * preferences UI can work before notification permission is even asked
  * for. Re-run after a key rotation: the fanout token follows the current
  * content key, so a stale hash stops verifying and this circle quietly
- * goes dark.
+ * goes dark. `resyncPushIfStale` is what notices.
  */
 export async function syncCirclePushPrefs(circleId: string, categories: PushCategory[]): Promise<void> {
   const masterSeed = await getMasterSeed();
@@ -49,6 +49,7 @@ export async function syncCirclePushPrefs(circleId: string, categories: PushCate
   const pushFanoutHash = derivePushFanoutHash(derivePushFanoutToken(current.key), pushRoutingId);
 
   await putPushPrefs(pushRoutingId, pushFanoutHash, categories, current.version);
+  await setCirclePushKeyVersion(circleId, current.version);
 }
 
 /** Turns notifications on for a circle. The only path that writes to the log. */

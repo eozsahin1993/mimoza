@@ -111,8 +111,12 @@ key the relay can't use would mean it couldn't send.
 ## The flow
 
 **Register** — on join, and again on every launch, since a push token
-rotates and the fanout hash follows the content key. Authenticated,
-`accountId` not persisted:
+rotates and the fanout hash follows the content key. A rotation also
+re-writes the hash as soon as this device has the new key, rather than
+waiting for a launch: the circle row's `pushKeyVersion` records which
+version the relay has, and the sync pass retries until it catches up.
+Until then a removed member's old token still verifies and everyone
+else's new one doesn't. Authenticated, `accountId` not persisted:
 
 - `PUT /v1/push/{routingId}` with `{ pushFanoutHash, categories, keyVersion }`
 - `PUT /v1/push/{routingId}/devices/{deviceId}` with `{ pushToken, platform, enabled }`

@@ -12,14 +12,17 @@ import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 import {
   PushLevels,
   circlePushPreferences,
+  isPushStale,
   levelForMask,
   maskForLevel,
   setCircleLevel,
+  resyncPushIfStale,
   setCircleSilenced,
   syncPushPreferences,
 } from '@/features/push-notifications/usecases/push-preferences';
 import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
+import { addCircleKeyVersion, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { deletePushRouting, putPushPrefs } from '@/features/push-notifications/services/relay';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { getAppSettings } from '@/core/services/settings';
@@ -146,4 +149,58 @@ test('someone joining is in every level', () => {
 test('a mask that matches no level rounds down', () => {
   expect(levelForMask(0b0101)).toBe('posts');
   expect(levelForMask(0)).toBe('posts');
+});
+
+describe('after a key rotation', () => {
+  async function rotate(circleId: string): Promise<number> {
+    const current = await getCurrentContentKey(circleId);
+    const version = current!.version + 1;
+    await addCircleKeyVersion(circleId, version, new Uint8Array(32).fill(version));
+    return version;
+  }
+
+  test('a circle this device never registered is left alone', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    await rotate(circleId);
+
+    expect(await isPushStale(circleId)).toBe(false);
+    await resyncPushIfStale(circleId);
+    expect(putPushPrefs).not.toHaveBeenCalled();
+  });
+
+  test('a registered circle re-writes its hash for the new key', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    await setCircleLevel(circleId, 'comments');
+    const version = await rotate(circleId);
+    jest.clearAllMocks();
+    (putPushPrefs as jest.Mock).mockResolvedValue(undefined);
+
+    expect(await isPushStale(circleId)).toBe(true);
+    await resyncPushIfStale(circleId);
+
+    expect(putPushPrefs).toHaveBeenCalledTimes(1);
+    expect((putPushPrefs as jest.Mock).mock.calls[0][3]).toBe(version);
+    expect(await isPushStale(circleId)).toBe(false);
+  });
+
+  /** The lag is the only record that the re-sync is still owed, so a failure must leave it. */
+  test('a failed re-sync stays stale for the next pass', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    await setCircleLevel(circleId, 'comments');
+    await rotate(circleId);
+    (putPushPrefs as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+
+    await expect(resyncPushIfStale(circleId)).rejects.toThrow();
+
+    expect(await isPushStale(circleId)).toBe(true);
+  });
+
+  test('a silenced circle has no row to re-sync', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    await setCircleLevel(circleId, 'comments');
+    await setCircleSilenced(circleId, true);
+    await rotate(circleId);
+
+    expect(await isPushStale(circleId)).toBe(false);
+  });
 });

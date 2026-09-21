@@ -52,6 +52,7 @@ function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: nu
     createdAt: Date.now(),
     pushCategoryMask: 3,
     pushSilenced: false,
+    pushKeyVersion: null,
     leftAt: null,
     metaCursor: 0,
     contentCursor: 0,

@@ -255,6 +255,11 @@ export async function setCirclePushSilenced(id: string, pushSilenced: boolean): 
   await db.update(circles).set({ pushSilenced }).where(eq(circles.id, id));
 }
 
+/** Records which content-key version the relay's push hash was written for. */
+export async function setCirclePushKeyVersion(id: string, pushKeyVersion: number): Promise<void> {
+  await db.update(circles).set({ pushKeyVersion }).where(eq(circles.id, id));
+}
+
 /** Records which notification categories a circle sends. */
 export async function setCirclePushCategoryMask(id: string, pushCategoryMask: number): Promise<void> {
   await db.update(circles).set({ pushCategoryMask }).where(eq(circles.id, id));

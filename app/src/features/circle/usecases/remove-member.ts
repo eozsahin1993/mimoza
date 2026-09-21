@@ -11,6 +11,7 @@ import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey } from '@/
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, rotateLog } from '@/core/services/log-relay';
 import { pullMeta } from '@/core/sync/pull-log';
+import { resyncPushIfStale } from '@/features/push-notifications/usecases/push-preferences';
 
 /**
  * Removes a member and rotates the content key — admin only. Roster
@@ -89,4 +90,7 @@ export async function removeMember(circleId: string, identityPublicKey: string):
 
   await recordMemberRemovedLocally({ circleId, subjectPublicKey: identityPublicKey, removedAt });
   await addCircleKeyVersion(circleId, newVersion, newKey);
+  // Now rather than on the next sync pass: until it lands, the member just
+  // removed can still push to this account and nobody else can.
+  await resyncPushIfStale(circleId).catch((err) => console.error('Failed to re-sync notifications after removal', err));
 }
