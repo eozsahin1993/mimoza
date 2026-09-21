@@ -16,7 +16,7 @@ set -euo pipefail
 force=${FORCE:-none}
 is_release=${IS_RELEASE:-false}
 message=$(git log -1 --pretty=%B)
-build=false
+native_build=false
 
 for platform in ios android; do
   # Accumulated rather than parsed per chunk: a fingerprint is ~65KB of
@@ -27,7 +27,7 @@ for platform in ios android; do
 
   if [ "$is_release" = true ] || [ "$force" = both ] || [ "$force" = "$platform" ] || [[ "$message" == *"[build]"* ]]; then
     echo "$platform: build requested"
-    build=true
+    native_build=true
     continue
   fi
 
@@ -36,10 +36,9 @@ for platform in ios android; do
     echo "$platform: $hash already shipped"
   else
     echo "$platform: $hash is new, native build needed"
-    build=true
+    native_build=true
   fi
 done
 
-echo "build-ios=$build" >> "$GITHUB_OUTPUT"
-echo "build-android=$build" >> "$GITHUB_OUTPUT"
-[ "$build" = true ] && echo "→ building both" || echo "→ JS only"
+echo "native-build=$native_build" >> "$GITHUB_OUTPUT"
+[ "$native_build" = true ] && echo "→ building both" || echo "→ JS only"

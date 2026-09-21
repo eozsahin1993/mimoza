@@ -257,9 +257,11 @@ def prebuild_android(env_file, build_number)
   # key wins. Expo's defaults (2g heap, 512m metaspace) are not enough for
   # KSP once expo-updates is in the build: it dies with an OutOfMemoryError
   # in metaspace about thirteen minutes in.
-  File.open(File.join(app_root, 'android', 'gradle.properties'), 'a') do |f|
-    f.puts('org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m')
-  end
+  # The generated file ends without a newline, so appending blindly fuses
+  # this onto the last property — which silently hands autolinking a
+  # watched-directories value full of JVM flags.
+  properties = File.join(app_root, 'android', 'gradle.properties')
+  File.write(properties, "\norg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m\n", mode: 'a')
 end
 
 # The run number, so one number means the same build on both platforms —

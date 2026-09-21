@@ -45,7 +45,6 @@ jobs:
   # same way, on Server Tests.
   test:
     name: Lint and test
-    needs: context
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -76,8 +75,7 @@ jobs:
       run:
         working-directory: app
     outputs:
-      build-ios: ${{ steps.check.outputs.build-ios }}
-      build-android: ${{ steps.check.outputs.build-android }}
+      native-build: ${{ steps.check.outputs.native-build }}
       ios-fingerprint: ${{ steps.check.outputs.ios-fingerprint }}
       android-fingerprint: ${{ steps.check.outputs.android-fingerprint }}
     steps:
@@ -111,11 +109,11 @@ jobs:
   android:
     name: Android to App Distribution
     needs: [context, test, fingerprint]
-    if: needs.fingerprint.outputs.build-android == 'true'
+    if: needs.fingerprint.outputs.native-build == 'true'
     runs-on: ubuntu-latest
     environment: ${{ needs.context.outputs.environment }}
     concurrency:
-      group: ship-android-${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
+      group: ship-android-${{ needs.context.outputs.environment }}
       cancel-in-progress: false
     defaults:
       run:
@@ -180,13 +178,13 @@ jobs:
   ios:
     name: iOS to TestFlight
     needs: [context, test, fingerprint]
-    if: needs.fingerprint.outputs.build-ios == 'true'
+    if: needs.fingerprint.outputs.native-build == 'true'
     runs-on: macos-latest
     environment: ${{ needs.context.outputs.environment }}
     # Two at once would claim the same build number, and the second upload
     # is rejected after ten minutes of work.
     concurrency:
-      group: ship-app-${{ startsWith(github.ref, 'refs/tags/app-v') && 'production' || 'staging' }}
+      group: ship-ios-${{ needs.context.outputs.environment }}
       cancel-in-progress: false
     defaults:
       run:
@@ -254,9 +252,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # One path or the other, never both: a native build embeds its own
+  # bundle, and an update published beside it targets the same new runtime
+  # version — a duplicate of what the binary already carries, useless to
+  # every device still on the old one.
   update:
     name: Publish the JS
     needs: [context, test, fingerprint]
+    if: needs.fingerprint.outputs.native-build == 'false'
     runs-on: ubuntu-latest
     environment: ${{ needs.context.outputs.environment }}
     defaults:

@@ -1,13 +1,12 @@
 name: App Unit Tests
 
+# Pull requests only. A push to main is tested by Deploy App, which gates
+# the ship on the same checks — running both would test every merge twice.
 on:
-  push:
+  pull_request:
     branches: [main]
     # Includes this workflow itself, so a change to it is validated by
     # the run it defines rather than waiting for the next app/ commit.
-    paths: ['app/**', '.github/workflows/app-unit-test.yml']
-  pull_request:
-    branches: [main]
     paths: ['app/**', '.github/workflows/app-unit-test.yml']
 
 jobs:
