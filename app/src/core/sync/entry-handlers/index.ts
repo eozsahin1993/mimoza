@@ -25,8 +25,8 @@ export type { EntryHandler } from '@/core/sync/entry-handlers/types';
  * because local state is a disposable projection, so a later build that
  * understands the type rebuilds it by replaying from epoch 0.
  *
- * Not yet here, because nothing writes it yet: `circle_renamed`. The
- * registry test enforces that everything which *is* written has an entry.
+ * The registry test enforces that everything which is written has an
+ * entry here.
  */
 export const metaHandlers: Record<string, EntryHandler> = {
   [EntryTypes.MEMBER_ADDED]: memberAddedHandler,

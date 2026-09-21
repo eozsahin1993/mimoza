@@ -84,9 +84,10 @@ of, which answers the only question that matters before shipping: does
 this change need a new binary, or will the JS bundle carry it?
 
 The three are not interchangeable. The hash covers the resolved app
-config, and `app.config.js` gives each environment its own bundle id, App
-Group and APNs entitlement, so the same commit fingerprints differently
-per environment:
+config, and `app.config.js` gives each environment its own bundle id and
+App Group, so the same commit fingerprints differently per environment
+(the APNs entitlement is not per-environment — it follows
+`APNS_PRODUCTION`, which only the fastlane lanes set):
 
 ```
 production  69c7f5c76f98e42b5583c23f6126fbb4c0e0f0c6

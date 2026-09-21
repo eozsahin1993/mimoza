@@ -21,7 +21,7 @@ internal/
              one column per entity: domain types and store interface at the
              root, one subpackage per endpoint under http/, one per adapter
              (dynamodb/, s3/, cdn/) — see AGENTS.md
-  app/       builds the real AWS-backed adapters both cmd/ entries run on
+  app/       builds the real AWS-backed adapters every cmd/ entry runs on
   config/    reads every env var once, in one place
   util/      httputil, dynamoutil, localstack, testsupport — cross-cutting
 provision/
@@ -314,8 +314,9 @@ Deploying itself is CI's job (`.github/workflows/server-deploy.yml`):
 staging applies on every `main` push whose Server Tests run passed, prod
 only on a `server-v*` tag, and `workflow_dispatch` re-runs staging by
 hand. Each job runs `provision/build.sh` and then `terraform apply` in
-`envs/<env>`, with the account id and domain coming from that GitHub
-Environment rather than a `.tfvars` file.
+`envs/<env>`, with the account id, domain, alert email and repository
+passed as `TF_VAR_*` from that GitHub Environment rather than a `.tfvars`
+file — a pre-apply step fails the job if any of them is empty.
 
 Applying from your own machine — and reading an env's outputs — is the
 same sequence:

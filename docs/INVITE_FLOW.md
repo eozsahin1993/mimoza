@@ -16,10 +16,9 @@ too: a joined circle row starts at cursor 0 and `pullMeta`/`pullContent`
 doc captures the full design worked out for it, refining DESIGN.md's
 "Invites" and "Mailbox" sections (3) into a concrete mechanism for this
 one specific use of the mailbox concept. Read
-[server/README.md](../server/README.md)'s "Identity model" section first,
-with one correction: a circle's relay address is a random `syncId` minted
-at creation (`create-circle.ts`), not the derived `circleLogId` that doc
-still describes.
+[server/README.md](../server/README.md)'s "Identity model" section first:
+a circle's relay address is a random `syncId` minted at creation
+(`create-circle.ts`), which that section now describes.
 
 ## Goals and constraints
 

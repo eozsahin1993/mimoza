@@ -12,7 +12,7 @@
 // end-to-end encryption here exists to avoid. Entries live one partition
 // per syncId, sk-ordered "meta#"/"content#", each ciphertext holding
 // {type, payload, authorPubkey, signature} — see
-// internal/synclog/dynamodb/log_store.go for the concrete shape.
+// internal/synclog/dynamodb/store.go for the concrete shape.
 //
 // Usage:
 //

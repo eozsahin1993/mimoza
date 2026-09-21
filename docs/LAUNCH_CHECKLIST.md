@@ -57,13 +57,16 @@ Prod is 852138521113, staging 223057859233. See
 
 ## App build
 
-- [x] `aps-environment` production-only for `APP_ENV=production` — commit
-      a356a70.
-- [x] `ITSAppUsesNonExemptEncryption: true` — the app carries its own
-      ciphers, so the HTTPS exemption doesn't apply.
-- [ ] `ios.buildNumber` and `android.versionCode` — both unset in
-      `app.json`, and each store rejects a repeat upload of the same one.
-      Decide now whether CI bumps them or you do.
+- [x] `aps-environment` follows `APNS_PRODUCTION`, which only the fastlane
+      lanes set — a locally-run production build still signs against the
+      sandbox, deliberately. Commit a356a70.
+- [x] `ITSAppUsesNonExemptEncryption: false` — commit daec8ec: the app's
+      ciphers fall under the exemption.
+- [x] `ios.buildNumber` and `android.versionCode` — each store rejects a
+      repeat upload of the same one, so fastlane derives the next from
+      TestFlight (`next_build_number`) and injects it as
+      `APP_BUILD_NUMBER`. `app.json`'s `1` is only the fallback for a
+      local build.
 - [ ] Play upload key generated and backed up somewhere you'd still have
       after losing the laptop. Losing it means a new listing.
 - [ ] Verify Play's current target API floor at submission — it moves

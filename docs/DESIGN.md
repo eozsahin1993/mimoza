@@ -201,8 +201,9 @@ Reserved for private, per-individual exchanges — not circle content.
 - No FIFO: rows come back in sort-key order, which is by the requester's
   random id. Each carries its own `createdAt` for a client that wants
   arrival order.
-- Deletion is scoped per-row and has one caller — the creator dismissing a
-  join request. Dismissing Alice's has no effect on Bob's.
+- Deletion is scoped per-row: the creator dismissing a join request, the
+  requester clearing their own once it's answered, and device transfer
+  clearing its row. Dismissing Alice's has no effect on Bob's.
 
 ## Invites
 
@@ -423,7 +424,7 @@ which is the actual backstop either way.
 - Env vars are **not** a substitute for any of this — a Lambda env var is
   readable by any normal code running in that function, no attestation
   gate at all. Fine for values the server is *supposed* to read freely
-  (`TABLE_NAME`, `BUCKET_NAME`, already env vars); wrong for anything
+  (`RESOURCE_PREFIX`, which names every table and bucket); wrong for anything
   meant to be hidden from the server's own normal code path.
 - Abuse mitigation that doesn't need any of the above: cheap infra-level
   bounding, not identity-based prevention — a Lambda reserved-concurrency
@@ -444,7 +445,7 @@ which is the actual backstop either way.
   spike, and takes down the service for everyone either way), but a real
   automated stop if wanted instead of a page.
 - **Per-account rate limiting, since built** — `internal/ratelimit` gates
-  each circle route on a fixed-window budget keyed by the account
+  each circle and epochs route on a fixed-window budget keyed by the account
   `RequireSession` resolved, with separate write and read limits (500 and
   2000 per 10 minutes by default) so a read-heavy catch-up can't spend a
   write budget. It fails open when its own store errors: a rate-limit
@@ -553,8 +554,11 @@ circle's identity from the seed → replay each circle's log from epoch 0 →
 restored. No other circle member's help needed.
 
 **The retention caveat this section used to carry is void.** There is no
-`LOG_RETENTION_DAYS` and no TTL eviction anywhere: the log is permanent
-(`SYNC_DESIGN.md` invariant 1), and prod runs continuous backups of the
+`LOG_RETENTION_DAYS`, and nothing evicts a log entry: the log is permanent
+(`SYNC_DESIGN.md` invariant 1). DynamoDB TTL is enabled on the sync-log
+table, but only idempotency markers ever carry the `expiresAt` it sweeps
+(48h), alongside invite and session rows in their own tables. Prod runs
+continuous backups of the
 sync-log and accounts tables on top of that. Recovery replays the whole
 history, not a live window. What it can't bring back is a blob someone
 deliberately deleted — blobs have no backup at all, bucket versioning

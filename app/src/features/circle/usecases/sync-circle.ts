@@ -189,8 +189,7 @@ async function pushAccountDeletion(
  * Sends a queued authority change — see `authorityAction` on the outbox
  * schema. The signature is produced here rather than at queue time
  * because it's over the entry id and the target key, and the authority
- * keypair is seed-derived and never stored; the same reason
- * `deleteBlobFor` derives its own.
+ * keypair is seed-derived and never stored.
  *
  * Writes nothing locally: the entry this pushes comes straight back on
  * the same sync pass, and its replay is the single writer for both the

@@ -51,9 +51,12 @@ the architecture is wrong for it — not a signal to bend the rule.
    | control plane (`#control`) | mutable current state |
    | blob store | a post photo is write-once (first upload wins); the cover overwrites; both deletable |
 
-   A blob is removed only on request from whoever uploaded it or an admin
-   who signs for that exact entry (see
-   `internal/synclog/http/deleteblob`). That does not soften the row above
+   A blob goes only on an explicit request, but not always one naming the
+   blob itself: `deleteblob` takes the uploader's or an admin's signature
+   for that exact entry, and `deleteentry`, `deleteauthorcontent` and
+   `deletecircle` each take the blobs belonging to what they strip, in the
+   same call (`internal/synclog/http/deleteentry/service.go`). Nothing
+   sweeps blobs on a timer. That does not soften the row above
    it: the entries naming a deleted blob stay, so replay still converges.
    Bytes are the part that carries storage cost and any obligation to
    actually destroy content.
@@ -64,11 +67,17 @@ the architecture is wrong for it — not a signal to bend the rule.
    against their own replayed state.
 5. **Default-deny.** Unknown entry type, bad signature, failed predicate,
    type-in-wrong-namespace → discard. Never accept because unrecognized.
-6. **Everything is derivable from (seed + log).** No state that exists only
-   on one device. If a feature needs device-only state, it's unrecoverable
-   and violates the architecture.
-7. **Projections are disposable.** Every local table must be rebuildable by
-   replay. The log is the only truth.
+6. **Everything shared is derivable from (seed + log).** Anything a
+   recovering device must see again belongs in the log or the manifest;
+   device-only state is by definition unrecoverable, so it is only ever
+   acceptable for a preference the device can pick a default for. Today's
+   exceptions are exactly that: a circle's push mask and silence flag
+   (reset to the default on restore), `lastViewedAt` unread marks, and the
+   invite codes this device issued — see "Open issues".
+7. **Projections are disposable.** Every table that projects the log must
+   be rebuildable by replay; the log is the only truth. The exceptions are
+   the tables that aren't projections — the outbox, `circle_invites`,
+   `pending_join_requests` — which hold this device's own in-flight work.
 8. **Applying an entry twice is a no-op.** Sync redelivers; that must be
    harmless.
 9. **Content and meta epochs are never compared.** No cross-namespace
@@ -196,9 +205,11 @@ them. It keys off **which operation the client invokes**:
 **The relay's destructive operations are few, named, and never
 automatic.** It appends and it mutates those two control fields. Beyond
 that it destroys only when explicitly asked: one blob (`deleteblob`), one
-entry's ciphertext (`deleteentry`), everything one identity authored
-(`deleteauthorcontent`), or a whole circle (`deletecircle`). Nothing is
-swept as a side effect of anything else, and there is no "which namespaces
+entry's ciphertext and its blob (`deleteentry`), everything one identity
+authored and those entries' blobs (`deleteauthorcontent`), or a whole
+circle (`deletecircle`). A request destroys the bytes belonging to what it
+names and nothing further — a post's photo goes with the post, never on a
+timer or a neighbouring request — and there is no "which namespaces
 are deletable" flag — only content is ever swept wholesale, and only by a
 circle deletion.
 
@@ -430,7 +441,10 @@ syncId, keyMap}` it carries (`restore-from-phrase.ts`). That works —
   strips the target row's ciphertext in the same commit. The row stays —
   comments and reactions reference it by id — stamped `deletedAt`, which
   every client skips quietly rather than logging as a decrypt failure.
-  Deleting the blob is a separate `deleteblob` call.
+  The post's blob goes in the same call, best-effort after the commit: the
+  tombstone is the truth clients act on, so a failed blob delete is logged
+  rather than retried. `deleteblob` exists for a blob whose entry stays,
+  and no client calls it today.
 - **Predicate** (client side, on the tombstone): honor only if
   `tombstone.authorPubkey == target.authorPubkey`, or the signer is an
   admin. The relay can't apply that rule — the author's key is inside the
@@ -726,11 +740,19 @@ to keep forever.
 9. ~~**Nullable `posts.photo`.**~~ Resolved by moving bytes out of `posts`
    entirely: `attachments` is its own table, keyed by `(circleId,
    entryId)`, because a blob has a lifecycle its post doesn't.
-10. **Leave/rejoin = fresh identity** (`completeJoin` mints a new
-    `circleId`). Fine by default; documented as deliberate vs. reusing the
-    old id to make rejoining continuous.
+10. **Leave/rejoin = fresh identity.** `requestToJoin` mints the
+    `circleId` and `completeJoin` adopts it, so a rejoin is a new identity
+    to everyone else. Fine by default; documented as deliberate vs. reusing
+    the old id to make rejoining continuous.
 11. **Circle deletion is a product question**, not just a mechanism: should
     one admin be able to tear down shared history? "Dormant forever" may be
-    the more honest default. The mechanism shipped without that question
-    being settled — any admin can do it today.
+    the more honest default. The relay would accept `deletecircle` from any
+    authority signer; the app only offers it to the last member leaving
+    (`leave-circle.ts`), so the question is settled in the product and
+    still open in the protocol.
 12. **Metadata leaks, accepted and named** — see the visibility table.
+13. **Device-only state exists** (invariant 6): push mask and silence flag,
+    `lastViewedAt` unread marks, and locally-issued invite codes. Each is a
+    preference a restored device can default, not shared history — but a
+    restore silently resets them, and revoking an invite from a lost device
+    is impossible.

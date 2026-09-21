@@ -9,7 +9,8 @@ import { getDevicePushToken } from '@/features/push-notifications/services/token
 
 /**
  * Registers this device for every circle it can be reached in — call on
- * launch, and after joining or creating one.
+ * launch. A circle joined or created since then registers when its feed
+ * is first opened (`askForPushOnCircle`), or on the next launch.
  *
  * Re-running is the point rather than a cost: push tokens rotate, and the
  * fanout hash follows the circle's content key, so a rotation leaves a

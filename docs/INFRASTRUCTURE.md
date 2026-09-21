@@ -4,9 +4,11 @@ Status: **staging is built** — its own account, both distributions, the
 relay behind `api.staging.joinmimoza.com`. Blobs are the exception:
 Terraform writes the settings parameter with the distribution, so signing
 waits only on the hand-created `cloudfront-signing-key` in SSM — without
-it downloads stay on presigned S3, silently (below). Prod is not built:
-the Terraform is written and its settings decided, but there is no
-account yet, and `env_domain` is unset. Each section marks what is
+it downloads stay on presigned S3, silently (below). Prod is configured
+but unverified here: its account id, domain, alert email and signing key
+are checked in (`envs/prod/prod.auto.tfvars`), with deletion protection
+and PITR on; whether an apply has run is only visible in its remote
+state. Each section marks what is
 decided, open, or deferred.
 
 ---
@@ -92,8 +94,10 @@ cannot select a circle's rows to fix them.
 **Auth and rate limiting are both the relay's own, not AWS's.** Sign-in
 verifies a Google or Apple ID token against that provider's JWKS over
 plain HTTPS — no AWS permission involved — and issues a bearer token of
-the relay's own. Every route requires it except sign-in and `POST
-/push/send`, which is unauthenticated by design (`PUSH_DESIGN.md`).
+the relay's own. Every route requires it except sign-in, `POST
+/push/send` — unauthenticated by design (`PUSH_DESIGN.md`) — and
+`POST /auth/logout`, which sits outside the session middleware because it
+validates and burns the token itself.
 Budgets are counters in DynamoDB, applied per handler: writes and reads
 carry different limits, and push recipients carry a third. There is no
 WAF; see *Cost* for why.
@@ -165,7 +169,8 @@ we control before any build ships to a real user.
   so nothing here is cached. Blobs are the opposite; see below.
 - DNS at Cloudflare, **"DNS only"**. Proxying would stack two CDNs.
 - **The function URL stays publicly callable** (`behind_cloudfront` and
-  `sign_origin_requests`, both false in every env). Origin access control
+  `sign_origin_requests`, both false in staging and prod; local runs no
+  Lambda at all). Origin access control
   is built and can be switched on, but Lambda rejects unsigned payloads:
   every POST/PUT would have to carry `x-amz-content-sha256` with the
   body's hash, put there by the client.
@@ -185,7 +190,8 @@ backbone on the long leg.
 Built as `modules/cdn`, wired into both envs but inert until `env_domain`
 is set — with it empty, `api_endpoint` stays the raw function URL.
 Certificate validation is manual: the first apply blocks on the record,
-which the `cdn` output prints for adding at Cloudflare.
+which the env-level `dns_records` output prints for adding at Cloudflare
+(it comes from `modules/certificate`, not `modules/cdn`).
 
 ---
 
@@ -295,12 +301,12 @@ secrets. OIDC — no stored AWS keys; the trust policy names the repo and
 environment.
 
 - Server Tests green on `main` → staging, or `workflow_dispatch` by hand.
-  Those tests only run on `server/**`, so a merge touching only `app/`
-  deploys nothing.
+  Those tests only run on `server/**` and the workflow file itself, so a
+  merge touching only `app/` deploys nothing.
 - A `server-v*` tag → prod, through the `production` environment.
 
-The app has no pipeline of its own: `app-unit-test.yml` runs Jest and
-stops there, so builds and submissions are local.
+The app has no pipeline of its own: `app-unit-test.yml` lints and runs
+Jest and stops there, so builds and submissions are local.
 
 **Relay first, then the app.** One relay serves every installed version,
 and a rollback can't unwrite what new clients appended — older clients
@@ -325,9 +331,10 @@ sandbox versus production.
 
 Version is plain semver; the build number is separate
 (`ios.buildNumber`, `android.versionCode` — iOS needs a unique build per
-version, Android a strictly increasing integer). Neither is set in
-`app.json` today, and nothing increments them: there is no EAS config and
-no app build workflow. Surface `1.0.0 (15) · <commit> · <env>` in-app:
+version, Android a strictly increasing integer). `app.json` carries `1` as
+a local fallback; a shipped build gets its number from fastlane, which
+asks TestFlight for the last one and adds one (`APP_BUILD_NUMBER`, read by
+`app.config.js`). There is no EAS config and no app build workflow. Surface `1.0.0 (15) · <commit> · <env>` in-app:
 the SHA is the only identifier that can't drift.
 
 ### Verifying an upgrade

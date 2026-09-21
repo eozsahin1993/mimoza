@@ -110,12 +110,18 @@ key the relay can't use would mean it couldn't send.
 
 ## The flow
 
-**Register** — on join, and again on every launch, since a push token
-rotates and the fanout hash follows the content key. Authenticated,
+**Register** — on every launch, and again when a circle's feed is first
+opened (`enablePushEverywhere`, `askForPushOnCircle`), since a push token
+rotates and the fanout hash follows the content key. Joining a circle only
+creates its Android channel; registration happens on the next of those. Authenticated,
 `accountId` not persisted:
 
 - `PUT /v1/push/{routingId}` with `{ pushFanoutHash, categories, keyVersion }`
 - `PUT /v1/push/{routingId}/devices/{deviceId}` with `{ pushToken, platform, enabled }`
+
+`PUT /v1/push/{routingId}/silenced` exists on the relay as the
+delete-nothing way to mute a circle, but no client calls it — see
+"Categories" below.
 
 `DELETE` on either undoes it — the device row for this device alone, the
 routing row for the whole circle.
@@ -140,7 +146,9 @@ sees a circle-to-routing-ID map.
 is skipped silently. This is a shared-secret comparison, not a signature:
 there is no key here the relay could verify against — an entry's author
 signature is inside the ciphertext, and is checked client-side on replay
-by `authoredByMember`. (The relay does verify signatures elsewhere, for
+by `verifyLogEntry` (`app/src/core/sync/log-entry.ts`), which every
+handler runs before `authoredByMember` decides whether that author was
+ever a member. (The relay does verify signatures elsewhere, for
 write authority — `synclog/capability.go`. Just not for push.)
 
 The salted hash is what stops a member of circle A targeting circle B's
@@ -247,7 +255,7 @@ session to budget against, that half is pushed out to the edge:
   so the function URL still answers direct callers and anything attached
   to the distribution is bypassable. `reserved_concurrent_executions` is
   wired to a variable that both environments leave at `-1` — unreserved.
-  Both are still to do before push ships.
+  Push shipped without either; both are still to do.
 
 **Order matters: verify before consuming any budget.** Cheapest and most
 selective first — the length cap (no I/O at all), then read and verify each
@@ -303,7 +311,10 @@ there is an `enabled` flag on the device row, but nothing writes `false`
 to it — turning one device off deletes that device's row instead
 (`unregisterDeviceForCircle`), which is also what signing out does.
 "Silence this circle" deletes the whole routing row, prefs and devices
-together; nothing needs to sync, and no log entry is written.
+together; nothing needs to sync, and no log entry is written. The relay
+also carries a `silenced` flag and a `PUT …/silenced` route for muting
+without discarding the row, which no client uses yet — deciding between
+them is open.
 
 ## Levels, and Android channels
 
@@ -380,7 +391,8 @@ cards arrive silently. It groups them instead, by setting
 ## What this leaks, honestly
 
 **At rest, nothing that groups anyone.** A stolen table yields opaque
-routing IDs, encrypted tokens, salted hashes, and category bits. No
+routing IDs, push tokens (stored as received — see above), salted hashes,
+and category bits. No
 accounts, no circles, no graph.
 
 **In flight, the grouping.** A send call carries a set of routing IDs, and
@@ -425,8 +437,9 @@ default. Retention on whatever remains should be short.
   extension can't read from AsyncStorage. Stale is benign: the card says
   "Someone".
 - Android: an FCM data-message path into the JS background task.
-- APNs auth key and FCM service account credentials on the relay,
-  KMS-encrypted SSM SecureStrings created by hand. These are the most
+- APNs auth key and FCM service account credentials on the relay, SSM
+  SecureStrings created by hand under the AWS-managed `aws/ssm` key (this
+  project has no KMS key of its own — see DESIGN.md). These are the most
   dangerous secret the relay will ever hold — anyone with them can put
   arbitrary text on users' lock screens, bypassing the extension entirely
   by omitting `mutable-content`.

@@ -40,8 +40,9 @@ export class BlobAlreadyExistsError extends Error {
 /**
  * Thrown when the relay refuses to delete a blob (403): this device
  * neither uploaded it nor holds an admin key the circle recognises. A
- * permanent refusal, not a transient one — see `deleteBlobFor`, which
- * gives up on the bytes rather than blocking the queue behind it.
+ * permanent refusal, not a transient one: a caller gives up on the bytes
+ * rather than blocking the queue behind it. Nothing calls `deleteBlob`
+ * today — the relay sweeps a post's blob with its entry.
  */
 export class BlobDeleteRefusedError extends Error {
   constructor(detail: string) {

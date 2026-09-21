@@ -32,7 +32,7 @@ type Config struct {
 	// InviteTableName is the standalone invite/join-request table: pk =
 	// hash(invite code), with one row for the invite itself and one row
 	// per pending join request under it — see
-	// server/provision/modules/storage/dynamodb.tf's invites resource.
+	// server/provision/modules/storage/invites_table.tf.
 	InviteTableName string
 	// RateLimitTableName is the standalone per-account request-budget
 	// table — see server/provision/modules/storage/rate_limit_table.tf. Shared by the write
@@ -127,7 +127,7 @@ type Config struct {
 	// .env.example's INVITE_RETENTION_DAYS. 0 means "use the adapter's own
 	// default".
 	// Eviction itself is DynamoDB's native TTL
-	// (see provision/modules/storage/dynamodb.tf), not this process — this
+	// (see provision/modules/storage/invites_table.tf), not this process — this
 	// only controls what expiresAt gets written as.
 	InviteRetentionDays int64
 	// LogLevel is debug|info|warn|error — info in deployed environments,

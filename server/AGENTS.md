@@ -8,16 +8,20 @@ repo root — read `docs/SYNC_DESIGN.md` before touching anything under
 
 `internal/` is organized by entity, not by layer. Each column owns its
 whole stack — domain types and interfaces at the column root, the
-HTTP-facing slice in `http/` (one subpackage per endpoint, each with its
-own `handler.go`/`router.go`/`service.go`), and one adapter subpackage per
-backing technology (`dynamodb/`, `s3/`):
+HTTP-facing slice in `http/` (a subpackage per endpoint where a column
+has many — `synclog/`, `auth/`, `account/`; `invite/` and `push/` are each
+one flat package — with its own `handler.go`/`router.go`/`service.go`),
+and one adapter subpackage per backing technology (`dynamodb/`, `s3/`,
+`cdn/`):
 
 - `synclog/` — the append-only per-circle log and the blobs behind its
   entries (one aggregate: a blob is gated by the same write token and
   swept on the same circle deletion as the log). `LogStore` and
   `BlobStore` are the two storage interfaces at the root.
-- `auth/` — sessions, OIDC verification, and the `google`/`apple`/`logout`
-  sign-in providers under `auth/http/`.
+- `auth/` — sessions, OIDC verification, the `google`/`apple`/`logout`
+  sign-in providers under `auth/http/`, and `appleid/` for Apple's
+  client-secret signing and grant revocation (whose credential store is
+  the one thing here that writes to the accounts table, not sessions).
 - `account/` — the per-account encrypted manifest, plus account deletion.
 - `invite/` — the invite/join-request flow.
 - `push/` — mobile push: routing prefs, fanout, and platform dispatch
@@ -59,10 +63,10 @@ failure instead of a silent green run.
 Before pushing, also run what CI checks as a separate `build` job:
 
 ```bash
+go mod tidy && git diff --exit-code go.mod go.sum   # must be a no-op
 go build ./...
 go vet ./...
 gofmt -l .          # must print nothing
-go mod tidy && git diff --exit-code go.mod go.sum   # must be a no-op
 ```
 
 `go mod tidy` runs *before* `go build` in CI specifically because an
@@ -73,7 +77,7 @@ cache can hide this on a machine that's built the tree before.
 ## Storage interfaces: what they're actually for
 
 Every store in this tree is a Go interface at its column's root, backed
-by exactly one implementation (`dynamodb/` or `s3/`) — there has never
+by exactly one implementation (`dynamodb/`, `s3/`, `cdn/`) — there has never
 been a second backend for any of them. Don't read that as portability:
 it hasn't paid for that. Keep it because it (a) is where `synclog`'s
 `LogStore`/`BlobStore` contracts are written down independent of AWS, and

@@ -16,7 +16,8 @@ rebuild, not a retry.
       `node_modules` was installed against. A mismatched Node makes
       `npx jest` hang forever rather than fail, and the process resists
       `kill -9` (`app/AGENTS.md`).
-- [ ] `npx jest --ci --forceExit --runInBand` green. Add `--no-cache`
+- [ ] `npm test -- --ci --forceExit --runInBand` green (`npm test` pins
+      the Node version itself, so it survives a mismatched shell). Add `--no-cache`
       once if any `migrations/*.sql` changed — Jest caches the old SQL and
       fails naming a column the migration visibly declares.
 - [ ] Schema change? A **new** numbered migration from `npm run
@@ -27,7 +28,8 @@ rebuild, not a retry.
       extension can't read the app's locale JSON and keeps its own
       `Localizable.xcstrings` copy; `push-copy-parity.test.ts` fails until
       you regenerate it.
-- [ ] `npx expo lint`.
+- [ ] `npm run lint -- --max-warnings 0` — what CI gates on; plain `expo
+      lint` passes on warnings CI fails.
 
 ## The relay
 
@@ -82,9 +84,12 @@ rebuild, not a retry.
 `aps-environment: development`, so it registers a sandbox APNs token,
 while TestFlight and the App Store both run against production APNs. The
 build registers, the relay accepts the token, and nothing ever arrives —
-no error anywhere. Test push on a build installed from Xcode, or use a
-production build (commit a356a70 is the fix, and only `APP_ENV=production`
-flips the entitlement).
+no error anywhere. Test push on a build installed from Xcode, or ship
+through a fastlane lane: the entitlement follows `APNS_PRODUCTION`, not
+`APP_ENV`, and only the fastlane lanes set it (`app/app.config.js`'s
+`withPushEnvironment`, `app/fastlane/Fastfile`). A production build run
+locally still gets the sandbox entitlement, because only a distribution
+profile can carry the production one.
 
 **Android release artifacts are signed with the debug keystore**
 (`android/app/build.gradle`, still the Expo default). Fine for

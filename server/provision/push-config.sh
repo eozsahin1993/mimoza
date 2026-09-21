@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Uploads server/<env>.env to SSM, where the Lambda module reads it:
 # settings go to /<RESOURCE_PREFIX>/config/<KEY> (read by Terraform at
-# apply time), the two push keys to /<RESOURCE_PREFIX>/fcm-service-account
-# and /<RESOURCE_PREFIX>/apns-auth-key (read by the relay at runtime). Run it
+# apply time), and each key file to /<RESOURCE_PREFIX>/<name> as a
+# SecureString (fcm-service-account, apns-auth-key, apple-signin-key —
+# read by the relay at runtime). Run it
 # again whenever the file changes, then `terraform apply` so the Lambda
 # picks the new settings up.
 #
