@@ -35,9 +35,9 @@ export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: Pen
   const tints = useTints();
   const language = useLanguage();
   return (
-    <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipReactedBorder }]}>
+    <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipIdleBorder }]}>
       <View style={styles.header}>
-        <Avatar size={44} uri={request.pictureUri} name={request.selfReportedName} />
+        <Avatar size={44} uri={request.pictureUri} name={request.selfReportedName} colorSeed={request.identityPublicKey} />
         <View style={styles.text}>
           <ThemedText type="titleMedium">{request.selfReportedName || t('invite.request.someone')}</ThemedText>
           <ThemedText type="labelSmall" themeColor="muted">
@@ -46,8 +46,8 @@ export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: Pen
         </View>
       </View>
       <View style={styles.actions}>
-        <PrimaryButton label={t('invite.request.letIn')} disabled={busy} onPress={onApprove} style={styles.actionButton} />
         <SecondaryButton label={t('invite.request.notNow')} disabled={busy} onPress={onDeny} style={styles.actionButton} />
+        <PrimaryButton label={t('invite.request.letIn')} disabled={busy} onPress={onApprove} style={styles.actionButton} />
       </View>
     </ThemedView>
   );

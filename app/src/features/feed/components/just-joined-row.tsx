@@ -6,6 +6,7 @@ import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius, Space, Spacing } from '@/ui/theme/tokens';
+import { useTints } from '@/ui/theme/hooks/use-theme';
 
 export type JustJoinedRowsInput = {
   /** Whether this arrival was a join at all — the route carries that, not the feed. */
@@ -37,9 +38,10 @@ export function justJoinedRow(): FeedRow {
 
 function JustJoinedBanner() {
   const { t } = useTranslation();
+  const tints = useTints();
 
   return (
-    <ThemedView style={styles.banner} type="surface">
+    <ThemedView style={[styles.banner, { borderColor: tints.chipIdleBorder }]} type="surface">
       <ThemedText type="titleMedium">{t('feed.justJoinedTitle')}</ThemedText>
       <ThemedText type="labelSmall" themeColor="muted">
         {t('feed.justJoinedBody')}
@@ -54,6 +56,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.gapBetweenPosts,
     padding: Space.s400,
     borderRadius: Radius.panel,
+    borderWidth: 1,
     alignItems: 'center',
     gap: Space.s100,
   },

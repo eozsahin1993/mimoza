@@ -75,7 +75,7 @@ test('approveJoinRequest throws for a device with no identity in the circle', as
   await expect(approveJoinRequest('not-a-real-circle-id', 'some-requester')).rejects.toThrow();
 });
 
-test('discoverPendingRequests decodes the self-reported name, picture, and createdAt', async () => {
+test('discoverPendingRequests decodes the identity key, self-reported name, picture, and createdAt', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
   const invite = await getOrCreateInvite(circleId);
 
@@ -98,6 +98,7 @@ test('discoverPendingRequests decodes the self-reported name, picture, and creat
   expect(requests).toEqual([
     {
       requesterId: 'req-1',
+      identityPublicKey: 'aa'.repeat(32),
       selfReportedName: 'Priya Raman',
       pictureUri: expect.stringContaining('data:image/jpeg;base64,'),
       createdAt,

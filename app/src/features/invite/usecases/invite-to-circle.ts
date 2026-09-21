@@ -147,6 +147,8 @@ async function requireInviteCreatorPublicKey(circleId: string): Promise<{ public
 
 export type PendingRequest = {
   requesterId: string;
+  /** The key they'll be a member under once let in — seeds their avatar colour so it doesn't change on approval. */
+  identityPublicKey: string;
   selfReportedName: string;
   /** Data URI of the requester's self-reported thumbnail, if they sent one — see `compressToThumbnail`. */
   pictureUri?: string;
@@ -179,6 +181,7 @@ export async function discoverPendingRequests(circleId: string): Promise<Pending
       const picture = parsePictureThumbnail(payload.pictureThumbnail);
       pending.push({
         requesterId: request.requesterId,
+        identityPublicKey: payload.identityPublicKey,
         selfReportedName: payload.selfReportedName,
         pictureUri: picture ? bytesToDataUri(picture) : undefined,
         createdAt: request.createdAt,

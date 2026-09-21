@@ -29,7 +29,7 @@ const noRequestActions = { busy: false, onApprove: () => {}, onDeny: () => {} };
 /** The same mapping `useCircleFeed` performs, with the row kinds it has today. */
 function build(events: MemberEvent[] = [], justJoined = false): FeedRow[] {
   return buildFeedRows([
-    pendingRequestRow({ requesterId: 'a', selfReportedName: 'Marcus', createdAt: 1 }, noRequestActions),
+    pendingRequestRow({ requesterId: 'a', identityPublicKey: 'k', selfReportedName: 'Marcus', createdAt: 1 }, noRequestActions),
     ...(justJoined ? [justJoinedRow()] : []),
     ...rosterChangeRows(events, [], null, 'en'),
   ]);
@@ -80,7 +80,7 @@ describe('each row decides for itself', () => {
    * nothing. It stays at the top through `orderRows` instead.
    */
   test('no row asks to stick', () => {
-    expect(pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions).sticky).toBeUndefined();
+    expect(pendingRequestRow({ requesterId: 'a', identityPublicKey: 'k', selfReportedName: 'M', createdAt: 1 }, noRequestActions).sticky).toBeUndefined();
     expect(eventRow(1).sticky).toBeUndefined();
   });
 
@@ -88,14 +88,14 @@ describe('each row decides for itself', () => {
   test('a join request stays above dated rows', () => {
     const rows = buildFeedRows([
       ...rosterChangeRows([event('e1', 9_000)], [], null, 'en'),
-      pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions),
+      pendingRequestRow({ requesterId: 'a', identityPublicKey: 'k', selfReportedName: 'M', createdAt: 1 }, noRequestActions),
     ]);
     expect(rows[0].key).toBe('request:a');
   });
 
   test('only a timeline row carries a time', () => {
     expect(eventRow(5_000).at).toBe(5_000);
-    expect(pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions).at).toBeUndefined();
+    expect(pendingRequestRow({ requesterId: 'a', identityPublicKey: 'k', selfReportedName: 'M', createdAt: 1 }, noRequestActions).at).toBeUndefined();
   });
 
   /** A roster change means nothing by being scrolled past; a post marks its comments seen. */
