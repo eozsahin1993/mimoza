@@ -16,6 +16,8 @@ import (
 const MaxPushTokenBytes = 4096
 
 type putPrefsRequest struct {
+	// circle, invite or pending_request.
+	Kind push.PushKind `json:"kind"`
 	// Base64 sha256(pushFanoutToken || pushRoutingId), computed client-side. The
 	// relay never holds the token itself.
 	PushFanoutHash string `json:"pushFanoutHash"`
@@ -104,8 +106,12 @@ func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if !req.Kind.Valid() {
+		httputil.WriteError(w, http.StatusBadRequest, "kind must be circle, invite or pending_request")
+		return
+	}
 
-	prefs := push.Prefs{PushFanoutHash: pushFanoutHash, CategoryMask: categoryMask, KeyVersion: req.KeyVersion}
+	prefs := push.Prefs{Kind: req.Kind, PushFanoutHash: pushFanoutHash, CategoryMask: categoryMask, KeyVersion: req.KeyVersion}
 	err = h.Service.PutPrefs(r.Context(), pushRoutingID, prefs, owner)
 	if writeOwnershipError(w, err) {
 		return

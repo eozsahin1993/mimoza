@@ -1,7 +1,7 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/log-relay');
-jest.mock('@/features/push-notifications/services/relay');
+jest.mock('@/core/services/push-relay');
 jest.mock('@/core/photo/image');
 
 import { Buffer } from 'buffer';

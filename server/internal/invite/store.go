@@ -39,7 +39,7 @@ type JoinRequest struct {
 // Store persists one table's worth of invite rows: an "invite" row per
 // invite tag, plus one "join request" row per requester under that tag.
 // Every row is ephemeral (TTL'd by the backing store — see
-// invite/dynamodb's DefaultInviteRetentionDays), never circle
+// config.InviteRetentionDays), never circle
 // content itself.
 type Store interface {
 	// CreateInvite writes the sk="invite" row — the one proactive server

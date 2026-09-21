@@ -69,7 +69,7 @@ func TestSendPostsADataOnlyMessage(t *testing.T) {
 	sender := New(testAccount(t, tokens.URL))
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
-	if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("ciphertext")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("ciphertext")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -120,7 +120,7 @@ func TestAccessTokenIsReusedAcrossSends(t *testing.T) {
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
 	for range 3 {
-		if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -146,7 +146,7 @@ func TestAnAlmostExpiredTokenIsRefreshed(t *testing.T) {
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
 	for range 2 {
-		if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -169,7 +169,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 	sender := New(testAccount(t, tokens.URL))
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
-	err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x"))
+	err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -186,7 +186,7 @@ func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 
-	err := New(account).Send(context.Background(), "device-token", "routing-1", 3, []byte("x"))
+	err := New(account).Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -213,3 +213,30 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
 var _ = time.Second
+
+func TestSendAttachesTheKindsLine(t *testing.T) {
+	calls := 0
+	tokens := tokenServer(t, 3600, &calls)
+	defer tokens.Close()
+	var got map[string]any
+	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer fcmAPI.Close()
+
+	sender := New(testAccount(t, tokens.URL))
+	sender.Client.Transport = redirectTo(fcmAPI.URL)
+
+	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindPendingRequest, 0, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+
+	data := got["message"].(map[string]any)["data"].(map[string]any)
+	if data["placeholder"] != push.KindPendingRequest.Alert() {
+		t.Fatalf("expected the pending request line, got %v", data["placeholder"])
+	}
+	if data["kind"] != string(push.KindPendingRequest) {
+		t.Fatalf("expected the kind, got %v", data["kind"])
+	}
+}

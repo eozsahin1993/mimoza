@@ -7,7 +7,7 @@ import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
 import { generateUUID } from '@/core/crypto/primitives';
 import { derivePushRoutingId } from '@/core/crypto/identity';
-import { derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { derivePushFanoutToken } from '@/core/crypto/push';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 

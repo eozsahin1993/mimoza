@@ -23,8 +23,6 @@
       "fr": "Französisch",
       "de": "Deutsch"
     },
-    "newCircles": "Standard für neue Kreise",
-    "newCirclesFootnote": "Sobald du in einem Kreis bist, hat er seine eigene Einstellung. Die änderst du im Kreis selbst. Benachrichtigungen entstehen auf deinem Handy; kein Push-Server erfährt, was passiert ist.",
     "notifyMeAbout": "Benachrichtigungen",
     "pushLevels": {
       "posts": "Nur neue Fotos",
@@ -56,7 +54,17 @@
     "deleteMessage": "Damit wird alles gelöscht, was du in deinen Kreisen gepostet hast, und danach dein Konto endgültig. Das kann nicht rückgängig gemacht werden.",
     "deleteConfirm": "Löschen",
     "deleting": "Dein Konto wird gelöscht…",
-    "deletingDetail": "Das kann einen Moment dauern. Schließ die App nicht."
+    "deletingDetail": "Das kann einen Moment dauern. Schließ die App nicht.",
+    "notifications": "Mitteilungen",
+    "newCirclesRow": "Neue Kreise",
+    "invitesRow": "Einladungen",
+    "notificationsFootnote": "Diese Einstellungen gelten nur für dieses Gerät. Mitteilungen kommen verschlüsselt an und entstehen erst hier bei dir. Kein Push-Server sieht je einen Namen oder eine Nachricht.",
+    "invitePushLevels": {
+      "all": "Beitrittsanfragen und Antworten",
+      "requests": "Nur Beitrittsanfragen",
+      "answers": "Nur Antworten auf deine Anfragen",
+      "off": "Aus"
+    }
   },
   "account": {
     "credits": {
@@ -502,7 +510,14 @@
     "alsoCommentedWithText": "{{name}} hat auch kommentiert: „{{text}}“",
     "reaction": "{{name}} hat auf dein Foto reagiert",
     "reactionWithEmoji": "{{name}} hat mit {{emoji}} auf dein Foto reagiert",
-    "channelGroup": "Kreise"
+    "joinRequest": "{{name}} möchte beitreten",
+    "joinRequestAnyCircle": "Jemand möchte einem Kreis beitreten",
+    "joinRequestNews": "Es gibt Neuigkeiten zu deiner Beitrittsanfrage",
+    "joinApproved": "{{name}} hat deine Anfrage angenommen",
+    "joinApprovedNoName": "Deine Anfrage wurde angenommen",
+    "joinApprovedAnyCircle": "Es gibt Neuigkeiten zu deiner Anfrage, einem Kreis beizutreten",
+    "channelGroup": "Kreise",
+    "invitesChannel": "Einladungen"
   },
   "notifications": {
     "prompt": {

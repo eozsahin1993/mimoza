@@ -23,8 +23,6 @@
       "fr": "Fransızca",
       "de": "Almanca"
     },
-    "newCircles": "Yeni çevreler için varsayılan",
-    "newCirclesFootnote": "Her çevrenin kendi ayarı vardır; onu çevrenin içinden değiştirebilirsin. Bildirimler telefonunda oluşturulur; sunucuya ne olduğu iletilmez.",
     "notifyMeAbout": "Bildirim tercihleri",
     "pushLevels": {
       "posts": "Sadece yeni fotoğraflar",
@@ -56,7 +54,17 @@
     "deleteMessage": "Bu işlem katıldığın tüm çevrelerde paylaştığın her şeyi kaldırır ve hesabını kalıcı olarak siler. Geri alınamaz.",
     "deleteConfirm": "Sil",
     "deleting": "Hesabın siliniyor…",
-    "deletingDetail": "Bu işlem biraz zaman alabilir. Lütfen uygulamayı kapatma."
+    "deletingDetail": "Bu işlem biraz zaman alabilir. Lütfen uygulamayı kapatma.",
+    "notifications": "Bildirimler",
+    "newCirclesRow": "Yeni çevreler",
+    "invitesRow": "Davetler",
+    "notificationsFootnote": "Bu ayarlar sadece bu telefon için. Bildirimler şifreli gelir ve burada, telefonunda hazırlanır; hiçbir bildirim sunucusu bir isim ya da mesaj görmez.",
+    "invitePushLevels": {
+      "all": "Katılma istekleri ve yanıtlar",
+      "requests": "Sadece katılma istekleri",
+      "answers": "Sadece isteklerine gelen yanıtlar",
+      "off": "Kapalı"
+    }
   },
   "account": {
     "credits": {
@@ -502,7 +510,14 @@
     "alsoCommentedWithText": "{{name}} aynı fotoğrafa yorum yaptı: “{{text}}”",
     "reaction": "{{name}} fotoğrafına tepki verdi",
     "reactionWithEmoji": "{{name}} fotoğrafına {{emoji}} tepkisi verdi",
-    "channelGroup": "Çevreler"
+    "joinRequest": "{{name}} çevrene katılmak istiyor",
+    "joinRequestAnyCircle": "Biri çevrene katılmak istiyor",
+    "joinRequestNews": "Katılma isteğinle ilgili bir gelişme var",
+    "joinApproved": "{{name}} katılma isteğini kabul etti",
+    "joinApprovedNoName": "Katılma isteğin kabul edildi",
+    "joinApprovedAnyCircle": "Bir çevreye katılma isteğinle ilgili bir gelişme var",
+    "channelGroup": "Çevreler",
+    "invitesChannel": "Davetler"
   },
   "notifications": {
     "prompt": {

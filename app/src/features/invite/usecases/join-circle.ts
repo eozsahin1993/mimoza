@@ -30,16 +30,16 @@ import { deleteJoinRequest, getJoinRequestApproval, putJoinRequest } from '@/cor
 import { JoinRequestGoneError } from '@/core/services/relay-errors';
 import { getInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getBlob } from '@/core/services/blob-relay';
+import { notifyInviteCreator, registerPushForPendingRequest } from '@/features/invite/usecases/invite-push';
+import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 
 /**
- * Fetches and decrypts the circle's cover photo, if it has one — the
- * fixed, predictable `entryId: 'cover'` location (see
- * services/relay.ts's `getBlob` and set-cover-photo.ts) means a joiner
- * can fetch it directly on join without needing `pullCircle`/meta-log
- * consumption to exist first (which nothing in the app does yet — see
- * this function's caller's doc comment). Best-effort: a stranger's
- * tampered or missing object just decrypts to nothing usable, caught
- * here rather than failing the join over a picture.
+ * Fetches the circle's cover straight from its fixed `cover` key, so a
+ * joiner sees it before the first meta pull rather than a few seconds
+ * after. It decrypts with the current key, which is wrong if the cover
+ * predates a rotation — that fails authentication and lands here, and the
+ * pull fixes it once `cover_photo_set` arrives with the right version.
+ * Best-effort throughout: a missing or tampered object never fails a join.
  */
 async function fetchCoverPhoto(syncId: string, contentKey: Uint8Array): Promise<Uint8Array | null> {
   try {
@@ -111,8 +111,23 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
     }
   }
 
+  // Claimed before the request shares it with every holder of the code
+  // (see invite-push.ts). It's the future circle's own routing id, so joining
+  // later just re-locks it.
+  const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
+  // Best-effort: a request that can't register push still goes out, and
+  // polling finds the answer. It still has to carry the routing id, which
+  // the approver needs for the roster.
+  const pushRegistered = await registerPushForPendingRequest(pushRoutingId, inviteCode).then(
+    () => true,
+    (err) => {
+      console.error('Failed to register push for a join request', err);
+      return false;
+    },
+  );
+
   const request: JoinRequestPayload = {
-    pushRoutingId: derivePushRoutingId(masterSeed, circleId),
+    pushRoutingId,
     ...buildAuthorityKeyClaim(masterSeed, circleId, bytesToHex(identity.publicKey)),
     ephemeralPublicKey: bytesToHex(keypair.publicKey),
     identityPublicKey: bytesToHex(identity.publicKey),
@@ -122,6 +137,12 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
   };
   const key = deriveJoinRequestKey(inviteCode);
   await putJoinRequest(deriveInviteTag(inviteCode), requestId, encryptJSON(request, key));
+  // Optional in the preview type; every invite this app creates has one.
+  if (preview.pushRoutingId) {
+    notifyInviteCreator(preview.pushRoutingId, inviteCode, requestId, request.selfReportedName).catch((err) =>
+      console.error('Failed to notify the invite creator', err),
+    );
+  }
 
   await savePendingJoinKeypair(requestId, keypair);
   await insertPendingJoinRequest({
@@ -134,7 +155,10 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
     ephemeralPublicKey: bytesToHex(keypair.publicKey),
     submittedAt: Date.now(),
     status: 'pending',
+    pushRoutingId: pushRegistered ? pushRoutingId : null,
   });
+  // The iOS extension reads the request from the snapshot to verify its approval push.
+  void refreshPushSnapshot();
 
   return { requestId };
 }

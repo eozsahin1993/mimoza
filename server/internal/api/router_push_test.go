@@ -58,6 +58,7 @@ func registerPush(t *testing.T, serverURL, token, pushRoutingID string) []byte {
 	pushFanoutToken := []byte("fanout-token-for-" + pushRoutingID)
 
 	body, err := json.Marshal(map[string]any{
+		"kind":           "circle",
 		"pushFanoutHash": b64(push.PushFanoutHash(pushFanoutToken, pushRoutingID)),
 		"categories":     []int64{0, 1},
 		"keyVersion":     1,
@@ -211,7 +212,7 @@ func TestEndToEnd_Push_RejectsShortFanoutHash(t *testing.T) {
 	claims["iss"] = google.Issuer
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
-	body, _ := json.Marshal(map[string]any{"pushFanoutHash": b64([]byte("short")), "categories": []int64{0}})
+	body, _ := json.Marshal(map[string]any{"kind": "circle", "pushFanoutHash": b64([]byte("short")), "categories": []int64{0}})
 	pushRoutingID := testsupport.UniqueInviteTag(t)
 	resp := ownedRequest(t, http.MethodPut, server.URL+"/v1/push/"+pushRoutingID, token, ownerOf(pushRoutingID), string(body))
 	defer resp.Body.Close()
@@ -239,7 +240,7 @@ func TestEndToEnd_Push_AnotherAccountCannotChangeARoutingID(t *testing.T) {
 	wrongOwner := []byte("somebody-elses-owner-token-32byt")
 	url := server.URL + "/v1/push/" + pushRoutingID
 
-	prefs, _ := json.Marshal(map[string]any{"pushFanoutHash": b64(make([]byte, 32)), "categories": []int64{0}})
+	prefs, _ := json.Marshal(map[string]any{"kind": "circle", "pushFanoutHash": b64(make([]byte, 32)), "categories": []int64{0}})
 	device, _ := json.Marshal(map[string]any{"pushToken": b64([]byte("attacker-token")), "platform": "ios", "enabled": true})
 	for _, attempt := range []struct{ method, path, body string }{
 		{http.MethodPut, "", string(prefs)},
@@ -316,5 +317,57 @@ func TestEndToEnd_Push_AMemberCannotDeleteAnothersPushConfig(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("a member deleting their own routing: expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestEndToEnd_Push_KindIsRequired(t *testing.T) {
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
+
+	for _, kind := range []string{"", "someone-else"} {
+		body, _ := json.Marshal(map[string]any{"kind": kind, "pushFanoutHash": b64(make([]byte, 32)), "categories": []int64{0}})
+		pushRoutingID := testsupport.UniqueInviteTag(t)
+		resp := ownedRequest(t, http.MethodPut, server.URL+"/v1/push/"+pushRoutingID, token, ownerOf(pushRoutingID), string(body))
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("kind %q: expected 400, got %d", kind, resp.StatusCode)
+		}
+	}
+}
+
+// A pending request's push needs no ciphertext: the requester's phone
+// writes the text from its own row. An empty payload must still deliver.
+func TestEndToEnd_Push_AnEmptyPayloadStillDelivers(t *testing.T) {
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
+
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	pushFanoutToken := registerPush(t, server.URL, token, pushRoutingID)
+
+	body, _ := json.Marshal(map[string]any{
+		"pushRoutingIds":  []string{pushRoutingID},
+		"pushFanoutToken": b64(pushFanoutToken),
+		"category":        0,
+		"payload":         "",
+	})
+	resp, err := http.Post(server.URL+"/v1/push/send", "application/json", jsonBody(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var result map[string]int
+	_ = json.NewDecoder(resp.Body).Decode(&result)
+	if resp.StatusCode != http.StatusOK || result["delivered"] != 1 {
+		t.Fatalf("expected one delivery, got %d %+v", resp.StatusCode, result)
 	}
 }

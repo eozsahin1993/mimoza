@@ -23,8 +23,6 @@
       "fr": "French",
       "de": "German"
     },
-    "newCircles": "New circles start with",
-    "newCirclesFootnote": "Each circle keeps its own setting once you are in it. Change those in the circle itself. Notifications are generated on your phone; no push server is told what happened.",
     "notifyMeAbout": "Notify me about",
     "pushLevels": {
       "posts": "New photos only",
@@ -56,7 +54,17 @@
     "deleteMessage": "This erases everything you've posted in every circle you're in, then permanently deletes your account. This can't be undone.",
     "deleteConfirm": "Delete",
     "deleting": "Deleting your account…",
-    "deletingDetail": "This can take a moment. Don't close the app."
+    "deletingDetail": "This can take a moment. Don't close the app.",
+    "notifications": "Notifications",
+    "newCirclesRow": "New circles",
+    "invitesRow": "Invites",
+    "notificationsFootnote": "These are just for this phone. Notifications arrive encrypted and are put together right here, so no push server ever sees a name or a message.",
+    "invitePushLevels": {
+      "all": "Requests to join and answers",
+      "requests": "Requests to join only",
+      "answers": "Answers to your requests only",
+      "off": "Off"
+    }
   },
   "account": {
     "credits": {
@@ -502,7 +510,14 @@
     "alsoCommentedWithText": "{{name}} also commented: “{{text}}”",
     "reaction": "{{name}} reacted to your photo",
     "reactionWithEmoji": "{{name}} reacted {{emoji}} to your photo",
-    "channelGroup": "Circles"
+    "joinRequest": "{{name}} wants to join",
+    "joinRequestAnyCircle": "Someone wants to join a circle",
+    "joinRequestNews": "There’s news on your request to join",
+    "joinApproved": "{{name}} accepted your request",
+    "joinApprovedNoName": "Your request was accepted",
+    "joinApprovedAnyCircle": "There’s news on your request to join a circle",
+    "channelGroup": "Circles",
+    "invitesChannel": "Invites"
   },
   "notifications": {
     "prompt": {

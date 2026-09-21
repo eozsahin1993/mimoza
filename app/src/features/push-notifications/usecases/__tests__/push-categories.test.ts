@@ -1,4 +1,7 @@
-import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { getAppSettings } from '@/core/services/settings';
+import { ALL_INVITE_PUSH, InvitePushCategories, PushCategories } from '@/features/push-notifications/usecases/push-categories';
 
 /**
  * Pinned deliberately, not merely asserted. These are bit positions inside
@@ -16,4 +19,18 @@ test('category values are permanent', () => {
     reaction: 2,
     memberJoined: 3,
   });
+});
+
+test('invite category values are permanent', () => {
+  expect(InvitePushCategories).toEqual({
+    joinRequest: 0,
+    joinApproved: 1,
+  });
+});
+
+/** settings.ts spells the default out to stay free of feature code; this keeps the two equal. */
+test('a phone starts with every invite category on', async () => {
+  await AsyncStorage.clear();
+
+  expect((await getAppSettings()).invitePushMask).toBe(ALL_INVITE_PUSH);
 });

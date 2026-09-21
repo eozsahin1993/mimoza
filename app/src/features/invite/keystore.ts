@@ -33,3 +33,20 @@ export async function getPendingJoinKeypair(requestId: string): Promise<Keypair 
 export async function deletePendingJoinKeypair(requestId: string): Promise<void> {
   await deleteSecret(pendingJoinKeypairStorageKey(requestId));
 }
+
+function inviteJoinRequestKeyStorageKey(pushRoutingId: string) {
+  return `invite_join_request_key_${pushRoutingId}`;
+}
+
+/**
+ * An invite's join-request key, for the iOS notification extension to read
+ * request pushes with (it can't open SQLite, where the code lives). The key
+ * rather than the code: the key only reads requests, the code could send them.
+ */
+export async function saveInviteJoinRequestKey(pushRoutingId: string, key: Uint8Array): Promise<void> {
+  await setSecret(inviteJoinRequestKeyStorageKey(pushRoutingId), bytesToHex(key));
+}
+
+export async function deleteInviteJoinRequestKey(pushRoutingId: string): Promise<void> {
+  await deleteSecret(inviteJoinRequestKeyStorageKey(pushRoutingId));
+}

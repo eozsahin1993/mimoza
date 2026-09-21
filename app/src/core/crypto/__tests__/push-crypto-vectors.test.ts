@@ -1,7 +1,10 @@
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
-import { bytesToHex, concatBytes } from '@noble/curves/utils.js';
+import { x25519 } from '@noble/curves/ed25519.js';
+import { bytesToHex, concatBytes, hexToBytes } from '@noble/curves/utils.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 
-import { verify } from '@/core/crypto/primitives';
+import { openSealedBox, sign, verify } from '@/core/crypto/primitives';
 import { deriveCircleIdentity, derivePushRoutingId } from '@/core/crypto/identity';
 import { buildLogEntry, verifyLogEntry } from '@/core/sync/log-entry';
 
@@ -57,4 +60,28 @@ test('a signed prefix cut at the last authorPubkey marker verifies', () => {
       Uint8Array.from(Buffer.from(parsed.authorPubkey, 'hex')),
     ),
   ).toBe(true);
+});
+
+test('sealed approval vector opens and verifies', () => {
+  // sealToPublicKey picks its own sender key and nonce; the vector fixes
+  // both, so the wire format is assembled here and checked against the
+  // real openSealedBox.
+  const recipient = { secretKey: new Uint8Array(32).fill(4), publicKey: x25519.getPublicKey(new Uint8Array(32).fill(4)) };
+  const senderSecret = new Uint8Array(32).fill(5);
+  const senderPublic = x25519.getPublicKey(senderSecret);
+  const creator = deriveCircleIdentity(seed, circleId);
+  const approval = { keyMap: { 1: '02'.repeat(32) }, syncId: 'sync-1', circleName: 'Family' };
+  const envelope = { approval, signature: bytesToHex(sign(new TextEncoder().encode(JSON.stringify(approval)), creator.secretKey)) };
+  const key = hkdf(sha256, x25519.getSharedSecret(senderSecret, recipient.publicKey), undefined, concatBytes(new TextEncoder().encode('join-approval-box'), senderPublic, recipient.publicKey), 32);
+  const approvalNonce = new Uint8Array(24).fill(6);
+  const sealed = concatBytes(senderPublic, approvalNonce, xchacha20poly1305(key, approvalNonce).encrypt(new TextEncoder().encode(JSON.stringify(envelope))));
+
+  expect(bytesToHex(key)).toBe('191d40e75151b6a90f0fb3f45e70c675ac5333371fe2691b5d5515bdbde1bc29');
+  expect(bytesToHex(sealed)).toBe('50a61409b1ddd0325e9b16b700e719e9772c07000b1bd7786e907c653d20495d060606060606060606060606060606060606060606060606263f0e628489644428f2a89d757678a43339c2a7598176cb5cf1c62924d95fa4d95772aeb06801b9742c02d044daf83f48ec0239e243297cf619692378d429ae00ce47c03e87bb75b00243f3eebfaae6b3426f41d06b9e75f65aa385719fe98c0b4bf82d3b1a770f237867d18f5cac29b1ac97ee65f18e41490b6e3c6ba59e709a4c094a3ecf44cbb44dd96d49668b0aca6a26f26003cc88613bae2fed7d9c5a0fb95030f0888aa549e2c5054f249a4e65468e234d33813b57628877fd2f611ccf0ba02a68832219332d4dc104e6d7d7ae243c3cbb42406a9f2f1a46aba15aa8332a3bc8602e3f6650d099ceda57972eb83d98ee4961099a88c2804f36955d831013ae65afb4eba8b24ef7f21784f6d24b0954536d4f71513a52705ad8822e20507af9b76d15a6');
+
+  // The Swift port verifies the text between `{"approval":` and the last
+  // `,"signature":"`, rather than re-serializing.
+  const text = new TextDecoder().decode(openSealedBox(sealed, recipient));
+  const message = new TextEncoder().encode(text.slice('{"approval":'.length, text.lastIndexOf(',"signature":"')));
+  expect(verify(hexToBytes(envelope.signature), message, creator.publicKey)).toBe(true);
 });

@@ -81,8 +81,8 @@ already uses:
 
 ```
 pk = routingId
-sk = "prefs"             -> { pushFanoutHash, ownerHash, categoryMask, keyVersion, silenced }
-sk = "device#<deviceId>" -> { pushToken, platform, enabled }
+sk = "prefs"             -> { kind, pushFanoutHash, ownerHash, categoryMask, keyVersion, silenced, expiresAt? }
+sk = "device#<deviceId>" -> { pushToken, platform, enabled, expiresAt? }
 
 pushFanoutHash = sha256(fanoutToken || routingId)    who can send
 ownerHash      = sha256(ownerToken  || routingId)    who can change the rows
@@ -112,10 +112,48 @@ on the account produces the same one and nobody else can.
 
 Push tokens are **not** encrypted at rest beyond DynamoDB's own SSE. The
 client base64s the platform token and the relay stores those bytes as it
-received them (`putPushDevice` in `services/relay.ts`, `PutDevice` in
+received them (`putPushDevice` in `core/services/push-relay.ts`, `PutDevice` in
 `push/dynamodb`) — it has to hand APNs and FCM the token verbatim, so an
 application-layer key it also holds would buy nothing. Encrypting under a
 key the relay can't use would mean it couldn't send.
+
+## Kinds of routing
+
+A circle is one kind of routing; the invite handshake adds two more
+([INVITE_PUSH.md](INVITE_PUSH.md)). All three have the same rows and the
+same owner lock; what differs is the routing id, what opens it, and how
+long it lives. `kind` is stored on the prefs row, read on every send to
+pick the fixed alert, and never authorizes anything.
+
+| | circle | invite | pending_request |
+|---|---|---|---|
+| routing id | `HKDF(seed, "push-enabled" ‖ circleId)` | `HKDF(seed, "push-invite" ‖ code)` | as circle, for the future circle |
+| send lock | content key, current version | invite code | invite code |
+| shared via | `push_enabled` entry | invite preview | join request |
+| relay expiry | never | invite retention | invite retention |
+| fixed alert | "New activity" | "Someone wants to join a circle" | "There's news on your request to join a circle" |
+
+`circleId` is local to each person's phones, and the seed is theirs, so
+two members' routing ids for the same circle share nothing the relay
+could match. A pending routing becomes a circle routing on joining: same
+id, re-registered with the content key. Both writes replace the whole
+row, so that also drops the expiry.
+
+When a phone registers:
+
+```
+launch            every circle; sweep invite routings (delete finished ones,
+                  re-send the device for live ones)
+feed opens        that circle, if this phone never has (pushKeyVersion null)
+key rotation      re-hash that circle's prefs (pushKeyVersion lags)
+invite created    its routing, before the preview names it
+request sent      its pending routing, before the request names it
+link replaced     delete the old invite routing at once
+permission given  every circle, at once
+```
+
+A routing is always registered before it's shared: the first `PUT prefs`
+claims it, and anyone who read the id first could claim it instead.
 
 ## The flow
 
@@ -127,7 +165,7 @@ version the relay has, and the sync pass retries until it catches up.
 Until then a removed member's old token still verifies and everyone
 else's new one doesn't. Authenticated, `accountId` not persisted:
 
-- `PUT /v1/push/{routingId}` with `{ pushFanoutHash, categories, keyVersion }`
+- `PUT /v1/push/{routingId}` with `{ kind, pushFanoutHash, categories, keyVersion }`
 - `PUT /v1/push/{routingId}/devices/{deviceId}` with `{ pushToken, platform, enabled }`
 
 `DELETE` on either undoes it — the device row for this device alone, the
@@ -144,9 +182,11 @@ sees a circle-to-routing-ID map.
 - routing IDs come from the sender's own decrypted roster, minus their
   own, and are shuffled — roster order is stable, so sending in it would
   leak the ordering across posts
-- `payload` is the entry's existing ciphertext, nothing else. The
-  placeholder is the relay's own constant (`push.Placeholder`), stapled
-  on at dispatch; a sender cannot choose it
+- `payload` is the entry's existing ciphertext, nothing else, and may be
+  empty for a push the recipient writes from its own state (a pending
+  request's; see INVITE_PUSH). The alert text is the relay's own, picked
+  from the recipient routing's `kind` (`PushKind.Alert`: "New activity"
+  for a circle) and stapled on at dispatch; a sender cannot choose it
 
 **Verify** — per routing ID, the relay recomputes
 `hash(fanoutToken || routingId)` and compares against that row. A mismatch
@@ -165,8 +205,9 @@ design exists to withhold.
 
 **Deliver** — check the category bit, then dispatch to each `enabled`
 token individually rather than as one grouped send. Each delivered push
-carries only that recipient's own `routingId` (plus `keyVersion` and the
-ciphertext) — the full `routingIds[]` list exists only in the send
+carries only that recipient's own `routingId` (plus its `kind`,
+`keyVersion`, the ciphertext, and the kind's alert) — the full
+`routingIds[]` list exists only in the send
 request, so no member ever sees another member's routing id, and nothing
 delivered reveals the grouping.
 
@@ -180,14 +221,16 @@ background task (`services/task.ts`).
 One log entry that skipped the line. `payload` is byte-for-byte the
 `encryptedMeta` the sender appended to the sync log — same encryption,
 same signature, the bytes the next sync would deliver anyway — with a
-delivery address stapled on. The iOS shape (Android carries the same
-three in an FCM data message, `keyVersion` as a string, plus a
-`placeholder` field neither receiver reads):
+delivery address stapled on. The iOS shape for a circle push (Android
+carries the same fields in an FCM data message, `keyVersion` as a
+string, plus a `placeholder` field with the kind's alert that neither
+receiver reads):
 
 ```
 {
   "aps": { "alert": "New activity", "mutable-content": 1 },
   "pushRoutingId": "837256bc0d92…",   ← recipient's own address, resolvable only by their seed
+  "kind": "circle",                    ← the routing's kind; picks the alert and the device's text
   "keyVersion": 3,                     ← already plaintext on every append
   "payload": "KP6zUVZg6cgu…"          ← base64: nonce(24) ‖ XChaCha20-Poly1305 box
 }

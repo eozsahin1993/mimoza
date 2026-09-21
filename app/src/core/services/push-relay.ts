@@ -19,18 +19,23 @@ function ownerHeader(ownerToken: Uint8Array): Record<string, string> {
   return { 'Push-Owner': Buffer.from(ownerToken).toString('base64') };
 }
 
-/** Writes this account's control row for one circle — categories and the fanout hash. */
+/** What a routing id addresses. The relay stores it, expires the temporary two, and picks its fallback line by it. */
+export type PushKind = 'circle' | 'invite' | 'pending_request';
+
+/** Writes an address's control row — its kind, categories and fanout hash. */
 export async function putPushPrefs(
   pushRoutingId: string,
   pushFanoutHash: Uint8Array,
   categories: number[],
   keyVersion: number,
   ownerToken: Uint8Array,
+  kind: PushKind,
 ): Promise<void> {
   const response = await authorizedFetch(`/v1/push/${pushRoutingId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...ownerHeader(ownerToken) },
     body: JSON.stringify({
+      kind,
       pushFanoutHash: Buffer.from(pushFanoutHash).toString('base64'),
       categories,
       keyVersion,

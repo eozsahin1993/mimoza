@@ -1,8 +1,9 @@
 // Package dynamodb implements push.Store. Same single-table shape as
 // invite/dynamodb: PK = pushRoutingId, SK splits prefs from device rows.
 //
-// No TTL, unlike the invite table: a routing id is how a device stays
-// reachable between posts, not a handoff that expires.
+// Circle addresses never expire: a routing id is how a device stays
+// reachable between posts. Invite and pending-request addresses do (see
+// push.PushKind.Temporary), through the table's TTL on expiresAt.
 package dynamodb
 
 import (
@@ -25,6 +26,10 @@ const (
 	deviceSKPrefix = "device#"
 )
 
+func (s *Store) expiresAt() types.AttributeValue {
+	return &types.AttributeValueMemberN{Value: strconv.FormatInt(dynamoutil.NowMillis()/1000+s.temporaryRetentionSeconds, 10)}
+}
+
 func deviceSK(deviceID string) string {
 	return deviceSKPrefix + deviceID
 }
@@ -32,26 +37,36 @@ func deviceSK(deviceID string) string {
 type Store struct {
 	client    *dynamodb.Client
 	tableName string
+	// How long an invite or pending-request address lasts. Always the
+	// invite retention, passed in by the caller (see app.go).
+	temporaryRetentionSeconds int64
 }
 
-func New(client *dynamodb.Client, tableName string) *Store {
-	return &Store{client: client, tableName: tableName}
+func New(client *dynamodb.Client, tableName string, inviteRetentionDays int64) *Store {
+	return &Store{client: client, tableName: tableName, temporaryRetentionSeconds: inviteRetentionDays * 24 * 60 * 60}
 }
 
 var _ push.Store = (*Store)(nil)
 
 func (s *Store) PutPrefs(ctx context.Context, pushRoutingID string, prefs push.Prefs) error {
+	item := map[string]types.AttributeValue{
+		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
+		dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: prefsSK},
+		"kind":            &types.AttributeValueMemberS{Value: string(prefs.Kind)},
+		"pushFanoutHash":  &types.AttributeValueMemberB{Value: prefs.PushFanoutHash},
+		"ownerHash":       &types.AttributeValueMemberB{Value: prefs.OwnerHash},
+		"categoryMask":    &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.CategoryMask, 10)},
+		"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.KeyVersion, 10)},
+		"silenced":        &types.AttributeValueMemberBOOL{Value: prefs.Silenced},
+	}
+	// A whole-item put, so leaving expiresAt out is what clears it.
+	if prefs.Kind.Temporary() {
+		item["expiresAt"] = s.expiresAt()
+	}
+
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
-		Item: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: prefsSK},
-			"pushFanoutHash":  &types.AttributeValueMemberB{Value: prefs.PushFanoutHash},
-			"ownerHash":       &types.AttributeValueMemberB{Value: prefs.OwnerHash},
-			"categoryMask":    &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.CategoryMask, 10)},
-			"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.KeyVersion, 10)},
-			"silenced":        &types.AttributeValueMemberBOOL{Value: prefs.Silenced},
-		},
+		Item:      item,
 		// A new row, or the same owner.
 		ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s) OR ownerHash = :owner", dynamoutil.PKAttr)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
@@ -102,7 +117,20 @@ func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*push.Prefs
 	// empty one authorizes no write (see Service.authorize).
 	ownerHash, _ := dynamoutil.AttrBytes(out.Item, "ownerHash")
 
+	// DynamoDB's TTL deletes lazily, days after expiresAt at worst; until
+	// then an expired row would still take pushes. Past it is past.
+	if expiresAt, err := dynamoutil.AttrInt(out.Item, "expiresAt"); err == nil && expiresAt <= dynamoutil.NowMillis()/1000 {
+		return nil, push.ErrPushRoutingNotFound
+	}
+
+	// Rows from before kinds existed are all circles.
+	kind := push.KindCircle
+	if stored, ok := dynamoutil.AttrString(out.Item, "kind"); ok {
+		kind = push.PushKind(stored)
+	}
+
 	prefs := push.Prefs{
+		Kind:           kind,
 		PushFanoutHash: pushFanoutHash,
 		OwnerHash:      ownerHash,
 		CategoryMask:   categoryMask,
@@ -136,15 +164,19 @@ func (s *Store) SetSilenced(ctx context.Context, pushRoutingID string, silenced 
 }
 
 func (s *Store) PutDevice(ctx context.Context, pushRoutingID string, device push.Device) error {
+	item := map[string]types.AttributeValue{
+		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
+		dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: deviceSK(device.DeviceID)},
+		"pushToken":       &types.AttributeValueMemberB{Value: device.PushToken},
+		"platform":        &types.AttributeValueMemberS{Value: device.Platform},
+		"enabled":         &types.AttributeValueMemberBOOL{Value: device.Enabled},
+	}
+	if device.Temporary {
+		item["expiresAt"] = s.expiresAt()
+	}
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
-		Item: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: deviceSK(device.DeviceID)},
-			"pushToken":       &types.AttributeValueMemberB{Value: device.PushToken},
-			"platform":        &types.AttributeValueMemberS{Value: device.Platform},
-			"enabled":         &types.AttributeValueMemberBOOL{Value: device.Enabled},
-		},
+		Item:      item,
 	})
 	if err != nil {
 		return fmt.Errorf("put push device: %w", err)

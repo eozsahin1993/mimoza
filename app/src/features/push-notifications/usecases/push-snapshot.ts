@@ -1,7 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import { getAllCircles, getCircleMembers } from '@/data/db';
+import { getAllCircles, getAllPendingJoinRequests, getCircleMembers, getInvitesWithPushRouting } from '@/data/db';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { getAppSettings } from '@/core/services/settings';
 import { APP_GROUP } from '@/features/push-notifications/app-group';
@@ -16,6 +16,9 @@ let generation = 0;
  * needs into the App Group container — it can't open the app's SQLite.
  * Stale is benign (a card says "Someone"); never throws, since the sync
  * and launch paths calling it must not fail on it.
+ *
+ * Live invites and pending join requests ride along so the two join
+ * handshake pushes can be matched and read there (docs/INVITE_PUSH.md).
  *
  * Also carries the language picked in the app, which the extension can't
  * read from AsyncStorage either. Left out when following the device, so
@@ -43,9 +46,26 @@ export async function refreshPushSnapshot(): Promise<void> {
       });
     }
 
+    const now = Date.now();
+    const invites = (await getInvitesWithPushRouting())
+      .filter((invite) => invite.revokedAt === null && invite.expiresAt > now)
+      .map((invite) => ({ pushRoutingId: invite.pushRoutingId, circleId: invite.circleId }));
+    const pendingRequests = (await getAllPendingJoinRequests())
+      .filter((request) => request.pushRoutingId)
+      .map((request) => ({
+        requestId: request.id,
+        pushRoutingId: request.pushRoutingId,
+        circleId: request.circleId,
+        circleName: request.circleName,
+        createdByName: request.createdByName,
+        createdByPublicKey: request.createdByPublicKey,
+      }));
+
     // Synchronous from this check to the write, so no clear can land between them.
     if (generation !== startedAt) return;
-    new File(container, PUSH_SNAPSHOT_FILE).write(JSON.stringify({ circles, language: language === 'system' ? undefined : language }));
+    new File(container, PUSH_SNAPSHOT_FILE).write(
+      JSON.stringify({ circles, invites, pendingRequests, language: language === 'system' ? undefined : language }),
+    );
   } catch (err) {
     console.error('Failed to write the push snapshot', err);
   }

@@ -7,6 +7,7 @@ import { circlePushPreferences } from '@/features/push-notifications/usecases/pu
 import { registerPushForCircle, unregisterDeviceForCircle } from '@/features/push-notifications/usecases/push-registration';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
+import { sweepInvitePush, unregisterInvitePushDevice } from '@/features/invite/usecases/invite-push';
 
 /**
  * Registers this device for every circle it can be reached in — call on
@@ -27,6 +28,10 @@ export async function enablePushEverywhere(): Promise<void> {
   // Even without permission (or a token), the iOS extension's snapshot
   // should reflect this launch's circles.
   await refreshPushSnapshot();
+
+  // Removing a finished invite's routing needs no token, so before the
+  // permission check below.
+  await sweepInvitePush().catch((err) => console.error('Failed to tend invite push', err));
 
   // Never prompts: this runs on every launch, and the OS spends its one
   // prompt on whatever asks first.
@@ -58,6 +63,9 @@ export async function unregisterPushEverywhere(): Promise<void> {
       console.error(`Failed to disable notifications for circle ${circle.id}`, err);
     }
   }
+  // Invite and pending routings too: the iOS extension writes their line
+  // from the kind alone, so a signed-out phone would still show it.
+  await unregisterInvitePushDevice();
 }
 
 /**

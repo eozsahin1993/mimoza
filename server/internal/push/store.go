@@ -33,6 +33,7 @@ const MaxCategory = 62
 
 // Prefs is one routing id's control row.
 type Prefs struct {
+	Kind           PushKind
 	PushFanoutHash []byte
 	// Who may change this row and its devices; see OwnerHash.
 	OwnerHash []byte
@@ -56,6 +57,9 @@ type Device struct {
 	PushToken []byte
 	Platform  string
 	Enabled   bool
+	// Expire with the address; set by the service from the prefs row's
+	// kind, never by the caller.
+	Temporary bool
 }
 
 // Store persists one prefs row per routing id, plus a device row per
@@ -63,7 +67,10 @@ type Device struct {
 type Store interface {
 	// PutPrefs writes prefs.OwnerHash along with the rest. A new row is
 	// claimed; an existing one owned by a different hash returns
-	// ErrNotOwner — atomically, so two first writes can't both win.
+	// ErrNotOwner — atomically, so two first writes can't both win. A
+	// temporary kind expires. The write replaces the whole row, so re-putting
+	// it as a circle clears that; its devices clear the same way when the
+	// joining phone re-registers them.
 	PutPrefs(ctx context.Context, pushRoutingID string, prefs Prefs) error
 	// SetSilenced flips just that flag, leaving the hash and categories
 	// alone — no re-derivation, and unsilencing needs no content key.

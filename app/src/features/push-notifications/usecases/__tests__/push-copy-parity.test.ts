@@ -22,8 +22,8 @@ const catalog = JSON.parse(readFileSync(join(extension, 'Localizable.xcstrings')
 };
 const swift = readFileSync(join(extension, 'NotificationService.swift'), 'utf8');
 
-/** Android names its notification channel group; iOS has no such thing. Mirrors the script. */
-const ANDROID_ONLY = new Set(['channelGroup']);
+/** Android names its notification channels and their group; iOS has neither. Mirrors the script. */
+const ANDROID_ONLY = new Set(['channelGroup', 'invitesChannel']);
 
 const translations = { en, tr, es, fr, de };
 

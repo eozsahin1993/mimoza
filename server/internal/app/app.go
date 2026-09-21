@@ -117,7 +117,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		// see auth/dynamodb's AppleCredentialStore for the key spacing.
 		AppleCredentials: authdynamodb.NewAppleCredentialStore(dynamo(), cfg.AccountsTableName),
 		Push: api.PushDeps{
-			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName),
+			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName, cfg.InviteRetentionDays),
 			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),
 			// Each dispatcher gates on its own platform internally (see
 			// fcm.NewDispatcher/apns.NewDispatcher), so calling both is a

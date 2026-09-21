@@ -13,8 +13,10 @@ to double as both a map of the code and a design history.
 - [ACCOUNT_RECOVERY.md](ACCOUNT_RECOVERY.md) — getting an account back on a
   new phone: the phrase, the encrypted account manifest, two devices at
   once. Supersedes `DESIGN.md`'s "Account recovery" section.
-- [PUSH_DESIGN.md](PUSH_DESIGN.md) — mobile push notifications: routing,
-  fanout, on-device composition.
+- [PUSH_DESIGN.md](PUSH_DESIGN.md) — mobile push notifications: routing and
+  its kinds, fanout, on-device composition.
+- [INVITE_PUSH.md](INVITE_PUSH.md) — pushing both halves of the join
+  handshake.
 - [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — accounts, environments, the
   CloudFront front door, blob delivery, deploys, cost.
 - [STAGING_CHECKLIST.md](STAGING_CHECKLIST.md) — cutting an internal

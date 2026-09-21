@@ -41,6 +41,7 @@ import (
 	manifestdynamodb "mimoza-relay/internal/account/dynamodb"
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	"mimoza-relay/internal/config"
 	"mimoza-relay/internal/invite"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	"mimoza-relay/internal/push"
@@ -317,6 +318,10 @@ func NewManifestStore(t testing.TB) account.Store {
 // assert on the written expiresAt need a known, non-default window.
 func NewInviteStore(t testing.TB, retentionDays int64) invite.Store {
 	t.Helper()
+	// 0 stands for "whatever production would use", as config resolves it.
+	if retentionDays == 0 {
+		retentionDays = config.DefaultInviteRetentionDays
+	}
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
@@ -367,7 +372,18 @@ func NewPushStore(t testing.TB) push.Store {
 		unreachable(t, "DynamoDB", pushTableErr)
 	}
 
-	return pushdynamodb.New(client, pushTableName)
+	return pushdynamodb.New(client, pushTableName, config.DefaultInviteRetentionDays)
+}
+
+// NewPushStoreWithRetention is NewPushStore with a chosen invite retention
+// — negative to write temporary rows that have already expired.
+func NewPushStoreWithRetention(t testing.TB, retentionDays int64) push.Store {
+	t.Helper()
+	NewPushStore(t)
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
+	})
+	return pushdynamodb.New(client, pushTableName, retentionDays)
 }
 
 // NewRateLimitStore returns a real dynamodb-backed ratelimit.Store
@@ -446,6 +462,27 @@ func RawItem(t testing.TB, pk, sk string) (map[string]ddbtypes.AttributeValue, e
 	})
 	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
 		TableName: aws.String(tableName),
+		Key: map[string]ddbtypes.AttributeValue{
+			"pk": &ddbtypes.AttributeValueMemberS{Value: pk},
+			"sk": &ddbtypes.AttributeValueMemberS{Value: sk},
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.Item, nil
+}
+
+// RawPushItem is RawItem against the push table, for the expiresAt the
+// push Store sets but never returns.
+func RawPushItem(t testing.TB, pk, sk string) (map[string]ddbtypes.AttributeValue, error) {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
+	})
+	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
+		TableName: aws.String(pushTableName),
 		Key: map[string]ddbtypes.AttributeValue{
 			"pk": &ddbtypes.AttributeValueMemberS{Value: pk},
 			"sk": &ddbtypes.AttributeValueMemberS{Value: sk},

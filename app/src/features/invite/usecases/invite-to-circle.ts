@@ -25,6 +25,8 @@ import { pullMeta } from '@/core/sync/pull-log';
 import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { deleteJoinRequest, listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay';
 import { createInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { notifyRequester, registerPushForInvite, unregisterPushForInvite } from '@/features/invite/usecases/invite-push';
+import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -65,7 +67,7 @@ export async function requireAdminPublicKey(circleId: string, message = "Only an
  * preview never lands is unjoinable, so a failure here should surface the
  * same way any other invite-creation failure does.
  */
-async function writeInvitePreview(code: string, circleName: string, createdByPublicKey: string): Promise<void> {
+async function writeInvitePreview(code: string, circleName: string, createdByPublicKey: string, pushRoutingId: string | null): Promise<void> {
   const profile = await getProfile();
   // Best-effort, like the one on a join request: a thumbnail that won't
   // compress shouldn't stop an invite being created.
@@ -78,7 +80,7 @@ async function writeInvitePreview(code: string, circleName: string, createdByPub
     }
   }
 
-  const payload: InvitePreviewPayload = { name: circleName, createdByName: profile?.name ?? '', createdByPublicKey, createdByPicture };
+  const payload: InvitePreviewPayload = { name: circleName, createdByName: profile?.name ?? '', createdByPublicKey, createdByPicture, pushRoutingId: pushRoutingId ?? undefined };
   const key = deriveInvitePreviewKey(code);
   await createInvitePreview(deriveInviteTag(code), encryptJSON(payload, key));
 }
@@ -87,17 +89,30 @@ async function createInvite(circleId: string, createdByPublicKey: string): Promi
   const circle = await getCircle(circleId);
   if (!circle) throw new Error('Circle not found.');
 
+  const code = generateInviteCode();
+  // Before the preview: that's where the routing id gets shared, and it
+  // has to be claimed by then (see invite-push.ts). Claims it even without
+  // notification permission; this phone's device joins when that's given.
+  // Push is best-effort: if it fails, the link works and just sends none.
+  const pushRoutingId = await registerPushForInvite(code).catch((err) => {
+    console.error('Failed to register push for a new invite', err);
+    return null;
+  });
+
   const now = Date.now();
   const invite: Invite = {
-    code: generateInviteCode(),
+    code,
     circleId,
     createdByPublicKey,
     createdAt: now,
     expiresAt: now + INVITE_TTL_MS,
     revokedAt: null,
+    pushRoutingId,
   };
   await insertInvite(invite);
-  await writeInvitePreview(invite.code, circle.name, createdByPublicKey);
+  await writeInvitePreview(invite.code, circle.name, createdByPublicKey, pushRoutingId);
+  // The iOS extension finds the invite's circle in the snapshot to title its request push.
+  if (pushRoutingId) void refreshPushSnapshot();
   return invite;
 }
 
@@ -125,7 +140,12 @@ export async function replaceInvite(circleId: string): Promise<Invite> {
   const publicKey = await requireAdminPublicKey(circleId);
 
   const current = await getCurrentInvite(circleId);
-  if (current) await revokeInvite(current.code);
+  if (current) {
+    await revokeInvite(current.code);
+    // Straight away rather than on the next sweep: replacing a link is
+    // meant to cut the old one off. A failure leaves it to the sweep.
+    await unregisterPushForInvite(current).catch((err) => console.error('Failed to unregister push for the replaced invite', err));
+  }
 
   return createInvite(circleId, publicKey);
 }
@@ -257,6 +277,10 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
 
   const sealed = sealToPublicKey(new TextEncoder().encode(JSON.stringify(envelope)), hexToBytes(ephemeralPublicKey));
   await putJoinApproval(inviteTag, requesterId, sealed);
+  // The payload type allows none; every request this app sends has one.
+  if (pushRoutingId) {
+    notifyRequester(pushRoutingId, invite.code, sealed).catch((err) => console.error('Failed to notify the requester', err));
+  }
 
   // Only an admin may write `member_added`, so it is written here, by
   // the approver, rather than self-announced by the joiner — an entry

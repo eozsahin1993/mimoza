@@ -1,6 +1,7 @@
 import { deleteCircle } from '@/data/db';
 import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
 import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
+import { unregisterPushForCircleInvites } from '@/features/invite/usecases/invite-push';
 
 /**
  * Removes every trace of a circle from this device: rows (which take the
@@ -18,6 +19,8 @@ import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
  * layer, so nothing can.
  */
 export async function purgeCircleLocally(circleId: string): Promise<void> {
+  // Before the rows: the invite rows are what name its push routings.
+  await unregisterPushForCircleInvites(circleId);
   await deleteCircle(circleId);
   deleteCirclePhotoFiles(circleId);
   await deleteCircleKeys(circleId);

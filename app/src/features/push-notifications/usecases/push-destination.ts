@@ -1,9 +1,10 @@
-import { getPost } from '@/data/db';
+import { getInviteByPushRoutingId, getPendingJoinRequestByPushRoutingId, getPost } from '@/data/db';
 import { circleForRoutingId, decryptPushEntry, type PushData } from '@/features/push-notifications/usecases/handle-push';
 
 export type PushDestination =
   | { screen: 'post'; circleId: string; postId: string }
-  | { screen: 'feed'; circleId: string };
+  | { screen: 'feed'; circleId: string }
+  | { screen: 'pending'; requestId: string };
 
 /**
  * Where tapping a notification should land. The circle's feed is the
@@ -14,6 +15,17 @@ export type PushDestination =
  */
 export async function resolvePushDestination(data: PushData): Promise<PushDestination | null> {
   if (!data.pushRoutingId) return null;
+
+  // A join request opens the feed its card sits on; news on your own
+  // request opens the pending screen, which finishes the join.
+  if (data.kind === 'invite') {
+    const invite = await getInviteByPushRoutingId(data.pushRoutingId);
+    return invite ? { screen: 'feed', circleId: invite.circleId } : null;
+  }
+  if (data.kind === 'pending_request') {
+    const pending = await getPendingJoinRequestByPushRoutingId(data.pushRoutingId);
+    return pending ? { screen: 'pending', requestId: pending.id } : null;
+  }
 
   const circle = await circleForRoutingId(data.pushRoutingId);
   if (!circle) return null;

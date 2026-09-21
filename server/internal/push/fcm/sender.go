@@ -39,7 +39,7 @@ func New(account *ServiceAccount) *Sender {
 //
 // The placeholder rides alongside so the card is not blank when the
 // handler doesn't run.
-func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, keyVersion int64, payload []byte) error {
+func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, kind push.PushKind, keyVersion int64, payload []byte) error {
 	accessToken, err := s.tokens.accessToken(ctx)
 	if err != nil {
 		return err
@@ -60,7 +60,9 @@ func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, ke
 				// trial-decrypting against every version it holds.
 				"keyVersion":  strconv.FormatInt(keyVersion, 10),
 				"payload":     base64.StdEncoding.EncodeToString(payload),
-				"placeholder": push.Placeholder,
+				"placeholder": kind.Alert(),
+				// So the handler can pick its own line without decrypting.
+				"kind": string(kind),
 			},
 			"android": map[string]any{
 				// High priority, or Doze defers a data-only message

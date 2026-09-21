@@ -59,6 +59,36 @@ enum CircleCrypto {
     return envelope
   }
 
+  /// openSealedBox in primitives.ts: senderPublicKey(32) || nonce(24) || box,
+  /// keyed by HKDF over the X25519 secret with both public keys in the info.
+  static func openSealed(_ sealed: Data, recipientSecretKey: Data) -> Data? {
+    let senderPublicKey = Data(sealed.prefix(32))
+    guard sealed.count > 32,
+          let secret = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: recipientSecretKey),
+          let sender = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: senderPublicKey),
+          let shared = try? secret.sharedSecretFromKeyAgreement(with: sender)
+    else { return nil }
+    let info = Data("join-approval-box".utf8) + senderPublicKey + secret.publicKey.rawRepresentation
+    let key = shared.hkdfDerivedSymmetricKey(using: SHA256.self, salt: Data(), sharedInfo: info, outputByteCount: 32)
+    return open(Data(sealed.dropFirst(32)), key: key.withUnsafeBytes { Data($0) })
+  }
+
+  /// The creator signs JSON.stringify(approval), which is the envelope's
+  /// text between `{"approval":` and its last `,"signature":"`: the same
+  /// textual cut as verifyEnvelope, for the same reason.
+  static func verifyApproval(_ plaintext: Data, createdByPublicKey: String) -> Bool {
+    let prefix = Data("{\"approval\":".utf8)
+    guard plaintext.starts(with: prefix),
+          let marker = plaintext.range(of: Data(",\"signature\":\"".utf8), options: .backwards),
+          let envelope = (try? JSONSerialization.jsonObject(with: plaintext)) as? [String: Any],
+          let signatureHex = envelope["signature"] as? String,
+          let signature = Data(hexString: signatureHex), signature.count == 64,
+          let creator = Data(hexString: createdByPublicKey), creator.count == 32,
+          let key = try? Curve25519.Signing.PublicKey(rawRepresentation: creator)
+    else { return false }
+    let message = plaintext.subdata(in: (plaintext.startIndex + prefix.count)..<marker.lowerBound)
+    return key.isValidSignature(signature, for: message)
+  }
 }
 
 extension Data {

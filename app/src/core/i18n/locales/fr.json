@@ -23,8 +23,6 @@
       "fr": "Français",
       "de": "Allemand"
     },
-    "newCircles": "Par défaut pour les nouveaux cercles",
-    "newCirclesFootnote": "Chaque cercle a son propre réglage, que tu modifies dans le cercle lui-même. Les notifications sont générées sur ton téléphone : aucun serveur ne sait ce qui s’est passé.",
     "notifyMeAbout": "Notifications",
     "pushLevels": {
       "posts": "Nouvelles photos uniquement",
@@ -56,7 +54,17 @@
     "deleteMessage": "Cela efface tout ce que tu as publié dans tous tes cercles, puis supprime définitivement ton compte. C’est irréversible.",
     "deleteConfirm": "Supprimer",
     "deleting": "Suppression de ton compte…",
-    "deletingDetail": "Cela peut prendre un moment. Ne ferme pas l’app."
+    "deletingDetail": "Cela peut prendre un moment. Ne ferme pas l’app.",
+    "notifications": "Notifications",
+    "newCirclesRow": "Nouveaux cercles",
+    "invitesRow": "Invitations",
+    "notificationsFootnote": "Ces réglages ne valent que pour ce téléphone. Les notifications arrivent chiffrées et sont préparées ici même : aucun serveur de notifications ne voit jamais de nom ni de message.",
+    "invitePushLevels": {
+      "all": "Demandes pour rejoindre et réponses",
+      "requests": "Demandes pour rejoindre uniquement",
+      "answers": "Réponses à tes demandes uniquement",
+      "off": "Désactivées"
+    }
   },
   "account": {
     "credits": {
@@ -502,7 +510,14 @@
     "alsoCommentedWithText": "{{name}} a aussi commenté : « {{text}} »",
     "reaction": "{{name}} a réagi à ta photo",
     "reactionWithEmoji": "{{name}} a réagi avec {{emoji}} à ta photo",
-    "channelGroup": "Cercles"
+    "joinRequest": "{{name}} veut rejoindre le cercle",
+    "joinRequestAnyCircle": "Quelqu’un veut rejoindre un cercle",
+    "joinRequestNews": "Du nouveau pour ta demande d’adhésion",
+    "joinApproved": "{{name}} a accepté ta demande",
+    "joinApprovedNoName": "Ta demande a été acceptée",
+    "joinApprovedAnyCircle": "Du nouveau pour ta demande pour rejoindre un cercle",
+    "channelGroup": "Cercles",
+    "invitesChannel": "Invitations"
   },
   "notifications": {
     "prompt": {

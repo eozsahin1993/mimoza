@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+// DefaultInviteRetentionDays matches the client's INVITE_TTL_MS (7 days).
+// Eviction itself is DynamoDB's TTL; this only sets what expiresAt says.
+const DefaultInviteRetentionDays = 7
+
 // Every table, the blob bucket and both push-credential parameters are
 // named from one RESOURCE_PREFIX (mimoza-<env>), under the same
 // "<prefix>-<suffix>" convention server/provision/modules/storage and
@@ -123,9 +127,9 @@ type Config struct {
 	// DefaultMaxBlobSize — see .env.example's MAX_BLOB_SIZE_BYTES. 0 means
 	// "use the adapter's own default".
 	MaxBlobSize int64
-	// InviteRetentionDays is passed straight to invitedynamodb.New — see
-	// .env.example's INVITE_RETENTION_DAYS. 0 means "use the adapter's own
-	// default".
+	// InviteRetentionDays is how long invites, join requests and push's
+	// invite addresses last — one number for all three, so none outlives
+	// the others. See .env.example's INVITE_RETENTION_DAYS.
 	// Eviction itself is DynamoDB's native TTL
 	// (see provision/modules/storage/dynamodb.tf), not this process — this
 	// only controls what expiresAt gets written as.
@@ -183,7 +187,7 @@ func Load() Config {
 		BlobCDNSettingsParameter:   "/" + prefix + "/cdn",
 		BlobCDNSigningKeyParameter: "/" + prefix + "/cloudfront-signing-key",
 		MaxBlobSize:                intEnv("MAX_BLOB_SIZE_BYTES", 0),
-		InviteRetentionDays:        intEnv("INVITE_RETENTION_DAYS", 0),
+		InviteRetentionDays:        positiveIntEnv("INVITE_RETENTION_DAYS", DefaultInviteRetentionDays),
 		LogLevel:                   envOr("LOG_LEVEL", "info"),
 		Port:                       envOr("PORT", "8080"),
 		S3ForcePathStyle:           envOr("S3_FORCE_PATH_STYLE", "false") == "true",
@@ -210,6 +214,17 @@ func envOr(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// positiveIntEnv is intEnv for a value where zero or less is never
+// meant: a retention of 0 would write expiry times that have already
+// passed.
+func positiveIntEnv(name string, fallback int64) int64 {
+	value := intEnv(name, fallback)
+	if value <= 0 {
+		log.Fatalf("%s must be positive, got %d", name, value)
+	}
+	return value
 }
 
 func intEnv(name string, fallback int64) int64 {

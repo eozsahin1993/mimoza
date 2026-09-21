@@ -134,6 +134,20 @@
       "when": 1790010541404,
       "tag": "0018_absurd_sister_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1790015845022,
+      "tag": "0019_curly_rogue",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1790017131483,
+      "tag": "0020_funny_thunderbolt",
+      "breakpoints": true
     }
   ]
 }

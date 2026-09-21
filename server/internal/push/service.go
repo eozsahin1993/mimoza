@@ -34,7 +34,7 @@ func (s *Service) PutPrefs(ctx context.Context, pushRoutingID string, prefs Pref
 }
 
 func (s *Service) SetSilenced(ctx context.Context, pushRoutingID string, silenced bool, ownerToken []byte) error {
-	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil {
+	if _, err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil {
 		return err
 	}
 	return s.PushStore.SetSilenced(ctx, pushRoutingID, silenced)
@@ -43,45 +43,42 @@ func (s *Service) SetSilenced(ctx context.Context, pushRoutingID string, silence
 // PutDevice needs the prefs row to exist: a device can't claim an address,
 // only join one its owner already holds.
 func (s *Service) PutDevice(ctx context.Context, pushRoutingID string, device Device, ownerToken []byte) error {
-	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil {
+	prefs, err := s.authorize(ctx, pushRoutingID, ownerToken)
+	if err != nil {
 		return err
 	}
+	// A device row lives exactly as long as the address it belongs to.
+	device.Temporary = prefs.Kind.Temporary()
 	return s.PushStore.PutDevice(ctx, pushRoutingID, device)
 }
 
 // DeleteDevice and DeleteRouting go ahead when there is no prefs row:
 // nothing is left to protect, and the device rows are already unreachable.
 func (s *Service) DeleteDevice(ctx context.Context, pushRoutingID, deviceID string, ownerToken []byte) error {
-	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil && !errors.Is(err, ErrPushRoutingNotFound) {
+	if _, err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil && !errors.Is(err, ErrPushRoutingNotFound) {
 		return err
 	}
 	return s.PushStore.DeleteDevice(ctx, pushRoutingID, deviceID)
 }
 
 func (s *Service) DeleteRouting(ctx context.Context, pushRoutingID string, ownerToken []byte) error {
-	if err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil && !errors.Is(err, ErrPushRoutingNotFound) {
+	if _, err := s.authorize(ctx, pushRoutingID, ownerToken); err != nil && !errors.Is(err, ErrPushRoutingNotFound) {
 		return err
 	}
 	return s.PushStore.DeleteRouting(ctx, pushRoutingID)
 }
 
-func (s *Service) authorize(ctx context.Context, pushRoutingID string, ownerToken []byte) error {
+func (s *Service) authorize(ctx context.Context, pushRoutingID string, ownerToken []byte) (*Prefs, error) {
 	prefs, err := s.PushStore.GetPrefs(ctx, pushRoutingID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Constant time, as for the fanout hash.
 	if len(prefs.OwnerHash) == 0 || !hmac.Equal(prefs.OwnerHash, OwnerHash(ownerToken, pushRoutingID)) {
-		return ErrNotOwner
+		return nil, ErrNotOwner
 	}
-	return nil
+	return prefs, nil
 }
-
-// Placeholder is what a device shows when it cannot decrypt a payload — the
-// extension/handler failed, or the push was forged by someone without the
-// circle's key. Both dispatchers (fcm, apns) send it fixed alongside the
-// ciphertext; a device that can decrypt substitutes its own copy.
-const Placeholder = "New activity"
 
 // Delivery is one resolved target.
 type Delivery struct {
@@ -90,6 +87,9 @@ type Delivery struct {
 	// Which routing id resolved to this device — the receiving app uses it
 	// to find the circle without trial-decrypting against all of them.
 	PushRoutingID string
+	// The address's own kind, from its prefs row: the dispatchers attach
+	// its Alert, and the device picks its own line by it.
+	Kind PushKind
 }
 
 // FanoutResult is counts, not per-target detail: saying *which* ids failed
@@ -172,6 +172,7 @@ func (s *Service) resolve(ctx context.Context, pushRoutingID string, pushFanoutT
 			PushToken:     device.PushToken,
 			Platform:      device.Platform,
 			PushRoutingID: pushRoutingID,
+			Kind:          prefs.Kind,
 		})
 	}
 	return deliveries, nil

@@ -48,6 +48,12 @@ async function openDestination(response: NotificationResponse): Promise<void> {
     let destination = await resolvePushDestination(data);
     if (!destination) return;
 
+    // No circle to sync yet: the pending screen fetches and completes the join itself.
+    if (destination.screen === 'pending') {
+      router.push({ pathname: '/join/pending', params: { requestId: destination.requestId } });
+      return;
+    }
+
     // The push can outrun the sync carrying its content, so sync first and
     // re-resolve — a feed destination may upgrade to the post once synced.
     // Capped: a dead network must delay the tap, not eat it.
@@ -55,7 +61,8 @@ async function openDestination(response: NotificationResponse): Promise<void> {
       syncCircle(destination.circleId).catch(() => {}),
       new Promise((resolve) => setTimeout(resolve, 4000)),
     ]);
-    destination = (await resolvePushDestination(data)) ?? destination;
+    const refined = await resolvePushDestination(data);
+    if (refined && refined.screen !== 'pending') destination = refined;
 
     // The feed goes under the post so back walks post -> feed -> wherever
     // the tap happened, rather than skipping the circle entirely.
@@ -81,6 +88,7 @@ function tapData(response: NotificationResponse): PushData {
   const data = (content.data ?? trigger?.payload ?? {}) as Record<string, unknown>;
   return {
     pushRoutingId: typeof data.pushRoutingId === 'string' ? data.pushRoutingId : undefined,
+    kind: typeof data.kind === 'string' ? data.kind : undefined,
     keyVersion: typeof data.keyVersion === 'string' || typeof data.keyVersion === 'number' ? data.keyVersion : undefined,
     payload: typeof data.payload === 'string' ? data.payload : undefined,
   };

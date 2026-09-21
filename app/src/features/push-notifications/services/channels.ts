@@ -50,6 +50,43 @@ export async function ensureCircleNotificationChannel(circleId: string, circleNa
 }
 
 /**
+ * Join requests, and news on your own, in one shared channel outside the
+ * Circles group: muting a circle shouldn't mute requests to join it, and a
+ * requester has no circle channel until they're in. Created up front,
+ * since Android 8+ silently drops a notification posted to a channel that
+ * doesn't exist.
+ */
+export const INVITES_CHANNEL_ID = 'invites';
+
+/**
+ * Creates, or renames, the channels and group whose names are the app's
+ * own words rather than a circle's: in the language the app is showing
+ * now. Re-creating with the same id only updates the name; the sound and
+ * importance a channel was created with stay.
+ */
+export async function ensureLocalizedChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  await setNotificationChannelGroupAsync(PUSH_CHANNEL_GROUP_ID, { name: i18n.t('push.channelGroup') });
+  await setNotificationChannelAsync(INVITES_CHANNEL_ID, {
+    name: i18n.t('push.invitesChannel'),
+    importance: AndroidImportance.DEFAULT,
+  });
+}
+
+/**
+ * Keeps those names in the app's language. At launch the channels can be
+ * created before the stored language has loaded, and the language can
+ * change from settings at any time; both end in `languageChanged`.
+ */
+export function followLanguageInChannelNames(): void {
+  if (Platform.OS !== 'android') return;
+  i18n.on('languageChanged', () => {
+    ensureLocalizedChannels().catch((err) => console.error('Failed to rename notification channels', err));
+  });
+}
+
+/**
  * Removes a circle's channel — leaving or deleting a circle. The group
  * stays: it is shared, and deleting it would take every other circle's
  * channel with it.

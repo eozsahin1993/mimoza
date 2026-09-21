@@ -20,6 +20,8 @@ import m0015 from './0015_steep_bloodaxe.sql';
 import m0016 from './0016_broad_meltdown.sql';
 import m0017 from './0017_unknown_prism.sql';
 import m0018 from './0018_absurd_sister_grimm.sql';
+import m0019 from './0019_curly_rogue.sql';
+import m0020 from './0020_funny_thunderbolt.sql';
 
   export default {
     journal,
@@ -42,7 +44,9 @@ m0014,
 m0015,
 m0016,
 m0017,
-m0018
+m0018,
+m0019,
+m0020
     }
   }
   

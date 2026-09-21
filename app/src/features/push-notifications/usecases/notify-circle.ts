@@ -3,9 +3,9 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { getCircleMembers, getCommentAuthors, getPost, hasOtherReaction } from '@/data/db';
 import { verifyLogEntry } from '@/core/sync/log-entry';
 import { PushCategories, type PushCategory } from '@/features/push-notifications/usecases/push-categories';
-import { derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { derivePushFanoutToken } from '@/core/crypto/push';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
-import { sendPush } from '@/features/push-notifications/services/relay';
+import { sendPush } from '@/core/services/push-relay';
 
 /**
  * Asks the relay to notify a circle about an entry that was just

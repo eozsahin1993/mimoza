@@ -1,5 +1,5 @@
 /**
- * Bit layout of the category mask the relay stores per circle:
+ * Bit layout of the category mask the relay stores per circle routing:
  *
  *     bit 0   newPost
  *     bit 1   comment
@@ -22,3 +22,23 @@ export const PushCategories = {
 } as const;
 
 export type PushCategory = (typeof PushCategories)[keyof typeof PushCategories];
+
+/**
+ * The invite routings' own categories — a separate set, numbered from 0.
+ * A category means nothing without the routing it's sent to: the relay
+ * checks it against that routing's mask, and an invite routing's mask only
+ * ever holds these bits. The phone picks text by the routing's kind, never
+ * by the number. Positions are permanent, as above.
+ *
+ *     bit 0   joinRequest    on an invite routing
+ *     bit 1   joinApproved   on a pending request's routing
+ */
+export const InvitePushCategories = {
+  joinRequest: 0,
+  joinApproved: 1,
+} as const;
+
+export type InvitePushCategory = (typeof InvitePushCategories)[keyof typeof InvitePushCategories];
+
+/** Both invite categories on: what a phone starts with (settings.ts). */
+export const ALL_INVITE_PUSH = (1 << InvitePushCategories.joinRequest) | (1 << InvitePushCategories.joinApproved);

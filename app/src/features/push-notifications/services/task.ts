@@ -8,6 +8,7 @@ import { defineTask } from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { handlePush } from '@/features/push-notifications/usecases/handle-push';
+import { ensureLocalizedChannels, followLanguageInChannelNames } from '@/features/push-notifications/services/channels';
 import { initDatabase } from '@/data/db';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { loadLanguage } from '@/core/i18n/i18n';
@@ -62,11 +63,12 @@ defineTask<NotificationTaskPayload>(PUSH_TASK, async ({ data, error }) => {
  * FCM data values arrive as strings, but the shape differs between a
  * delivered notification and a response to one being tapped.
  */
-function pushDataFrom(data: unknown): { pushRoutingId?: string; keyVersion?: string; payload?: string } {
+function pushDataFrom(data: unknown): { pushRoutingId?: string; kind?: string; keyVersion?: string; payload?: string } {
   const record = (data ?? {}) as Record<string, unknown>;
   const body = (record.data ?? record) as Record<string, unknown>;
   return {
     pushRoutingId: typeof body.pushRoutingId === 'string' ? body.pushRoutingId : undefined,
+    kind: typeof body.kind === 'string' ? body.kind : undefined,
     keyVersion: typeof body.keyVersion === 'string' ? body.keyVersion : undefined,
     payload: typeof body.payload === 'string' ? body.payload : undefined,
   };
@@ -94,5 +96,7 @@ export async function startPushHandling(): Promise<void> {
   // display — a JS background task would be too late to rewrite the card.
   if (Platform.OS !== 'android') return;
 
+  followLanguageInChannelNames();
+  await ensureLocalizedChannels();
   await registerTaskAsync(PUSH_TASK);
 }

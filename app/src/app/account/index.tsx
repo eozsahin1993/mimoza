@@ -22,8 +22,10 @@ import { deleteAccount, finishAccountDeletionIfPending, isAccountDeletionPending
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { logTestPushPayload } from '@/features/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
-import { PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
+import { InvitePushLevels, invitePushLevelForMask, PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
+import { applyInvitePushMask } from '@/features/invite/usecases/invite-push';
+import { getAppSettings } from '@/core/services/settings';
 import { Languages, resolveLanguage, type LanguagePreference } from '@/core/i18n/languages';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
@@ -64,6 +66,7 @@ export default function AccountScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [resettingDevData, setResettingDevData] = useState(false);
   const [levelPicker, setLevelPicker] = useState(false);
+  const [inviteLevelPicker, setInviteLevelPicker] = useState(false);
   const [languagePicker, setLanguagePicker] = useState(false);
   // Gates the "bring over" direction: adopting another account's seed
   // would strand any circle this device already joined under its own.
@@ -128,6 +131,7 @@ export default function AccountScreen() {
   ];
 
   const pushLevelOptions = PushLevels.map((level) => ({ id: level.id, label: t(`settings.pushLevels.${level.id}`) }));
+  const invitePushLevelOptions = InvitePushLevels.map((level) => ({ id: level.id, label: t(`settings.invitePushLevels.${level.id}`) }));
 
   /** Same shape the circle screen uses — one list, one row component, one set of spacings. */
   const settingsGroups: SettingsGroup[] = [
@@ -145,13 +149,18 @@ export default function AccountScreen() {
       ],
     },
     {
-      title: t('settings.newCircles'),
-      footnote: t('settings.newCirclesFootnote'),
+      title: t('settings.notifications'),
+      footnote: t('settings.notificationsFootnote'),
       rows: [
         {
-          label: t('settings.notifyMeAbout'),
+          label: t('settings.newCirclesRow'),
           control: { kind: 'value', text: t(`settings.pushLevels.${settings.defaultPushLevel as PushLevelId}`) },
           onPress: () => setLevelPicker(true),
+        },
+        {
+          label: t('settings.invitesRow'),
+          control: { kind: 'value', text: t(`settings.invitePushLevels.${invitePushLevelForMask(settings.invitePushMask)}`) },
+          onPress: () => setInviteLevelPicker(true),
         },
       ],
     },
@@ -384,6 +393,23 @@ export default function AccountScreen() {
         }}
       />
 
+      <OptionSheet
+        visible={inviteLevelPicker}
+        onClose={() => setInviteLevelPicker(false)}
+        title={t('settings.invitesRow')}
+        options={invitePushLevelOptions}
+        selected={invitePushLevelForMask(settings.invitePushMask)}
+        onSelect={(id) => {
+          setInviteLevelPicker(false);
+          const mask = InvitePushLevels.find((level) => level.id === id)?.mask ?? 0;
+          // Applies what was actually stored: a failed save rolls the setting
+          // back, and the relay mustn't be left holding the unsaved choice.
+          void updateSettings({ invitePushMask: mask })
+            .then(getAppSettings)
+            .then((stored) => applyInvitePushMask(stored.invitePushMask))
+            .catch((err) => console.error('Failed to apply invite notifications', err));
+        }}
+      />
       <OptionSheet
         visible={languagePicker}
         onClose={() => setLanguagePicker(false)}

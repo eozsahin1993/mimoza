@@ -210,6 +210,14 @@ export const circleInvites = sqliteTable(
     createdAt: integer('created_at').notNull(),
     expiresAt: integer('expires_at').notNull(),
     revokedAt: integer('revoked_at'),
+    /**
+     * This invite's push routing id on the relay (see
+     * `derivePushInviteRoutingId`), while one exists there. Set only after
+     * it's registered; cleared once the relay has deleted it. Stored rather
+     * than re-derived so a revoked invite's cleanup reads it straight off
+     * the row.
+     */
+    pushRoutingId: text('push_routing_id'),
   },
   (t) => [index('circle_invites_circle_id').on(t.circleId)]
 );
@@ -506,6 +514,14 @@ export const pendingJoinRequests = sqliteTable('pending_join_requests', {
   ephemeralPublicKey: text('ephemeral_public_key').notNull(),
   submittedAt: integer('submitted_at').notNull(),
   status: text('status', { enum: ['pending', 'approved'] }).notNull().default('pending'),
+  /**
+   * The push routing id this request asked to be told at: the future circle's
+   * own routing id (`derivePushRoutingId` over `circleId`), registered
+   * before the request went out. Stored so an incoming push is a lookup,
+   * not a derivation. Null on requests made before it existed. The relay
+   * expires it; nothing here deletes it.
+   */
+  pushRoutingId: text('push_routing_id'),
 });
 
 export const postComments = sqliteTable(
