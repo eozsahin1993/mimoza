@@ -143,6 +143,17 @@ jobs:
           working-directory: app
           bundler-cache: true
 
+      # android/ is regenerated every run, so only what it downloads is
+      # worth keeping. Keyed on the lockfile: the native dependencies come
+      # from the JS ones.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('app/package-lock.json') }}
+          restore-keys: gradle-
+
       - run: npm ci
 
       # The lane wants a path; a secret holds contents.
@@ -200,6 +211,14 @@ jobs:
         with:
           working-directory: app
           bundler-cache: true
+
+      # Pods land inside the regenerated ios/, so the pod *cache* is the
+      # part worth keeping — it saves the download, not the install.
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ hashFiles('app/package-lock.json') }}
+          restore-keys: pods-
 
       - run: npm ci
 

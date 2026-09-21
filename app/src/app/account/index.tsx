@@ -8,7 +8,6 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
-import { Wordmark } from '@/ui/components/wordmark';
 import { LoadingModal } from '@/ui/components/loading-modal';
 import { OptionSheet } from '@/ui/components/option-sheet';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
@@ -51,7 +50,7 @@ function buildLabel(): string {
   const native = Application.nativeBuildVersion;
   const js = (Constants.expoConfig?.extra as { jsBuild?: string } | undefined)?.jsBuild;
   if (!native) return '';
-  return js && js !== native ? ` (${native}-${js})` : ` (${native})`;
+  return js && js !== native ? ` (${native}.${js})` : ` (${native})`;
 }
 
 export default function AccountScreen() {
@@ -364,7 +363,6 @@ export default function AccountScreen() {
           <SettingsGroups groups={settingsGroups} />
 
           <View style={styles.version}>
-            <Wordmark size={21} />
             <ThemedText type="labelSmall" themeColor="faint">
               v{appVersion}{buildLabel()}
             </ThemedText>

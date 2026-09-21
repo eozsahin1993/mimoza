@@ -252,6 +252,14 @@ def prebuild_android(env_file, build_number)
       'expo', 'prebuild', '--platform', 'android', '--clean',
     )
   end
+
+  # Appended after prebuild because prebuild regenerates the file, and last
+  # key wins. Expo's defaults (2g heap, 512m metaspace) are not enough for
+  # KSP once expo-updates is in the build: it dies with an OutOfMemoryError
+  # in metaspace about thirteen minutes in.
+  File.open(File.join(app_root, 'android', 'gradle.properties'), 'a') do |f|
+    f.puts('org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m')
+  end
 end
 
 # The run number, so one number means the same build on both platforms —
@@ -267,8 +275,10 @@ def next_build_number(app_identifier)
   [run_number, latest.to_i + 1].max.to_s
 end
 
-# Zero locally, so a local build takes whatever the store says is next and
-# leaves the shared numbering to CI.
+# One number per run, so iOS and Android land on the same one. Already
+# ahead of both stores, and the max against each store's latest covers the
+# case where it isn't. Zero locally: a local build takes whatever its store
+# says is next rather than claiming a number CI will want.
 def run_number
   ENV['GITHUB_RUN_NUMBER'].to_i
 end
