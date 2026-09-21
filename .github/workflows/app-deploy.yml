@@ -93,15 +93,13 @@ jobs:
 
       - run: npm ci
 
-      # A shipped fingerprint is recorded as a tag, so "have we already
-      # built this native layer?" is one remote lookup and needs no store
-      # beyond the repo.
+      # The fingerprint depends on the resolved app config, so it needs the
+      # same environment the build would get.
       - id: check
         run: ../.github/scripts/decide-build.sh
         env:
           FORCE: ${{ inputs.force || 'none' }}
           IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/app-v') }}
-        env:
           APP_ENV: ${{ secrets.APP_ENV }}
           EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
           EAS_PROJECT_OWNER: ${{ secrets.EAS_PROJECT_OWNER }}
