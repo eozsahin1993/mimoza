@@ -278,6 +278,70 @@ func joinCircle(t *testing.T, admin, joiner *harness.Device, circleID string) {
 	}).Expect(http.StatusNoContent)
 }
 
+// A device that has asked to join holds no membership yet, so the list
+// it syncs against is also where it learns the answer.
+func TestCircles_TheSyncListCarriesWhatYouAreWaitingOn(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	joiner := relay.SignIn()
+	circleID := createCircle(t, admin, "Family")
+
+	var invite struct {
+		Code string `json:"code"`
+	}
+	admin.Post(api("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
+
+	// Before asking: nothing to show, and no circles either.
+	waiting := syncList(t, joiner)
+	harness.AssertEqual(t, len(waiting.Circles), 0, "in no circles yet")
+	harness.AssertEqual(t, len(waiting.Requests), 0, "and waiting on nothing")
+
+	var request struct {
+		RequestID string `json:"requestId"`
+	}
+	joiner.Post(api("/invites/"+invite.Code+"/requests"), nil).
+		Expect(http.StatusCreated).Decode(&request)
+
+	waiting = syncList(t, joiner)
+	harness.AssertEqual(t, len(waiting.Requests), 1, "one ask outstanding")
+	harness.AssertEqual(t, waiting.Requests[0].CircleID, circleID, "on the circle they asked about")
+	harness.AssertEqual(t, waiting.Requests[0].CircleName, "Family", "named, though they cannot read it yet")
+	harness.AssertEqual(t, waiting.Requests[0].Status, "pending", "and unanswered")
+
+	// The answer reaches the asker through the same list.
+	admin.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/deny"), nil).Expect(http.StatusNoContent)
+	waiting = syncList(t, joiner)
+	harness.AssertEqual(t, len(waiting.Requests), 1, "the ask is still theirs to see")
+	harness.AssertEqual(t, waiting.Requests[0].Status, "denied", "with the answer on it")
+	harness.AssertEqual(t, len(waiting.Circles), 0, "and no circle")
+
+	// Nobody else sees it.
+	harness.AssertEqual(t, len(syncList(t, admin).Requests), 0, "an admin is not waiting on anything")
+}
+
+// syncList is GET /circles: the circles an account is in, and the asks
+// it is waiting on.
+func syncList(t *testing.T, device *harness.Device) struct {
+	Circles  []circleRow `json:"circles"`
+	Requests []struct {
+		CircleID   string `json:"circleId"`
+		CircleName string `json:"circleName"`
+		Status     string `json:"status"`
+	} `json:"requests"`
+} {
+	t.Helper()
+	var body struct {
+		Circles  []circleRow `json:"circles"`
+		Requests []struct {
+			CircleID   string `json:"circleId"`
+			CircleName string `json:"circleName"`
+			Status     string `json:"status"`
+		} `json:"requests"`
+	}
+	device.Get(api("/circles")).Expect(http.StatusOK).Decode(&body)
+	return body
+}
+
 func containsEntry(page pageView, entryID string) bool {
 	for _, entry := range page.Entries {
 		if entry.EntryID == entryID {

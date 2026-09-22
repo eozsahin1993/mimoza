@@ -23,8 +23,19 @@ type membershipResponse struct {
 	NeedsRewrap   bool   `json:"needsRewrap,omitempty"`
 }
 
+// pendingResponse is an ask this account is waiting on. It carries a
+// status rather than only existing, so a device can tell "not answered
+// yet" from "turned down".
+type pendingResponse struct {
+	CircleID   string `json:"circleId"`
+	CircleName string `json:"circleName,omitempty"`
+	Status     string `json:"status"`
+	CreatedAt  int64  `json:"createdAt"`
+}
+
 type listResponse struct {
-	Circles []membershipResponse `json:"circles"`
+	Circles  []membershipResponse `json:"circles"`
+	Requests []pendingResponse    `json:"requests,omitempty"`
 }
 
 type ListHandler struct {
@@ -53,6 +64,20 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			RosterVersion: membership.Circle.RosterVersion,
 			LastEntryAt:   millis(membership.Circle.LastEntryAt),
 			NeedsRewrap:   membership.NeedsRewrap,
+		})
+	}
+	waiting, err := h.Service.Waiting(r.Context(), auth.AccountID(r.Context()))
+	if err != nil {
+		status, message := circles.Status(err)
+		httputil.WriteError(w, status, message)
+		return
+	}
+	for _, ask := range waiting {
+		body.Requests = append(body.Requests, pendingResponse{
+			CircleID:   ask.CircleID,
+			CircleName: ask.CircleName,
+			Status:     ask.Status,
+			CreatedAt:  millis(ask.CreatedAt),
 		})
 	}
 	httputil.WriteJSON(w, http.StatusOK, body)

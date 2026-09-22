@@ -70,7 +70,7 @@ through the `lookup` row.
 | `circle#<id>` | `member#<accountId>` | accountId, role `admin\|member`, notifyLevel, needsRewrap, joinedAt |
 | `circle#<id>` | `key#<accountId>` | keys `{ "<v>": sealedKey }`, updatedAt |
 | `circle#<id>` | `invite#<code>` | createdBy, createdAt, expiresAt |
-| `circle#<id>` | `request#<requestId>` | requesterId, publicKey, status `pending\|approved\|denied`, createdAt, expiresAt. Named requesterId, not accountId, so a pending ask stays out of the by-account index, which answers membership |
+| `circle#<id>` | `request#<requestId>` | accountId, publicKey, status `pending\|approved\|denied`, createdAt, expiresAt. Indexed by account like a membership, since the asker has no membership to read: the query that answers "which circles am I in" filters on the `member#` prefix, so an ask can never be mistaken for one |
 | `circle#<id>` | `entry#<postId>` | type `post`, authorId, keyVersion, ciphertext, hasBlob, visibility, commentCount, reactionCounts `{ tag: n }`, reactors `{ accountId: tag }`, commenters `{ accountId: true }`, recentComments, receivedAt, updatedAt, deletedAt, typeReceivedKey, typeUpdatedKey |
 | `circle#<id>` | `entry#<activityId>` | type `activity`, event, authorId (who did it), subjectId, subjectName, receivedAt, typeReceivedKey |
 | `circle#<id>` | `child#<postId>#comment#<commentId>` | authorId, parentCommentId, keyVersion, ciphertext, receivedAt, deletedAt |
@@ -164,7 +164,10 @@ replace its local copy at once.
 ```
 GET /circles
   → per circle: name, role, keyVersion, rosterVersion, lastEntryAt,
-    notifyLevel, needsRewrap; and this account's pending join requests
+    notifyLevel, needsRewrap; and this account's own join requests with
+    the circle each names. An answered ask stays here until it expires,
+    so the device that made it sees the answer rather than watching the
+    ask disappear
 
 GET /account
   → the caller's own profile. No account id in the path: the session is

@@ -94,7 +94,6 @@ const (
 	AttrUpdatedAt     = "updatedAt"
 	AttrExpiresAt     = "expiresAt"
 	AttrPublicKey     = "publicKey"
-	AttrRequesterID   = "requesterId"
 	AttrStatus        = "status"
 	AttrCircleID      = "circleId"
 )

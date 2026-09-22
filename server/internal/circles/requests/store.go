@@ -61,16 +61,76 @@ func (s *Store) CreateRequest(ctx context.Context, request circles.Request) erro
 	_, err := s.Client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.Name),
 		Item: map[string]types.AttributeValue{
-			dynamoutil.PKAttr:      dynamoutil.Str(dynamo.CirclePK(request.CircleID)),
-			dynamoutil.SKAttr:      dynamoutil.Str(dynamo.RequestKey(request.ID)),
-			dynamo.AttrRequesterID: dynamoutil.Str(request.AccountID),
-			dynamo.AttrPublicKey:   dynamoutil.Binary(request.PublicKey),
-			dynamo.AttrStatus:      dynamoutil.Str(request.Status),
-			dynamo.AttrCreatedAt:   dynamoutil.Millis(request.CreatedAt),
-			dynamo.AttrExpiresAt:   dynamoutil.Num(request.ExpiresAt.Unix()),
+			dynamoutil.PKAttr: dynamoutil.Str(dynamo.CirclePK(request.CircleID)),
+			dynamoutil.SKAttr: dynamoutil.Str(dynamo.RequestKey(request.ID)),
+			// accountId, the by-account index's hash key: an asker has to
+			// be able to find their own asks, and the one query that
+			// answers membership filters on the member# prefix, so an ask
+			// cannot be mistaken for a membership.
+			dynamo.ByAccountPK:   dynamoutil.Str(request.AccountID),
+			dynamo.AttrPublicKey: dynamoutil.Binary(request.PublicKey),
+			dynamo.AttrStatus:    dynamoutil.Str(request.Status),
+			dynamo.AttrCreatedAt: dynamoutil.Millis(request.CreatedAt),
+			dynamo.AttrExpiresAt: dynamoutil.Num(request.ExpiresAt.Unix()),
 		},
 	})
 	return err
+}
+
+// ListRequestsForAccount is the other direction: every ask this account
+// has made, which is how a device waiting to be let in learns it was
+// admitted or turned down. The index is keys-only, so the rows
+// themselves are read after it.
+func (s *Store) ListRequestsForAccount(ctx context.Context, accountID string) ([]circles.Request, error) {
+	paginator := dynamodb.NewQueryPaginator(s.Client, &dynamodb.QueryInput{
+		TableName:              aws.String(s.Name),
+		IndexName:              aws.String(dynamo.ByAccountIndex),
+		KeyConditionExpression: aws.String(dynamo.ByAccountPK + " = :account AND begins_with(sk, :prefix)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":account": dynamoutil.Str(accountID),
+			":prefix":  dynamoutil.Str(dynamo.RequestSK),
+		},
+	})
+
+	var keys []map[string]types.AttributeValue
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range page.Items {
+			keys = append(keys, s.Key(
+				dynamoutil.StringAt(item, dynamoutil.PKAttr),
+				dynamoutil.StringAt(item, dynamoutil.SKAttr),
+			))
+		}
+	}
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	var requests []circles.Request
+	now := s.Now()
+	for start := 0; start < len(keys); start += 100 {
+		out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+			RequestItems: map[string]types.KeysAndAttributes{
+				s.Name: {Keys: keys[start:min(start+100, len(keys))]},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range out.Responses[s.Name] {
+			request := requestFrom(item)
+			// An expired ask is one nobody can answer any more, so it is
+			// not something to still be waiting on.
+			if !request.ExpiresAt.IsZero() && request.ExpiresAt.Before(now) {
+				continue
+			}
+			requests = append(requests, request)
+		}
+	}
+	return requests, nil
 }
 
 func (s *Store) ListRequests(ctx context.Context, circleID string) ([]circles.Request, error) {
@@ -91,15 +151,7 @@ func (s *Store) ListRequests(ctx context.Context, circleID string) ([]circles.Re
 			return nil, err
 		}
 		for _, item := range page.Items {
-			request := circles.Request{
-				ID:        strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.SKAttr), dynamo.RequestSK),
-				CircleID:  circleID,
-				AccountID: dynamoutil.StringAt(item, dynamo.AttrRequesterID),
-				PublicKey: dynamoutil.BytesAt(item, dynamo.AttrPublicKey),
-				Status:    dynamoutil.StringAt(item, dynamo.AttrStatus),
-				CreatedAt: dynamoutil.TimeAt(item, dynamo.AttrCreatedAt),
-				ExpiresAt: dynamo.ExpiryFrom(item),
-			}
+			request := requestFrom(item)
 			// TTL sweeps these eventually; until it does, an expired ask
 			// is one an admin must not be able to answer.
 			if !request.ExpiresAt.IsZero() && request.ExpiresAt.Before(now) {
@@ -226,4 +278,19 @@ func (s *Store) DenyRequest(ctx context.Context, circleID, requestID string) err
 		return circles.ErrRequestNotFound
 	}
 	return err
+}
+
+// requestFrom reads one ask back. The circle is taken from the row's own
+// partition rather than passed in, so a read that gathered rows from
+// several circles at once still names each one correctly.
+func requestFrom(item map[string]types.AttributeValue) circles.Request {
+	return circles.Request{
+		ID:        strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.SKAttr), dynamo.RequestSK),
+		CircleID:  strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.PKAttr), dynamo.CirclePKPrefix),
+		AccountID: dynamoutil.StringAt(item, dynamo.ByAccountPK),
+		PublicKey: dynamoutil.BytesAt(item, dynamo.AttrPublicKey),
+		Status:    dynamoutil.StringAt(item, dynamo.AttrStatus),
+		CreatedAt: dynamoutil.TimeAt(item, dynamo.AttrCreatedAt),
+		ExpiresAt: dynamo.ExpiryFrom(item),
+	}
 }

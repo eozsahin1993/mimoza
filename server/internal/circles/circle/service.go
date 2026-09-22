@@ -22,6 +22,21 @@ type store interface {
 	DeleteCircle(ctx context.Context, circleID string) error
 }
 
+// joinRequests is the asks this account has made, which are not
+// memberships and are not in this slice's own rows. A device waiting to
+// be let in learns here that it was admitted or turned down.
+type joinRequests interface {
+	ListRequestsForAccount(ctx context.Context, accountID string) ([]circles.Request, error)
+}
+
+// Pending is one ask, with the name of the circle it was made to: the
+// asker is not a member, so nothing else would tell them what they are
+// waiting on.
+type Pending struct {
+	circles.Request
+	CircleName string
+}
+
 // blobs is the bucket. Deleting a circle is the one thing this slice
 // does to it, and it does it to the whole prefix at once.
 type blobs interface {
@@ -32,6 +47,8 @@ type Service struct {
 	Store store
 	// Blobs is nil in tests that do not care about bytes.
 	Blobs blobs
+	// Requests is what turns "no circles yet" into "waiting on Family".
+	Requests joinRequests
 }
 
 // Create mints the circle id rather than taking one: it is the relay's
@@ -111,4 +128,33 @@ func (s *Service) Delete(ctx context.Context, circleID, accountID string) error 
 // versions a device checks its own against.
 func (s *Service) List(ctx context.Context, accountID string) ([]circles.Membership, error) {
 	return s.Store.ListMemberships(ctx, accountID)
+}
+
+// Waiting is the asks this account has made that have not expired,
+// answered or not: an answered one stays until it expires, so the
+// device that asked sees what the answer was rather than watching the
+// ask disappear.
+func (s *Service) Waiting(ctx context.Context, accountID string) ([]Pending, error) {
+	if s.Requests == nil {
+		return nil, nil
+	}
+	asks, err := s.Requests.ListRequestsForAccount(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	waiting := make([]Pending, 0, len(asks))
+	for _, ask := range asks {
+		// The circle is read one at a time because an account has one or
+		// two asks outstanding, not a page of them.
+		circle, err := s.Store.GetCircle(ctx, ask.CircleID)
+		if err != nil {
+			// A circle deleted while someone was waiting on it: the ask
+			// is still theirs to see, it just has nothing to name.
+			waiting = append(waiting, Pending{Request: ask})
+			continue
+		}
+		waiting = append(waiting, Pending{Request: ask, CircleName: circle.Name})
+	}
+	return waiting, nil
 }

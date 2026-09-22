@@ -113,8 +113,9 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// needs; the session check wraps all of them at once.
 	circlesMux := http.NewServeMux()
 	circle.Register(circlesMux, &circle.Service{
-		Store: circle.NewStore(deps.Circles),
-		Blobs: deps.Blobs,
+		Store:    circle.NewStore(deps.Circles),
+		Blobs:    deps.Blobs,
+		Requests: requests.NewStore(deps.Circles),
 	}, readLimit, writeLimit)
 	members.Register(circlesMux, &members.Service{
 		Store:    members.NewStore(deps.Circles),
