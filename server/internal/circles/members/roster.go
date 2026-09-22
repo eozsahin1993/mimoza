@@ -11,7 +11,11 @@ import (
 )
 
 type memberResponse struct {
-	AccountID   string `json:"accountId"`
+	AccountID string `json:"accountId"`
+	Name      string `json:"name,omitempty"`
+	AvatarKey string `json:"avatarKey,omitempty"`
+	// PublicKey is what a member seals this member's content keys to.
+	PublicKey   string `json:"publicKey,omitempty"`
 	Role        string `json:"role"`
 	NotifyLevel string `json:"notifyLevel"`
 	NeedsRewrap bool   `json:"needsRewrap,omitempty"`
@@ -46,6 +50,9 @@ func (h *RosterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, member := range roster {
 		body.Members = append(body.Members, memberResponse{
 			AccountID:   member.AccountID,
+			Name:        member.Name,
+			AvatarKey:   member.AvatarKey,
+			PublicKey:   base64.StdEncoding.EncodeToString(member.PublicKey),
 			Role:        member.Role,
 			NotifyLevel: member.NotifyLevel,
 			NeedsRewrap: member.NeedsRewrap,

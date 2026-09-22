@@ -21,6 +21,7 @@ package harness
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -155,6 +156,7 @@ func (r *Relay) SignInAs(subject string) *Device {
 		if err := r.sessions.SaveSession(context.Background(), d.token, session); err != nil {
 			r.t.Fatalf("failed to mint a session: %v", err)
 		}
+		d.publishKey()
 		return d
 	}
 
@@ -167,7 +169,19 @@ func (r *Relay) SignInAs(subject string) *Device {
 	r.Anon().Post("/testonly/session", Body{"subject": subject, "token": d.token}).
 		Expect(http.StatusOK).Decode(&minted)
 	d.accountID = minted.AccountID
+	d.publishKey()
 	return d
+}
+
+// publishKey is what a real device does on its first launch: generate a
+// keypair and publish the public half, so members have something to seal
+// this account's content keys to. Asking to join a circle needs one, so
+// a test device without it is not a device anyone could admit.
+func (d *Device) publishKey() {
+	d.relay.t.Helper()
+	d.Put("/v1/account/pubkey", Body{
+		"publicKey": base64.StdEncoding.EncodeToString([]byte(d.accountID + "-public-key")),
+	}).Expect(http.StatusOK)
 }
 
 // Anon is a caller with no session, for the routes that must refuse one.

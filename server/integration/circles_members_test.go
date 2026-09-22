@@ -31,6 +31,124 @@ func TestCircles_OnlyAnAdminMayInviteRenameOrRemove(t *testing.T) {
 	admin.Patch(api("/circles/"+circleID), harness.Body{"name": "Renamed"}).Expect(http.StatusOK)
 }
 
+// The relay owns who people are, so the roster is where a device learns
+// the names it renders and the keys it seals to. Without this join a
+// client holds nothing but account ids.
+func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	member := relay.SignIn()
+	admin.Put(api("/account/profile"), harness.Body{"name": "Sarah", "avatarKey": "avatars/sarah"}).Expect(http.StatusOK)
+	member.Put(api("/account/profile"), harness.Body{"name": "Ali"}).Expect(http.StatusOK)
+
+	circleID := createCircle(t, admin, "Family")
+	joinCircle(t, admin, member, circleID)
+
+	var roster struct {
+		Members []struct {
+			AccountID string `json:"accountId"`
+			Name      string `json:"name"`
+			AvatarKey string `json:"avatarKey"`
+			PublicKey string `json:"publicKey"`
+			Role      string `json:"role"`
+		} `json:"members"`
+	}
+	member.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&roster)
+	harness.AssertEqual(t, len(roster.Members), 2, "both members")
+
+	byID := map[string]string{}
+	for _, entry := range roster.Members {
+		byID[entry.AccountID] = entry.Name
+		harness.AssertTrue(t, entry.PublicKey != "", "every member carries the key to seal to")
+	}
+	harness.AssertEqual(t, byID[admin.AccountID()], "Sarah", "the admin is named")
+	harness.AssertEqual(t, byID[member.AccountID()], "Ali", "and so is the member")
+
+	for _, entry := range roster.Members {
+		if entry.AccountID == admin.AccountID() {
+			harness.AssertEqual(t, entry.AvatarKey, "avatars/sarah", "the avatar comes with the name")
+			harness.AssertEqual(t, entry.Role, "admin", "and the membership survives the join")
+		}
+	}
+
+	// A name changes on the account, and the roster says so everywhere.
+	member.Put(api("/account/profile"), harness.Body{"name": "Ali Riza"}).Expect(http.StatusOK)
+	admin.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&roster)
+	for _, entry := range roster.Members {
+		if entry.AccountID == member.AccountID() {
+			harness.AssertEqual(t, entry.Name, "Ali Riza", "the new name reaches the other member")
+		}
+	}
+}
+
+// An admin answers a person, not an account id, so a pending ask
+// carries who is asking.
+func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	joiner := relay.SignIn()
+	joiner.Put(api("/account/profile"), harness.Body{"name": "Ali", "avatarKey": "avatars/ali"}).Expect(http.StatusOK)
+
+	circleID := createCircle(t, admin, "Family")
+	var invite struct {
+		Code string `json:"code"`
+	}
+	admin.Post(api("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
+	joiner.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated)
+
+	var pending struct {
+		Requests []struct {
+			AccountID string `json:"accountId"`
+			Name      string `json:"name"`
+			AvatarKey string `json:"avatarKey"`
+		} `json:"requests"`
+	}
+	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
+	harness.AssertEqual(t, len(pending.Requests), 1, "one ask")
+	harness.AssertEqual(t, pending.Requests[0].Name, "Ali", "named")
+	harness.AssertEqual(t, pending.Requests[0].AvatarKey, "avatars/ali", "with a face")
+	harness.AssertEqual(t, pending.Requests[0].AccountID, joiner.AccountID(), "and the account behind it")
+}
+
+// The wall has to say who left after they are gone, so the activity the
+// relay writes carries the name as it was at the time.
+func TestCircles_ActivityKeepsTheNameOfWhoeverLeft(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	member := relay.SignIn()
+	member.Put(api("/account/profile"), harness.Body{"name": "Ali"}).Expect(http.StatusOK)
+
+	circleID := createCircle(t, admin, "Family")
+	joinCircle(t, admin, member, circleID)
+	member.Post(api("/circles/"+circleID+"/leave"), nil).Expect(http.StatusNoContent)
+
+	var page struct {
+		Entries []struct {
+			Event       string `json:"event"`
+			SubjectID   string `json:"subjectId"`
+			SubjectName string `json:"subjectName"`
+		} `json:"entries"`
+	}
+	admin.Get(api("/circles/" + circleID + "/entries?type=activity")).Expect(http.StatusOK).Decode(&page)
+
+	var left, joined bool
+	for _, entry := range page.Entries {
+		if entry.SubjectID != member.AccountID() {
+			continue
+		}
+		switch entry.Event {
+		case "left":
+			left = true
+			harness.AssertEqual(t, entry.SubjectName, "Ali", "the departure keeps the name")
+		case "joined":
+			joined = true
+			harness.AssertEqual(t, entry.SubjectName, "Ali", "and so does the arrival")
+		}
+	}
+	harness.AssertTrue(t, left, "the departure is on the wall")
+	harness.AssertTrue(t, joined, "and the arrival before it")
+}
+
 // A circle must always have someone who can rotate a key or admit
 // anyone, so its last admin has to hand that on before going.
 func TestCircles_TheLastAdminCannotLeaveOrStepDown(t *testing.T) {

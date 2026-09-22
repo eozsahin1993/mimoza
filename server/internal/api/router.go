@@ -108,7 +108,10 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// needs; the session check wraps all of them at once.
 	circlesMux := http.NewServeMux()
 	circle.Register(circlesMux, &circle.Service{Store: circle.NewStore(deps.Circles)}, readLimit, writeLimit)
-	members.Register(circlesMux, &members.Service{Store: members.NewStore(deps.Circles)}, readLimit, writeLimit)
+	members.Register(circlesMux, &members.Service{
+		Store:    members.NewStore(deps.Circles),
+		Profiles: deps.Accounts,
+	}, readLimit, writeLimit)
 	posts.Register(circlesMux, &posts.Service{Store: posts.NewStore(deps.Circles)}, readLimit, writeLimit)
 	comments.Register(circlesMux, &comments.Service{Store: comments.NewStore(deps.Circles)}, writeLimit)
 	reactions.Register(circlesMux, &reactions.Service{Store: reactions.NewStore(deps.Circles)}, writeLimit)
@@ -118,6 +121,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	}, readLimit, writeLimit)
 	requests.Register(circlesMux, &requests.Service{
 		Store:     requests.NewStore(deps.Circles),
+		Profiles:  deps.Accounts,
 		Retention: deps.InviteRetention,
 	}, readLimit, writeLimit)
 	mux.Handle("/circles", auth.RequireSession(deps.Auth, httputil.LogRoutes(circlesMux)))

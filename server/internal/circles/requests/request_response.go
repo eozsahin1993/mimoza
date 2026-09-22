@@ -15,23 +15,16 @@ type requestResponse struct {
 	RequestID string `json:"requestId"`
 	CircleID  string `json:"circleId"`
 	AccountID string `json:"accountId"`
+	// Name and AvatarKey are who is asking. An admin answers a person,
+	// not an account id, so the list carries both.
+	Name      string `json:"name,omitempty"`
+	AvatarKey string `json:"avatarKey,omitempty"`
 	Status    string `json:"status"`
 	CreatedAt int64  `json:"createdAt"`
 }
 
 func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var body createRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httputil.WriteError(w, http.StatusBadRequest, "body must be JSON")
-		return
-	}
-	publicKey, err := base64.StdEncoding.DecodeString(body.PublicKey)
-	if err != nil || len(publicKey) == 0 {
-		httputil.WriteError(w, http.StatusBadRequest, "publicKey must be base64")
-		return
-	}
-
-	request, err := h.Service.Create(r.Context(), r.PathValue("code"), auth.AccountID(r.Context()), publicKey)
+	request, err := h.Service.Create(r.Context(), r.PathValue("code"), auth.AccountID(r.Context()))
 	if err != nil {
 		status, message := circles.Status(err)
 		httputil.WriteError(w, status, message)
@@ -50,7 +43,10 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	body := listResponse{Requests: make([]requestResponse, 0, len(requests))}
 	for _, request := range requests {
-		body.Requests = append(body.Requests, asResponse(request))
+		row := asResponse(request.Request)
+		row.Name = request.Name
+		row.AvatarKey = request.AvatarKey
+		body.Requests = append(body.Requests, row)
 	}
 	httputil.WriteJSON(w, http.StatusOK, body)
 }

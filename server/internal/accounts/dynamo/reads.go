@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -29,14 +30,89 @@ func (t *Table) GetProfile(ctx context.Context, accountID string) (accounts.Prof
 	if out.Item == nil {
 		return accounts.Profile{}, accounts.ErrNotFound
 	}
+	return profileFrom(accountID, out.Item), nil
+}
+
+func profileFrom(accountID string, item map[string]types.AttributeValue) accounts.Profile {
 	return accounts.Profile{
 		AccountID:      accountID,
-		Name:           dynamoutil.StringAt(out.Item, AttrName),
-		AvatarKey:      dynamoutil.StringAt(out.Item, AttrAvatarKey),
-		PublicKey:      dynamoutil.BytesAt(out.Item, AttrPublicKey),
-		PublicKeySetAt: dynamoutil.TimeAt(out.Item, AttrPublicKeyAt),
-		CreatedAt:      dynamoutil.TimeAt(out.Item, AttrCreatedAt),
-	}, nil
+		Name:           dynamoutil.StringAt(item, AttrName),
+		AvatarKey:      dynamoutil.StringAt(item, AttrAvatarKey),
+		PublicKey:      dynamoutil.BytesAt(item, AttrPublicKey),
+		PublicKeySetAt: dynamoutil.TimeAt(item, AttrPublicKeyAt),
+		CreatedAt:      dynamoutil.TimeAt(item, AttrCreatedAt),
+	}
+}
+
+// GetProfiles reads many at once, for the places that render a list of
+// people: a roster, or the requests waiting on an admin. Accounts with
+// no row are absent from the map rather than an error, since a member
+// can be deleted between the roster read and this one.
+//
+// Keys are batched in hundreds because that is BatchGetItem's limit, and
+// DynamoDB may return some keys unprocessed under load, which is a
+// throttle rather than a failure: those are retried until the batch
+// stops shrinking.
+func (t *Table) GetProfiles(ctx context.Context, accountIDs []string) (map[string]accounts.Profile, error) {
+	profiles := make(map[string]accounts.Profile, len(accountIDs))
+	for _, batch := range batches(unique(accountIDs), 100) {
+		keys := make([]map[string]types.AttributeValue, 0, len(batch))
+		for _, accountID := range batch {
+			keys = append(keys, t.Key(AccountPK(accountID), ProfileSK))
+		}
+
+		for len(keys) > 0 {
+			out, err := t.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+				RequestItems: map[string]types.KeysAndAttributes{
+					t.Name: {Keys: keys},
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range out.Responses[t.Name] {
+				accountID := strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.PKAttr), AccountPKPrefix)
+				profiles[accountID] = profileFrom(accountID, item)
+			}
+
+			unprocessed := out.UnprocessedKeys[t.Name].Keys
+			if len(unprocessed) >= len(keys) {
+				// Not shrinking: retrying the same batch forever would
+				// hang the request instead of answering it.
+				return nil, fmt.Errorf("accounts: batch read stalled with %d keys left", len(unprocessed))
+			}
+			keys = unprocessed
+		}
+	}
+	return profiles, nil
+}
+
+// unique keeps one key per account: a batch with the same key twice is
+// rejected outright, and a roster read can ask for the same person as
+// both actor and subject.
+func unique(ids []string) []string {
+	seen := make(map[string]struct{}, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+func batches(ids []string, size int) [][]string {
+	var out [][]string
+	for start := 0; start < len(ids); start += size {
+		end := min(start+size, len(ids))
+		out = append(out, ids[start:end])
+	}
+	return out
 }
 
 func (t *Table) ListDevices(ctx context.Context, accountID string) ([]accounts.Device, error) {

@@ -133,7 +133,8 @@ func Status(err error) (int, string) {
 		errors.Is(err, ErrStaleKeyVersion), errors.Is(err, ErrVersionMoved),
 		errors.Is(err, ErrWouldEmptyAdmins):
 		return http.StatusConflict, err.Error()
-	case errors.Is(err, ErrBadCursor), errors.Is(err, ErrIncompleteKeys):
+	case errors.Is(err, ErrBadCursor), errors.Is(err, ErrIncompleteKeys),
+		errors.Is(err, ErrNoPublicKey):
 		return http.StatusBadRequest, err.Error()
 	default:
 		// Unmapped means a bug, not a client mistake: say so in the log,

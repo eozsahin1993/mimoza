@@ -43,13 +43,13 @@ func TestCircles_JoinAndPost(t *testing.T) {
 	// Not a member yet: the circle's entries are not readable.
 	joiner.Get(api("/circles/" + circleID + "/entries?type=post")).Expect(http.StatusForbidden)
 
-	// The ask, carrying the key an approver seals to.
 	var request struct {
 		RequestID string `json:"requestId"`
 	}
-	joiner.Post(api("/invites/"+invite.Code+"/requests"), harness.Body{
-		"publicKey": base64.StdEncoding.EncodeToString([]byte("joiner-public-key")),
-	}).Expect(http.StatusCreated).Decode(&request)
+	// No body: the key an approver seals to comes from the joiner's own
+	// account, published when their device signed in.
+	joiner.Post(api("/invites/"+invite.Code+"/requests"), nil).
+		Expect(http.StatusCreated).Decode(&request)
 
 	var pending struct {
 		Requests []struct {
@@ -268,9 +268,10 @@ func joinCircle(t *testing.T, admin, joiner *harness.Device, circleID string) {
 	var request struct {
 		RequestID string `json:"requestId"`
 	}
-	joiner.Post(api("/invites/"+invite.Code+"/requests"), harness.Body{
-		"publicKey": base64.StdEncoding.EncodeToString([]byte("joiner-public-key")),
-	}).Expect(http.StatusCreated).Decode(&request)
+	// No body: the key an approver seals to comes from the joiner's own
+	// account, published when their device signed in.
+	joiner.Post(api("/invites/"+invite.Code+"/requests"), nil).
+		Expect(http.StatusCreated).Decode(&request)
 
 	admin.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/approve"), harness.Body{
 		"sealed": map[string]string{"1": base64.StdEncoding.EncodeToString([]byte("sealed-v1"))},

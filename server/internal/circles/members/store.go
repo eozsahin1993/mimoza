@@ -76,7 +76,7 @@ func (s *Store) ListMemberships(ctx context.Context, accountID string) ([]circle
 
 // SetRole promotes or demotes, and records it. The roster version moves
 // so every device refetches.
-func (s *Store) SetRole(ctx context.Context, circleID, accountID, role, actorID string) error {
+func (s *Store) SetRole(ctx context.Context, circleID, accountID, role, actorID, subjectName string) error {
 	current, err := s.GetMember(ctx, circleID, accountID)
 	if err != nil {
 		return err
@@ -123,11 +123,12 @@ func (s *Store) SetRole(ctx context.Context, circleID, accountID, role, actorID 
 			{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: dynamo.ActivityItem(circleID, circles.Entry{
-					Type:       circles.TypeActivity,
-					Event:      event,
-					AuthorID:   actorID,
-					SubjectID:  accountID,
-					ReceivedAt: s.Now(),
+					Type:        circles.TypeActivity,
+					Event:       event,
+					AuthorID:    actorID,
+					SubjectID:   accountID,
+					SubjectName: subjectName,
+					ReceivedAt:  s.Now(),
 				}),
 			}},
 		},
@@ -176,7 +177,7 @@ func (s *Store) SetNotifyLevel(ctx context.Context, circleID, accountID, level s
 // sealed must hold the new key for exactly the members who remain. The
 // check is not a formality — a missing entry would leave someone in the
 // circle unable to read anything posted after this.
-func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID string, expectedVersion int64, sealed map[string][]byte) error {
+func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID, subjectName string, expectedVersion int64, sealed map[string][]byte) error {
 	roster, err := s.ListMembers(ctx, circleID)
 	if err != nil {
 		return err
@@ -246,11 +247,12 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID s
 		{Put: &types.Put{
 			TableName: aws.String(s.Name),
 			Item: dynamo.ActivityItem(circleID, circles.Entry{
-				Type:       circles.TypeActivity,
-				Event:      circles.EventRemoved,
-				AuthorID:   actorID,
-				SubjectID:  accountID,
-				ReceivedAt: s.Now(),
+				Type:        circles.TypeActivity,
+				Event:       circles.EventRemoved,
+				AuthorID:    actorID,
+				SubjectID:   accountID,
+				SubjectName: subjectName,
+				ReceivedAt:  s.Now(),
 			}),
 		}},
 	}
@@ -285,7 +287,7 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID s
 // Leave is a member removing themselves. No rotation: a departing member
 // must not be able to churn everyone else's keys, and they already hold
 // every version anyway.
-func (s *Store) LeaveCircle(ctx context.Context, circleID, accountID string) error {
+func (s *Store) LeaveCircle(ctx context.Context, circleID, accountID, subjectName string) error {
 	member, err := s.GetMember(ctx, circleID, accountID)
 	if err != nil {
 		return err
@@ -326,11 +328,12 @@ func (s *Store) LeaveCircle(ctx context.Context, circleID, accountID string) err
 			{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: dynamo.ActivityItem(circleID, circles.Entry{
-					Type:       circles.TypeActivity,
-					Event:      circles.EventLeft,
-					AuthorID:   accountID,
-					SubjectID:  accountID,
-					ReceivedAt: s.Now(),
+					Type:        circles.TypeActivity,
+					Event:       circles.EventLeft,
+					AuthorID:    accountID,
+					SubjectID:   accountID,
+					SubjectName: subjectName,
+					ReceivedAt:  s.Now(),
 				}),
 			}},
 		},

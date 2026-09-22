@@ -23,4 +23,8 @@ var (
 	ErrInviteNotFound   = errors.New("circles: no such invite")
 	ErrRequestNotFound  = errors.New("circles: no such join request")
 	ErrBadCursor        = errors.New("circles: unreadable cursor")
+	// ErrNoPublicKey means the account asking to join has published no
+	// key to seal the circle's content keys to, so admitting it would
+	// admit someone who could not read a word of the circle.
+	ErrNoPublicKey = errors.New("circles: this account has published no public key")
 )

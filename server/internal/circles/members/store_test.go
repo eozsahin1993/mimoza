@@ -37,7 +37,7 @@ func TestStore_ACircleCannotBeLeftWithoutAnAdmin(t *testing.T) {
 
 	t.Run("the only admin cannot demote themselves while others remain", func(t *testing.T) {
 
-		err := memberStore.SetRole(ctx, circleID, admin, circles.RoleMember, admin)
+		err := memberStore.SetRole(ctx, circleID, admin, circles.RoleMember, admin, "")
 		if !errors.Is(err, circles.ErrWouldEmptyAdmins) {
 			t.Fatalf("expected ErrWouldEmptyAdmins, got %v", err)
 		}
@@ -51,23 +51,23 @@ func TestStore_ACircleCannotBeLeftWithoutAnAdmin(t *testing.T) {
 	})
 
 	t.Run("nor leave", func(t *testing.T) {
-		err := memberStore.LeaveCircle(ctx, circleID, admin)
+		err := memberStore.LeaveCircle(ctx, circleID, admin, "")
 		if !errors.Is(err, circles.ErrWouldEmptyAdmins) {
 			t.Fatalf("expected ErrWouldEmptyAdmins, got %v", err)
 		}
 	})
 
 	t.Run("but may once someone else is an admin", func(t *testing.T) {
-		if err := memberStore.SetRole(ctx, circleID, other, circles.RoleAdmin, admin); err != nil {
+		if err := memberStore.SetRole(ctx, circleID, other, circles.RoleAdmin, admin, ""); err != nil {
 			t.Fatal(err)
 		}
-		if err := memberStore.LeaveCircle(ctx, circleID, admin); err != nil {
+		if err := memberStore.LeaveCircle(ctx, circleID, admin, ""); err != nil {
 			t.Fatalf("leaving with another admin in place: %v", err)
 		}
 	})
 
 	t.Run("and the last member out strands nobody", func(t *testing.T) {
-		if err := memberStore.LeaveCircle(ctx, circleID, other); err != nil {
+		if err := memberStore.LeaveCircle(ctx, circleID, other, ""); err != nil {
 			t.Fatalf("the last member leaving: %v", err)
 		}
 	})

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/circles"
 )
 
@@ -20,17 +21,38 @@ type store interface {
 	DenyRequest(ctx context.Context, circleID, requestID string) error
 }
 
+// profiles is who the account ids on these requests are. An admin
+// answering a request sees a name and a face, and the key the requester
+// is admitted with comes from their account rather than from the body
+// of the ask.
+type profiles interface {
+	GetProfile(ctx context.Context, accountID string) (accounts.Profile, error)
+	GetProfiles(ctx context.Context, accountIDs []string) (map[string]accounts.Profile, error)
+}
+
+// Pending is one request with the person behind it, which is what an
+// admin actually answers.
+type Pending struct {
+	circles.Request
+	Name      string
+	AvatarKey string
+}
+
 type Service struct {
 	Store store
+	// Profiles names the requester, and holds the public key their copy
+	// of the content keys is sealed to.
+	Profiles profiles
 	// Retention is how long an unanswered request lasts, matching the
 	// code that allowed it.
 	Retention time.Duration
 }
 
-// Create is someone asking to join, holding a code. The public key they
-// send is what an approver seals the circle's keys to, so a request is
-// also how a joiner says where to put them.
-func (s *Service) Create(ctx context.Context, code, accountID string, publicKey []byte) (circles.Request, error) {
+// Create is someone asking to join, holding a code. The key an approver
+// seals the circle's keys to is read from the requester's account rather
+// than taken from the ask: the account is where that key lives, and a
+// request carrying its own copy is a second place for it to go stale.
+func (s *Service) Create(ctx context.Context, code, accountID string) (circles.Request, error) {
 	invite, err := s.Store.GetInvite(ctx, code)
 	if err != nil {
 		return circles.Request{}, err
@@ -45,6 +67,16 @@ func (s *Service) Create(ctx context.Context, code, accountID string, publicKey 
 		return circles.Request{}, err
 	}
 
+	profile, err := s.Profiles.GetProfile(ctx, accountID)
+	if err != nil {
+		return circles.Request{}, err
+	}
+	// Without a published key there is nothing to seal the circle to, and
+	// the approval would admit someone who cannot read a word of it.
+	if len(profile.PublicKey) == 0 {
+		return circles.Request{}, circles.ErrNoPublicKey
+	}
+
 	now := time.Now()
 	request := circles.Request{
 		// One request per account per circle: asking twice replaces the
@@ -52,7 +84,7 @@ func (s *Service) Create(ctx context.Context, code, accountID string, publicKey 
 		ID:        requestID(accountID),
 		CircleID:  invite.CircleID,
 		AccountID: accountID,
-		PublicKey: publicKey,
+		PublicKey: profile.PublicKey,
 		Status:    circles.RequestPending,
 		CreatedAt: now,
 		ExpiresAt: now.Add(s.Retention),
@@ -65,11 +97,34 @@ func (s *Service) Create(ctx context.Context, code, accountID string, publicKey 
 
 // List is any admin's, not only the code's author: an admin who did not
 // hand out the code still has to be able to answer what it produced.
-func (s *Service) List(ctx context.Context, circleID, accountID string) ([]circles.Request, error) {
+func (s *Service) List(ctx context.Context, circleID, accountID string) ([]Pending, error) {
 	if err := s.requireAdmin(ctx, circleID, accountID); err != nil {
 		return nil, err
 	}
-	return s.Store.ListRequests(ctx, circleID)
+	requests, err := s.Store.ListRequests(ctx, circleID)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(requests))
+	for _, request := range requests {
+		ids = append(ids, request.AccountID)
+	}
+	identities, err := s.Profiles.GetProfiles(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	pending := make([]Pending, 0, len(requests))
+	for _, request := range requests {
+		identity := identities[request.AccountID]
+		pending = append(pending, Pending{
+			Request:   request,
+			Name:      identity.Name,
+			AvatarKey: identity.AvatarKey,
+		})
+	}
+	return pending, nil
 }
 
 // Approve admits the requester with every content key sealed to them by
@@ -96,7 +151,13 @@ func (s *Service) Approve(ctx context.Context, circleID, requestID, accountID st
 			Role:        circles.RoleMember,
 			NotifyLevel: circles.NotifyAll,
 		}
-		return s.Store.ApproveRequest(ctx, circleID, requestID, accountID, member, sealed, "")
+		// The name is stamped now, so the wall can still say who joined
+		// after they have left again or deleted their account.
+		name := ""
+		if profile, err := s.Profiles.GetProfile(ctx, request.AccountID); err == nil {
+			name = profile.Name
+		}
+		return s.Store.ApproveRequest(ctx, circleID, requestID, accountID, member, sealed, name)
 	}
 	return circles.ErrRequestNotFound
 }

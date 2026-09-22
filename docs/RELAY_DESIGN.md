@@ -77,6 +77,14 @@ through the `lookup` row.
 | `circle#<id>` | `child#<postId>#reaction#<accountId>` | tag, keyVersion, ciphertext, receivedAt |
 | `invite#<code>` | `meta` | circleId, createdBy, createdAt, expiresAt |
 
+- The circles column holds no names. A roster and a list of pending
+  requests are joined to the accounts column as they are read, so a
+  renamed account is renamed everywhere at once. `subjectName` on an
+  activity row is the one copy, taken as the row is written: the wall
+  still has to name someone who has since left or deleted their account.
+- The key an approver seals a circle to is read from the joiner's
+  profile, not sent with the ask, so there is one place for it to live.
+  An account that has published none cannot ask to join.
 - `recentComments` is the newest N comments, `{commentId, authorId, keyVersion, ciphertext, receivedAt}`, N a relay constant.
 - `reactors` and `commenters` are what a card says about **you**: your reaction's tag, and whether you have commented. Bounded by the member cap, and a read projects only the caller's own entry, so a page of 200 posts carries 200 tags rather than every reactor in the circle. They also mean neither answer costs a second read.
 - `memberCount` exists so the member cap is a condition on the write rather than a count read beforehand, which two admins approving at once would both pass.
