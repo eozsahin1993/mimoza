@@ -168,13 +168,26 @@ late or an index that lagged; the device ignores entries it already
 holds. A post's `updatedAt` only moves forward, so a changed post
 re-enters the walk ahead of the cursor rather than behind it.
 
-**That rewind is an optimization, not the completeness guarantee.** Index
-propagation is asynchronous and has no documented bound, so a write can
-surface after any fixed window. `meta.lastEntryAt` is what closes it: it
-is written in the same transaction as the entry and read straight from
-the table, so a device that finishes a walk holding a `receivedAt` older
-than `lastEntryAt` knows it is missing something, and re-walks from
-before that point rather than trusting its cursor.
+**That rewind is a window, and a window can always be beaten.** A write
+can land behind it — the handler stamps a post before the write commits,
+so a slow write commits after a faster one with an earlier stamp, and
+index propagation has no documented bound either. Measured on a burst of
+20 concurrent posts, a walk that never rewinds missed 9 of them, and the
+rewind recovered every one (`spike_test.go`).
+
+What catches the rest is a count, not a wider window:
+
+```
+GET /circles/{id}/entries?type=post&count=1  → { count }
+```
+
+The device compares it with the posts it holds. Both sides are read
+through the same index, so a post that has not propagated yet is missing
+from both and raises no false alarm; once it propagates the counts
+disagree, and the device pages **backward** through `by-type-received`,
+where a key never moves, until the two agree again. `lastEntryAt` is only
+a hint that something happened at all, since a late write stamps an
+older time than one already seen.
 
 ## Push
 
