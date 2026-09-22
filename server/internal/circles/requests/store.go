@@ -43,9 +43,9 @@ func (s *Store) GetInvite(ctx context.Context, code string) (circles.Invite, err
 
 	invite := circles.Invite{
 		Code:      code,
-		CircleID:  dynamo.StringAt(out.Item, dynamo.AttrCircleID),
-		CreatedBy: dynamo.StringAt(out.Item, dynamo.AttrCreatedBy),
-		CreatedAt: dynamo.TimeAt(out.Item, dynamo.AttrCreatedAt),
+		CircleID:  dynamoutil.StringAt(out.Item, dynamo.AttrCircleID),
+		CreatedBy: dynamoutil.StringAt(out.Item, dynamo.AttrCreatedBy),
+		CreatedAt: dynamoutil.TimeAt(out.Item, dynamo.AttrCreatedAt),
 		ExpiresAt: dynamo.ExpiryFrom(out.Item),
 	}
 	if !invite.ExpiresAt.IsZero() && invite.ExpiresAt.Before(s.Now()) {
@@ -61,13 +61,13 @@ func (s *Store) CreateRequest(ctx context.Context, request circles.Request) erro
 	_, err := s.Client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.Name),
 		Item: map[string]types.AttributeValue{
-			dynamoutil.PKAttr:      dynamo.Str(dynamo.CirclePK(request.CircleID)),
-			dynamoutil.SKAttr:      dynamo.Str(dynamo.RequestKey(request.ID)),
-			dynamo.AttrRequesterID: dynamo.Str(request.AccountID),
-			dynamo.AttrPublicKey:   dynamo.Binary(request.PublicKey),
-			dynamo.AttrStatus:      dynamo.Str(request.Status),
-			dynamo.AttrCreatedAt:   dynamo.Millis(request.CreatedAt),
-			dynamo.AttrExpiresAt:   dynamo.Num(request.ExpiresAt.Unix()),
+			dynamoutil.PKAttr:      dynamoutil.Str(dynamo.CirclePK(request.CircleID)),
+			dynamoutil.SKAttr:      dynamoutil.Str(dynamo.RequestKey(request.ID)),
+			dynamo.AttrRequesterID: dynamoutil.Str(request.AccountID),
+			dynamo.AttrPublicKey:   dynamoutil.Binary(request.PublicKey),
+			dynamo.AttrStatus:      dynamoutil.Str(request.Status),
+			dynamo.AttrCreatedAt:   dynamoutil.Millis(request.CreatedAt),
+			dynamo.AttrExpiresAt:   dynamoutil.Num(request.ExpiresAt.Unix()),
 		},
 	})
 	return err
@@ -78,8 +78,8 @@ func (s *Store) ListRequests(ctx context.Context, circleID string) ([]circles.Re
 		TableName:              aws.String(s.Name),
 		KeyConditionExpression: aws.String("pk = :pk AND begins_with(sk, :prefix)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     dynamo.Str(dynamo.CirclePK(circleID)),
-			":prefix": dynamo.Str(dynamo.RequestSK),
+			":pk":     dynamoutil.Str(dynamo.CirclePK(circleID)),
+			":prefix": dynamoutil.Str(dynamo.RequestSK),
 		},
 	})
 
@@ -92,12 +92,12 @@ func (s *Store) ListRequests(ctx context.Context, circleID string) ([]circles.Re
 		}
 		for _, item := range page.Items {
 			request := circles.Request{
-				ID:        strings.TrimPrefix(dynamo.StringAt(item, dynamoutil.SKAttr), dynamo.RequestSK),
+				ID:        strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.SKAttr), dynamo.RequestSK),
 				CircleID:  circleID,
-				AccountID: dynamo.StringAt(item, dynamo.AttrRequesterID),
-				PublicKey: dynamo.BytesAt(item, dynamo.AttrPublicKey),
-				Status:    dynamo.StringAt(item, dynamo.AttrStatus),
-				CreatedAt: dynamo.TimeAt(item, dynamo.AttrCreatedAt),
+				AccountID: dynamoutil.StringAt(item, dynamo.AttrRequesterID),
+				PublicKey: dynamoutil.BytesAt(item, dynamo.AttrPublicKey),
+				Status:    dynamoutil.StringAt(item, dynamo.AttrStatus),
+				CreatedAt: dynamoutil.TimeAt(item, dynamo.AttrCreatedAt),
 				ExpiresAt: dynamo.ExpiryFrom(item),
 			}
 			// TTL sweeps these eventually; until it does, an expired ask
@@ -152,9 +152,9 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 					"#expiresAt": dynamo.AttrExpiresAt,
 				},
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":status":  dynamo.Str(circles.RequestApproved),
-					":pending": dynamo.Str(circles.RequestPending),
-					":now":     dynamo.Num(now.Unix()),
+					":status":  dynamoutil.Str(circles.RequestApproved),
+					":pending": dynamoutil.Str(circles.RequestPending),
+					":now":     dynamoutil.Num(now.Unix()),
 				},
 			}},
 			{Put: &types.Put{
@@ -164,10 +164,10 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 			{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:    dynamo.Str(dynamo.CirclePK(circleID)),
-					dynamoutil.SKAttr:    dynamo.Str(dynamo.SealedKeyKey(member.AccountID)),
+					dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circleID)),
+					dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(member.AccountID)),
 					dynamo.AttrKeys:      dynamo.SealedKeysAttr(sealed),
-					dynamo.AttrUpdatedAt: dynamo.Millis(now),
+					dynamo.AttrUpdatedAt: dynamoutil.Millis(now),
 				},
 			}},
 			// memberCount is what makes the cap hold when two admins
@@ -181,8 +181,8 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 				ConditionExpression: aws.String("attribute_not_exists(" + dynamo.AttrMemberCount + ") OR " +
 					dynamo.AttrMemberCount + " < :cap"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":one": dynamo.Num(1),
-					":cap": dynamo.Num(circles.MaxMembers),
+					":one": dynamoutil.Num(1),
+					":cap": dynamoutil.Num(circles.MaxMembers),
 				},
 			}},
 			{Put: &types.Put{
@@ -199,10 +199,10 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 		},
 	})
 	switch {
-	case dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:
 		// Gone, or already answered — either way there is nothing to grant.
 		return circles.ErrRequestNotFound
-	case dynamo.CancelledFor(err, 3) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 3) == dynamoutil.ConditionalCheckFailed:
 		return circles.ErrCircleFull
 	}
 	return err
@@ -218,11 +218,11 @@ func (s *Store) DenyRequest(ctx context.Context, circleID, requestID string) err
 		ConditionExpression:      aws.String("attribute_exists(sk) AND #status = :pending"),
 		ExpressionAttributeNames: map[string]string{"#status": dynamo.AttrStatus},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":status":  dynamo.Str(circles.RequestDenied),
-			":pending": dynamo.Str(circles.RequestPending),
+			":status":  dynamoutil.Str(circles.RequestDenied),
+			":pending": dynamoutil.Str(circles.RequestPending),
 		},
 	})
-	if dynamo.ConditionFailed(err) {
+	if dynamoutil.ConditionFailed(err) {
 		return circles.ErrRequestNotFound
 	}
 	return err

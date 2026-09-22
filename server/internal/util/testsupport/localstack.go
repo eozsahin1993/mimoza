@@ -37,6 +37,7 @@ import (
 	awsssm "github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
+	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
 	"mimoza-relay/internal/circles/dynamo"
@@ -68,6 +69,9 @@ var (
 )
 
 var (
+	accountsTableOnce sync.Once
+	accountsTableErr  error
+
 	circlesTableOnce sync.Once
 	circlesTableErr  error
 
@@ -149,6 +153,25 @@ func loadConfig(t testing.TB) aws.Config {
 		t.Fatalf("failed to load AWS config: %v", err)
 	}
 	return cfg
+}
+
+// NewAccountTable returns the shared accounts table against LocalStack,
+// for the slices that build their stores on it. Shared across tests —
+// safe because each picks its own account.
+func NewAccountTable(t testing.TB) *accountsdynamo.Table {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
+	})
+
+	accountsTableOnce.Do(func() {
+		accountsTableErr = localstack.CreateTable(context.Background(), client, shared.AccountsTableName, localstack.WithSortKey)
+	})
+	if accountsTableErr != nil {
+		unreachable(t, "DynamoDB", accountsTableErr)
+	}
+
+	return accountsdynamo.NewTable(client, shared.AccountsTableName)
 }
 
 // NewCircleTable returns the shared circles table against LocalStack,

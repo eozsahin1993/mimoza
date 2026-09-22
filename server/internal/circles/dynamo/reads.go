@@ -49,8 +49,8 @@ func (t *Table) ListMembers(ctx context.Context, circleID string) ([]circles.Mem
 		TableName:              aws.String(t.Name),
 		KeyConditionExpression: aws.String("pk = :pk AND begins_with(sk, :prefix)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     Str(CirclePK(circleID)),
-			":prefix": Str(MemberSK),
+			":pk":     dynamoutil.Str(CirclePK(circleID)),
+			":prefix": dynamoutil.Str(MemberSK),
 		},
 	})
 
@@ -91,7 +91,7 @@ func (t *Table) TouchCircle(circleID string, at time.Time) *types.Update {
 		Key:                       t.Key(CirclePK(circleID), MetaSK),
 		UpdateExpression:          aws.String("SET " + AttrLastEntryAt + " = :at"),
 		ConditionExpression:       aws.String("attribute_exists(pk)"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{":at": Millis(at)},
+		ExpressionAttributeValues: map[string]types.AttributeValue{":at": dynamoutil.Millis(at)},
 	}
 }
 
@@ -129,10 +129,10 @@ func (t *Table) GetReaction(ctx context.Context, circleID, postID, accountID str
 	return &circles.Reaction{
 		AccountID:  accountID,
 		PostID:     postID,
-		Tag:        StringAt(out.Item, AttrTag),
-		KeyVersion: IntAt(out.Item, AttrKeyVersion),
-		Ciphertext: BytesAt(out.Item, AttrCiphertext),
-		ReceivedAt: TimeAt(out.Item, AttrReceivedAt),
+		Tag:        dynamoutil.StringAt(out.Item, AttrTag),
+		KeyVersion: dynamoutil.IntAt(out.Item, AttrKeyVersion),
+		Ciphertext: dynamoutil.BytesAt(out.Item, AttrCiphertext),
+		ReceivedAt: dynamoutil.TimeAt(out.Item, AttrReceivedAt),
 	}, nil
 }
 
@@ -143,8 +143,8 @@ func (t *Table) ListChildren(ctx context.Context, circleID, postID string) ([]ci
 		TableName:              aws.String(t.Name),
 		KeyConditionExpression: aws.String("pk = :pk AND begins_with(sk, :prefix)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     Str(CirclePK(circleID)),
-			":prefix": Str(ChildPrefix(postID)),
+			":pk":     dynamoutil.Str(CirclePK(circleID)),
+			":prefix": dynamoutil.Str(ChildPrefix(postID)),
 		},
 	})
 
@@ -156,27 +156,27 @@ func (t *Table) ListChildren(ctx context.Context, circleID, postID string) ([]ci
 			return nil, nil, err
 		}
 		for _, item := range page.Items {
-			sk := StringAt(item, dynamoutil.SKAttr)
+			sk := dynamoutil.StringAt(item, dynamoutil.SKAttr)
 			switch {
 			case strings.Contains(sk, CommentSeg):
 				comments = append(comments, circles.Comment{
 					ID:              sk[strings.Index(sk, CommentSeg)+len(CommentSeg):],
 					PostID:          postID,
-					AuthorID:        StringAt(item, AttrAuthorID),
-					ParentCommentID: StringAt(item, AttrParentComment),
-					KeyVersion:      IntAt(item, AttrKeyVersion),
-					Ciphertext:      BytesAt(item, AttrCiphertext),
-					ReceivedAt:      TimeAt(item, AttrReceivedAt),
-					DeletedAt:       TimeAt(item, AttrDeletedAt),
+					AuthorID:        dynamoutil.StringAt(item, AttrAuthorID),
+					ParentCommentID: dynamoutil.StringAt(item, AttrParentComment),
+					KeyVersion:      dynamoutil.IntAt(item, AttrKeyVersion),
+					Ciphertext:      dynamoutil.BytesAt(item, AttrCiphertext),
+					ReceivedAt:      dynamoutil.TimeAt(item, AttrReceivedAt),
+					DeletedAt:       dynamoutil.TimeAt(item, AttrDeletedAt),
 				})
 			case strings.Contains(sk, ReactSeg):
 				reactions = append(reactions, circles.Reaction{
 					AccountID:  sk[strings.Index(sk, ReactSeg)+len(ReactSeg):],
 					PostID:     postID,
-					Tag:        StringAt(item, AttrTag),
-					KeyVersion: IntAt(item, AttrKeyVersion),
-					Ciphertext: BytesAt(item, AttrCiphertext),
-					ReceivedAt: TimeAt(item, AttrReceivedAt),
+					Tag:        dynamoutil.StringAt(item, AttrTag),
+					KeyVersion: dynamoutil.IntAt(item, AttrKeyVersion),
+					Ciphertext: dynamoutil.BytesAt(item, AttrCiphertext),
+					ReceivedAt: dynamoutil.TimeAt(item, AttrReceivedAt),
 				})
 			}
 		}

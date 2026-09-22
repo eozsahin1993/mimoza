@@ -29,19 +29,19 @@ var _ store = (*Store)(nil)
 // yet know which circle it belongs to.
 func (s *Store) CreateInvite(ctx context.Context, invite circles.Invite) error {
 	item := map[string]types.AttributeValue{
-		dynamoutil.PKAttr:    dynamo.Str(dynamo.CirclePK(invite.CircleID)),
-		dynamoutil.SKAttr:    dynamo.Str(dynamo.InviteKey(invite.Code)),
-		dynamo.AttrCreatedBy: dynamo.Str(invite.CreatedBy),
-		dynamo.AttrCreatedAt: dynamo.Millis(invite.CreatedAt),
-		dynamo.AttrExpiresAt: dynamo.Num(invite.ExpiresAt.Unix()),
+		dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(invite.CircleID)),
+		dynamoutil.SKAttr:    dynamoutil.Str(dynamo.InviteKey(invite.Code)),
+		dynamo.AttrCreatedBy: dynamoutil.Str(invite.CreatedBy),
+		dynamo.AttrCreatedAt: dynamoutil.Millis(invite.CreatedAt),
+		dynamo.AttrExpiresAt: dynamoutil.Num(invite.ExpiresAt.Unix()),
 	}
 	lookup := map[string]types.AttributeValue{
-		dynamoutil.PKAttr:    dynamo.Str(dynamo.InvitePK(invite.Code)),
-		dynamoutil.SKAttr:    dynamo.Str(dynamo.MetaSK),
-		dynamo.AttrCircleID:  dynamo.Str(invite.CircleID),
-		dynamo.AttrCreatedBy: dynamo.Str(invite.CreatedBy),
-		dynamo.AttrCreatedAt: dynamo.Millis(invite.CreatedAt),
-		dynamo.AttrExpiresAt: dynamo.Num(invite.ExpiresAt.Unix()),
+		dynamoutil.PKAttr:    dynamoutil.Str(dynamo.InvitePK(invite.Code)),
+		dynamoutil.SKAttr:    dynamoutil.Str(dynamo.MetaSK),
+		dynamo.AttrCircleID:  dynamoutil.Str(invite.CircleID),
+		dynamo.AttrCreatedBy: dynamoutil.Str(invite.CreatedBy),
+		dynamo.AttrCreatedAt: dynamoutil.Millis(invite.CreatedAt),
+		dynamo.AttrExpiresAt: dynamoutil.Num(invite.ExpiresAt.Unix()),
 	}
 
 	_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
@@ -54,7 +54,7 @@ func (s *Store) CreateInvite(ctx context.Context, invite circles.Invite) error {
 			}},
 		},
 	})
-	if dynamo.CancelledFor(err, 1) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed {
 		return circles.ErrAlreadyExists
 	}
 	return err
@@ -77,9 +77,9 @@ func (s *Store) GetInvite(ctx context.Context, code string) (circles.Invite, err
 
 	invite := circles.Invite{
 		Code:      code,
-		CircleID:  dynamo.StringAt(out.Item, dynamo.AttrCircleID),
-		CreatedBy: dynamo.StringAt(out.Item, dynamo.AttrCreatedBy),
-		CreatedAt: dynamo.TimeAt(out.Item, dynamo.AttrCreatedAt),
+		CircleID:  dynamoutil.StringAt(out.Item, dynamo.AttrCircleID),
+		CreatedBy: dynamoutil.StringAt(out.Item, dynamo.AttrCreatedBy),
+		CreatedAt: dynamoutil.TimeAt(out.Item, dynamo.AttrCreatedAt),
 		ExpiresAt: dynamo.ExpiryFrom(out.Item),
 	}
 	if !invite.ExpiresAt.IsZero() && invite.ExpiresAt.Before(s.Now()) {
@@ -93,8 +93,8 @@ func (s *Store) ListInvites(ctx context.Context, circleID string) ([]circles.Inv
 		TableName:              aws.String(s.Name),
 		KeyConditionExpression: aws.String("pk = :pk AND begins_with(sk, :prefix)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     dynamo.Str(dynamo.CirclePK(circleID)),
-			":prefix": dynamo.Str(dynamo.InviteSK),
+			":pk":     dynamoutil.Str(dynamo.CirclePK(circleID)),
+			":prefix": dynamoutil.Str(dynamo.InviteSK),
 		},
 	})
 
@@ -107,10 +107,10 @@ func (s *Store) ListInvites(ctx context.Context, circleID string) ([]circles.Inv
 		}
 		for _, item := range page.Items {
 			invite := circles.Invite{
-				Code:      strings.TrimPrefix(dynamo.StringAt(item, dynamoutil.SKAttr), dynamo.InviteSK),
+				Code:      strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.SKAttr), dynamo.InviteSK),
 				CircleID:  circleID,
-				CreatedBy: dynamo.StringAt(item, dynamo.AttrCreatedBy),
-				CreatedAt: dynamo.TimeAt(item, dynamo.AttrCreatedAt),
+				CreatedBy: dynamoutil.StringAt(item, dynamo.AttrCreatedBy),
+				CreatedAt: dynamoutil.TimeAt(item, dynamo.AttrCreatedAt),
 				ExpiresAt: dynamo.ExpiryFrom(item),
 			}
 			if !invite.ExpiresAt.IsZero() && invite.ExpiresAt.Before(now) {
@@ -135,11 +135,11 @@ func (s *Store) RevokeInvite(ctx context.Context, circleID, code string) error {
 				TableName:                 aws.String(s.Name),
 				Key:                       s.Key(dynamo.InvitePK(code), dynamo.MetaSK),
 				ConditionExpression:       aws.String(dynamo.AttrCircleID + " = :circleId"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{":circleId": dynamo.Str(circleID)},
+				ExpressionAttributeValues: map[string]types.AttributeValue{":circleId": dynamoutil.Str(circleID)},
 			}},
 		},
 	})
-	if dynamo.CancelledFor(err, 1) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed {
 		// The code belongs to another circle, or is already gone.
 		return circles.ErrInviteNotFound
 	}

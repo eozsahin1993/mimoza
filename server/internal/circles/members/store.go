@@ -37,8 +37,8 @@ func (s *Store) ListMemberships(ctx context.Context, accountID string) ([]circle
 		IndexName:              aws.String(dynamo.ByAccountIndex),
 		KeyConditionExpression: aws.String(dynamo.ByAccountPK + " = :account AND begins_with(sk, :prefix)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":account": dynamo.Str(accountID),
-			":prefix":  dynamo.Str(dynamo.MemberSK),
+			":account": dynamoutil.Str(accountID),
+			":prefix":  dynamoutil.Str(dynamo.MemberSK),
 		},
 	})
 
@@ -49,7 +49,7 @@ func (s *Store) ListMemberships(ctx context.Context, accountID string) ([]circle
 			return nil, err
 		}
 		for _, row := range page.Items {
-			circleID := strings.TrimPrefix(dynamo.StringAt(row, dynamoutil.PKAttr), dynamo.CirclePKPrefix)
+			circleID := strings.TrimPrefix(dynamoutil.StringAt(row, dynamoutil.PKAttr), dynamo.CirclePKPrefix)
 			member, err := s.GetMember(ctx, circleID, accountID)
 			if err != nil {
 				return nil, err
@@ -92,14 +92,14 @@ func (s *Store) SetRole(ctx context.Context, circleID, accountID, role, actorID 
 	// first, which two demotions at once can both pass.
 	now := s.Now()
 	meta := "SET " + dynamo.AttrLastEntryAt + " = :now ADD " + dynamo.AttrRosterVersion + " :one"
-	values := map[string]types.AttributeValue{":one": dynamo.Num(1), ":now": dynamo.Millis(now)}
+	values := map[string]types.AttributeValue{":one": dynamoutil.Num(1), ":now": dynamoutil.Millis(now)}
 	condition := ""
 	switch {
 	case role == circles.RoleAdmin && !current.IsAdmin():
 		meta += ", " + dynamo.AttrAdminCount + " :one"
 	case role == circles.RoleMember && current.IsAdmin():
 		meta += ", " + dynamo.AttrAdminCount + " :minusOne"
-		values[":minusOne"] = dynamo.Num(-1)
+		values[":minusOne"] = dynamoutil.Num(-1)
 		condition = dynamo.AttrAdminCount + " > :one"
 	}
 
@@ -111,7 +111,7 @@ func (s *Store) SetRole(ctx context.Context, circleID, accountID, role, actorID 
 				UpdateExpression:          aws.String("SET #role = :role"),
 				ConditionExpression:       aws.String("attribute_exists(sk)"),
 				ExpressionAttributeNames:  map[string]string{"#role": dynamo.AttrRole},
-				ExpressionAttributeValues: map[string]types.AttributeValue{":role": dynamo.Str(role)},
+				ExpressionAttributeValues: map[string]types.AttributeValue{":role": dynamoutil.Str(role)},
 			}},
 			{Update: &types.Update{
 				TableName:                 aws.String(s.Name),
@@ -133,9 +133,9 @@ func (s *Store) SetRole(ctx context.Context, circleID, accountID, role, actorID 
 		},
 	})
 	switch {
-	case dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:
 		return circles.ErrNotMember
-	case dynamo.CancelledFor(err, 1) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed:
 		return circles.ErrWouldEmptyAdmins
 	}
 	return err
@@ -151,7 +151,7 @@ func (s *Store) SetNotifyLevel(ctx context.Context, circleID, accountID, level s
 				Key:                       s.Key(dynamo.CirclePK(circleID), dynamo.MemberKey(accountID)),
 				UpdateExpression:          aws.String("SET " + dynamo.AttrNotifyLevel + " = :level"),
 				ConditionExpression:       aws.String("attribute_exists(sk)"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{":level": dynamo.Str(level)},
+				ExpressionAttributeValues: map[string]types.AttributeValue{":level": dynamoutil.Str(level)},
 			}},
 			// No activity row — nobody else needs to know — but the
 			// version moves, so this account's other devices refetch.
@@ -159,11 +159,11 @@ func (s *Store) SetNotifyLevel(ctx context.Context, circleID, accountID, level s
 				TableName:                 aws.String(s.Name),
 				Key:                       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
 				UpdateExpression:          aws.String("ADD " + dynamo.AttrRosterVersion + " :one"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamo.Num(1)},
+				ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamoutil.Num(1)},
 			}},
 		},
 	})
-	if dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return circles.ErrNotMember
 	}
 	return err
@@ -237,10 +237,10 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID s
 			),
 			ConditionExpression: aws.String(dynamo.AttrKeyVersion + " = :expected"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":next":     dynamo.Num(expectedVersion + 1),
-				":expected": dynamo.Num(expectedVersion),
-				":one":      dynamo.Num(1),
-				":minusOne": dynamo.Num(-1),
+				":next":     dynamoutil.Num(expectedVersion + 1),
+				":expected": dynamoutil.Num(expectedVersion),
+				":one":      dynamoutil.Num(1),
+				":minusOne": dynamoutil.Num(-1),
 			},
 		}},
 		{Put: &types.Put{
@@ -264,17 +264,17 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID s
 				"#version": version,
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":sealed": dynamo.Binary(sealed[member.AccountID]),
-				":now":    dynamo.Millis(s.Now()),
+				":sealed": dynamoutil.Binary(sealed[member.AccountID]),
+				":now":    dynamoutil.Millis(s.Now()),
 			},
 		}})
 	}
 
 	_, err = s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
 	switch {
-	case dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:
 		return circles.ErrNotMember
-	case dynamo.CancelledFor(err, 2) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 2) == dynamoutil.ConditionalCheckFailed:
 		// Another admin rotated first, so these sealed keys are for a
 		// version that is already history.
 		return circles.ErrVersionMoved
@@ -295,7 +295,7 @@ func (s *Store) LeaveCircle(ctx context.Context, circleID, accountID string) err
 	meta := "SET " + dynamo.AttrLastEntryAt + " = :now ADD " + dynamo.AttrRosterVersion + " :one, " +
 		dynamo.AttrMemberCount + " :minusOne"
 	values := map[string]types.AttributeValue{
-		":one": dynamo.Num(1), ":minusOne": dynamo.Num(-1), ":now": dynamo.Millis(now),
+		":one": dynamoutil.Num(1), ":minusOne": dynamoutil.Num(-1), ":now": dynamoutil.Millis(now),
 	}
 	condition := ""
 	if member.IsAdmin() {
@@ -336,9 +336,9 @@ func (s *Store) LeaveCircle(ctx context.Context, circleID, accountID string) err
 		},
 	})
 	switch {
-	case dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:
 		return circles.ErrNotMember
-	case dynamo.CancelledFor(err, 2) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 2) == dynamoutil.ConditionalCheckFailed:
 		// The circle's own row refused it: this is its last admin, and
 		// somebody else is still in it.
 		return circles.ErrWouldEmptyAdmins
@@ -354,10 +354,10 @@ func (s *Store) ReplaceSealedKeys(ctx context.Context, circleID, accountID strin
 			{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:    dynamo.Str(dynamo.CirclePK(circleID)),
-					dynamoutil.SKAttr:    dynamo.Str(dynamo.SealedKeyKey(accountID)),
+					dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circleID)),
+					dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(accountID)),
 					dynamo.AttrKeys:      dynamo.SealedKeysAttr(sealed),
-					dynamo.AttrUpdatedAt: dynamo.Millis(s.Now()),
+					dynamo.AttrUpdatedAt: dynamoutil.Millis(s.Now()),
 				},
 			}},
 			{Update: &types.Update{
@@ -365,7 +365,7 @@ func (s *Store) ReplaceSealedKeys(ctx context.Context, circleID, accountID strin
 				Key:                       s.Key(dynamo.CirclePK(circleID), dynamo.MemberKey(accountID)),
 				UpdateExpression:          aws.String("SET " + dynamo.AttrNeedsRewrap + " = :no"),
 				ConditionExpression:       aws.String("attribute_exists(sk)"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{":no": dynamo.Bool(false)},
+				ExpressionAttributeValues: map[string]types.AttributeValue{":no": dynamoutil.Bool(false)},
 			}},
 			// The circle's own version, not the member row's: it is what
 			// every other device watches to know the keys moved.
@@ -373,11 +373,11 @@ func (s *Store) ReplaceSealedKeys(ctx context.Context, circleID, accountID strin
 				TableName:                 aws.String(s.Name),
 				Key:                       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
 				UpdateExpression:          aws.String("ADD " + dynamo.AttrRosterVersion + " :one"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamo.Num(1)},
+				ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamoutil.Num(1)},
 			}},
 		},
 	})
-	if dynamo.CancelledFor(err, 1) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed {
 		return circles.ErrNotMember
 	}
 	return err
@@ -401,13 +401,13 @@ func (s *Store) MarkMembershipsNeedRewrap(ctx context.Context, accountID string)
 					Key:                       s.Key(dynamo.CirclePK(membership.Circle.ID), dynamo.MemberKey(accountID)),
 					UpdateExpression:          aws.String("SET " + dynamo.AttrNeedsRewrap + " = :yes"),
 					ConditionExpression:       aws.String("attribute_exists(sk)"),
-					ExpressionAttributeValues: map[string]types.AttributeValue{":yes": dynamo.Bool(true)},
+					ExpressionAttributeValues: map[string]types.AttributeValue{":yes": dynamoutil.Bool(true)},
 				}},
 				{Update: &types.Update{
 					TableName:                 aws.String(s.Name),
 					Key:                       s.Key(dynamo.CirclePK(membership.Circle.ID), dynamo.MetaSK),
 					UpdateExpression:          aws.String("ADD " + dynamo.AttrRosterVersion + " :one"),
-					ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamo.Num(1)},
+					ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamoutil.Num(1)},
 				}},
 			},
 		})

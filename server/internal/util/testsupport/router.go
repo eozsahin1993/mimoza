@@ -24,6 +24,8 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 	google = NewFakeOIDCProvider(t, "https://accounts.google.com")
 	apple = NewFakeOIDCProvider(t, "https://appleid.apple.com")
 	mux = api.NewRouter(api.Deps{
+		Accounts:   NewAccountTable(t),
+		Circles:    NewCircleTable(t),
 		Log:        NewLogStore(t),
 		Blob:       NewBlobStore(t),
 		Auth:       NewAuthStore(t),

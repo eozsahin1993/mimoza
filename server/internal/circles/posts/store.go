@@ -9,6 +9,7 @@ import (
 
 	"mimoza-relay/internal/circles"
 	"mimoza-relay/internal/circles/dynamo"
+	"mimoza-relay/internal/util/dynamoutil"
 )
 
 // Store is this slice's own reads and writes against the circles table.
@@ -40,7 +41,7 @@ func (s *Store) PutPost(ctx context.Context, circleID string, entry circles.Entr
 			{Update: s.TouchCircle(circleID, entry.ReceivedAt)},
 		},
 	})
-	if dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return s.GetPost(ctx, circleID, entry.ID, "")
 	}
 	if err != nil {
@@ -58,12 +59,12 @@ func (s *Store) SetVisibility(ctx context.Context, circleID, postID, visibility 
 			dynamo.ByTypeUpdatedKey + " = :key"),
 		ConditionExpression: aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":visibility": dynamo.Str(visibility),
-			":now":        dynamo.Millis(now),
-			":key":        dynamo.Str(circles.IndexKey(circles.TypePost, now, postID)),
+			":visibility": dynamoutil.Str(visibility),
+			":now":        dynamoutil.Millis(now),
+			":key":        dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
 		},
 	})
-	if dynamo.ConditionFailed(err) {
+	if dynamoutil.ConditionFailed(err) {
 		return circles.Entry{}, circles.ErrEntryNotFound
 	}
 	if err != nil {
@@ -84,11 +85,11 @@ func (s *Store) DeletePost(ctx context.Context, circleID, postID string) (circle
 			dynamo.ByTypeUpdatedKey + " = :key REMOVE " + dynamo.AttrCiphertext),
 		ConditionExpression: aws.String("attribute_exists(sk)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":now": dynamo.Millis(now),
-			":key": dynamo.Str(circles.IndexKey(circles.TypePost, now, postID)),
+			":now": dynamoutil.Millis(now),
+			":key": dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
 		},
 	})
-	if dynamo.ConditionFailed(err) {
+	if dynamoutil.ConditionFailed(err) {
 		return circles.Entry{}, circles.ErrEntryNotFound
 	}
 	if err != nil {
@@ -199,7 +200,7 @@ func (s *Store) CountEntries(ctx context.Context, circleID, entryType string) (i
 			IndexName:              aws.String(dynamo.ByTypeReceivedIndex),
 			KeyConditionExpression: aws.String(dynamo.ByTypeReceivedPK + " = :pk"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":pk": dynamo.Str(dynamo.TypePartition(circleID, entryType)),
+				":pk": dynamoutil.Str(dynamo.TypePartition(circleID, entryType)),
 			},
 			Select:            types.SelectCount,
 			ExclusiveStartKey: start,
@@ -219,10 +220,10 @@ func (s *Store) CountEntries(ctx context.Context, circleID, entryType string) (i
 // binding one DynamoDB never sees is rejected.
 func values(partition, position string, atStart bool) map[string]types.AttributeValue {
 	if atStart {
-		return map[string]types.AttributeValue{":pk": dynamo.Str(partition)}
+		return map[string]types.AttributeValue{":pk": dynamoutil.Str(partition)}
 	}
 	return map[string]types.AttributeValue{
-		":pk":       dynamo.Str(partition),
-		":position": dynamo.Str(position),
+		":pk":       dynamoutil.Str(partition),
+		":position": dynamoutil.Str(position),
 	}
 }

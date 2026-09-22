@@ -69,19 +69,19 @@ func (s *Store) set(ctx context.Context, circleID, postID, accountID string, nex
 		counts := []string{}
 		names := map[string]string{"#reactor": accountID}
 		values := map[string]types.AttributeValue{
-			":now": dynamo.Millis(now),
-			":key": dynamo.Str(circles.IndexKey(circles.TypePost, now, postID)),
+			":now": dynamoutil.Millis(now),
+			":key": dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
 		}
 		if previous != nil {
 			counts = append(counts, dynamo.AttrReactionCounts+".#old :minusOne")
 			names["#old"] = previous.Tag
-			values[":minusOne"] = dynamo.Num(-1)
+			values[":minusOne"] = dynamoutil.Num(-1)
 		}
 		if next != nil {
 			counts = append(counts, dynamo.AttrReactionCounts+".#new :one")
 			names["#new"] = next.Tag
-			values[":one"] = dynamo.Num(1)
-			values[":tag"] = dynamo.Str(next.Tag)
+			values[":one"] = dynamoutil.Num(1)
+			values[":tag"] = dynamoutil.Str(next.Tag)
 		}
 
 		slot := types.TransactWriteItem{Delete: &types.Delete{
@@ -92,12 +92,12 @@ func (s *Store) set(ctx context.Context, circleID, postID, accountID string, nex
 			slot = types.TransactWriteItem{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:     dynamo.Str(dynamo.CirclePK(circleID)),
-					dynamoutil.SKAttr:     dynamo.Str(dynamo.ReactionKey(postID, accountID)),
-					dynamo.AttrTag:        dynamo.Str(next.Tag),
-					dynamo.AttrKeyVersion: dynamo.Num(next.KeyVersion),
-					dynamo.AttrCiphertext: dynamo.Binary(next.Ciphertext),
-					dynamo.AttrReceivedAt: dynamo.Millis(now),
+					dynamoutil.PKAttr:     dynamoutil.Str(dynamo.CirclePK(circleID)),
+					dynamoutil.SKAttr:     dynamoutil.Str(dynamo.ReactionKey(postID, accountID)),
+					dynamo.AttrTag:        dynamoutil.Str(next.Tag),
+					dynamo.AttrKeyVersion: dynamoutil.Num(next.KeyVersion),
+					dynamo.AttrCiphertext: dynamoutil.Binary(next.Ciphertext),
+					dynamo.AttrReceivedAt: dynamoutil.Millis(now),
 				},
 			}}
 		}
@@ -108,7 +108,7 @@ func (s *Store) set(ctx context.Context, circleID, postID, accountID string, nex
 			slot = withCondition(slot, "attribute_not_exists(sk)", nil, nil)
 		} else {
 			slot = withCondition(slot, dynamo.AttrTag+" = :expected", nil,
-				map[string]types.AttributeValue{":expected": dynamo.Str(previous.Tag)})
+				map[string]types.AttributeValue{":expected": dynamoutil.Str(previous.Tag)})
 		}
 
 		_, err = s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
@@ -128,7 +128,7 @@ func (s *Store) set(ctx context.Context, circleID, postID, accountID string, nex
 		})
 		return err
 	})
-	if dynamo.CancelledFor(err, 1) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed {
 		return circles.Entry{}, circles.ErrEntryNotFound
 	}
 	if err != nil {
@@ -159,6 +159,6 @@ func reactorSet(next *circles.Reaction) string {
 // staleSlot reports whether the only thing that failed is the reaction
 // slot's own condition, at index 0 of the transaction.
 func staleSlot(err error) bool {
-	return dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed &&
-		dynamo.CancelledFor(err, 1) != dynamo.ConditionalCheckFailed
+	return dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed &&
+		dynamoutil.CancelledFor(err, 1) != dynamoutil.ConditionalCheckFailed
 }

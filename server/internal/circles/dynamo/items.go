@@ -67,24 +67,24 @@ func MintID() string {
 
 func PostItem(circleID string, entry circles.Entry) map[string]types.AttributeValue {
 	item := map[string]types.AttributeValue{
-		dynamoutil.PKAttr:  Str(CirclePK(circleID)),
-		dynamoutil.SKAttr:  Str(EntryKey(entry.ID)),
-		AttrType:           Str(circles.TypePost),
-		AttrAuthorID:       Str(entry.AuthorID),
-		AttrKeyVersion:     Num(entry.KeyVersion),
-		AttrCiphertext:     Binary(entry.Ciphertext),
-		AttrHasBlob:        Bool(entry.HasBlob),
-		AttrVisibility:     Str(entry.Visibility),
-		AttrCommentCount:   Num(0),
+		dynamoutil.PKAttr:  dynamoutil.Str(CirclePK(circleID)),
+		dynamoutil.SKAttr:  dynamoutil.Str(EntryKey(entry.ID)),
+		AttrType:           dynamoutil.Str(circles.TypePost),
+		AttrAuthorID:       dynamoutil.Str(entry.AuthorID),
+		AttrKeyVersion:     dynamoutil.Num(entry.KeyVersion),
+		AttrCiphertext:     dynamoutil.Binary(entry.Ciphertext),
+		AttrHasBlob:        dynamoutil.Bool(entry.HasBlob),
+		AttrVisibility:     dynamoutil.Str(entry.Visibility),
+		AttrCommentCount:   dynamoutil.Num(0),
 		AttrReactionCounts: &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{}},
 		AttrReactors:       &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{}},
 		AttrCommenters:     &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{}},
-		AttrReceivedAt:     Millis(entry.ReceivedAt),
-		AttrUpdatedAt:      Millis(entry.ReceivedAt),
-		ByTypeReceivedPK:   Str(TypePartition(circleID, circles.TypePost)),
-		ByTypeReceivedKey:  Str(circles.IndexKey(circles.TypePost, entry.ReceivedAt, entry.ID)),
-		ByTypeUpdatedPK:    Str(TypePartition(circleID, circles.TypePost)),
-		ByTypeUpdatedKey:   Str(circles.IndexKey(circles.TypePost, entry.ReceivedAt, entry.ID)),
+		AttrReceivedAt:     dynamoutil.Millis(entry.ReceivedAt),
+		AttrUpdatedAt:      dynamoutil.Millis(entry.ReceivedAt),
+		ByTypeReceivedPK:   dynamoutil.Str(TypePartition(circleID, circles.TypePost)),
+		ByTypeReceivedKey:  dynamoutil.Str(circles.IndexKey(circles.TypePost, entry.ReceivedAt, entry.ID)),
+		ByTypeUpdatedPK:    dynamoutil.Str(TypePartition(circleID, circles.TypePost)),
+		ByTypeUpdatedKey:   dynamoutil.Str(circles.IndexKey(circles.TypePost, entry.ReceivedAt, entry.ID)),
 	}
 	return item
 }
@@ -94,44 +94,44 @@ func ActivityItem(circleID string, entry circles.Entry) map[string]types.Attribu
 		entry.ID = MintID()
 	}
 	return map[string]types.AttributeValue{
-		dynamoutil.PKAttr: Str(CirclePK(circleID)),
-		dynamoutil.SKAttr: Str(EntryKey(entry.ID)),
-		AttrType:          Str(circles.TypeActivity),
-		AttrEvent:         Str(entry.Event),
-		AttrAuthorID:      Str(entry.AuthorID),
-		AttrSubjectID:     Str(entry.SubjectID),
-		AttrSubjectName:   Str(entry.SubjectName),
-		AttrReceivedAt:    Millis(entry.ReceivedAt),
-		ByTypeReceivedPK:  Str(TypePartition(circleID, circles.TypeActivity)),
-		ByTypeReceivedKey: Str(circles.IndexKey(circles.TypeActivity, entry.ReceivedAt, entry.ID)),
+		dynamoutil.PKAttr: dynamoutil.Str(CirclePK(circleID)),
+		dynamoutil.SKAttr: dynamoutil.Str(EntryKey(entry.ID)),
+		AttrType:          dynamoutil.Str(circles.TypeActivity),
+		AttrEvent:         dynamoutil.Str(entry.Event),
+		AttrAuthorID:      dynamoutil.Str(entry.AuthorID),
+		AttrSubjectID:     dynamoutil.Str(entry.SubjectID),
+		AttrSubjectName:   dynamoutil.Str(entry.SubjectName),
+		AttrReceivedAt:    dynamoutil.Millis(entry.ReceivedAt),
+		ByTypeReceivedPK:  dynamoutil.Str(TypePartition(circleID, circles.TypeActivity)),
+		ByTypeReceivedKey: dynamoutil.Str(circles.IndexKey(circles.TypeActivity, entry.ReceivedAt, entry.ID)),
 	}
 }
 
 func EntryFrom(item map[string]types.AttributeValue) circles.Entry {
 	entry := circles.Entry{
-		ID:         strings.TrimPrefix(StringAt(item, dynamoutil.SKAttr), EntrySK),
-		Type:       StringAt(item, AttrType),
-		AuthorID:   StringAt(item, AttrAuthorID),
-		ReceivedAt: TimeAt(item, AttrReceivedAt),
+		ID:         strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.SKAttr), EntrySK),
+		Type:       dynamoutil.StringAt(item, AttrType),
+		AuthorID:   dynamoutil.StringAt(item, AttrAuthorID),
+		ReceivedAt: dynamoutil.TimeAt(item, AttrReceivedAt),
 	}
 	if entry.Type == circles.TypeActivity {
-		entry.Event = StringAt(item, AttrEvent)
-		entry.SubjectID = StringAt(item, AttrSubjectID)
-		entry.SubjectName = StringAt(item, AttrSubjectName)
+		entry.Event = dynamoutil.StringAt(item, AttrEvent)
+		entry.SubjectID = dynamoutil.StringAt(item, AttrSubjectID)
+		entry.SubjectName = dynamoutil.StringAt(item, AttrSubjectName)
 		return entry
 	}
 
-	entry.KeyVersion = IntAt(item, AttrKeyVersion)
-	entry.Ciphertext = BytesAt(item, AttrCiphertext)
-	entry.HasBlob = BoolAt(item, AttrHasBlob)
-	entry.Visibility = StringAt(item, AttrVisibility)
-	entry.CommentCount = IntAt(item, AttrCommentCount)
+	entry.KeyVersion = dynamoutil.IntAt(item, AttrKeyVersion)
+	entry.Ciphertext = dynamoutil.BytesAt(item, AttrCiphertext)
+	entry.HasBlob = dynamoutil.BoolAt(item, AttrHasBlob)
+	entry.Visibility = dynamoutil.StringAt(item, AttrVisibility)
+	entry.CommentCount = dynamoutil.IntAt(item, AttrCommentCount)
 	entry.ReactionCounts = CountsFrom(item)
 	entry.RecentComments = RecentFrom(item, entry.ID)
 	entry.MyTag = TagOf(item)
 	entry.ICommented = HasCommented(item)
-	entry.UpdatedAt = TimeAt(item, AttrUpdatedAt)
-	entry.DeletedAt = TimeAt(item, AttrDeletedAt)
+	entry.UpdatedAt = dynamoutil.TimeAt(item, AttrUpdatedAt)
+	entry.DeletedAt = dynamoutil.TimeAt(item, AttrDeletedAt)
 	return entry
 }
 
@@ -159,11 +159,11 @@ func CountsFrom(item map[string]types.AttributeValue) map[string]int64 {
 
 func RecentItem(comment circles.Comment) types.AttributeValue {
 	return &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
-		AttrCommentID:  Str(comment.ID),
-		AttrAuthorID:   Str(comment.AuthorID),
-		AttrKeyVersion: Num(comment.KeyVersion),
-		AttrCiphertext: Binary(comment.Ciphertext),
-		AttrReceivedAt: Millis(comment.ReceivedAt),
+		AttrCommentID:  dynamoutil.Str(comment.ID),
+		AttrAuthorID:   dynamoutil.Str(comment.AuthorID),
+		AttrKeyVersion: dynamoutil.Num(comment.KeyVersion),
+		AttrCiphertext: dynamoutil.Binary(comment.Ciphertext),
+		AttrReceivedAt: dynamoutil.Millis(comment.ReceivedAt),
 	}}
 }
 
@@ -179,12 +179,12 @@ func RecentFrom(item map[string]types.AttributeValue, postID string) []circles.C
 			continue
 		}
 		comments = append(comments, circles.Comment{
-			ID:         StringAt(fields.Value, AttrCommentID),
+			ID:         dynamoutil.StringAt(fields.Value, AttrCommentID),
 			PostID:     postID,
-			AuthorID:   StringAt(fields.Value, AttrAuthorID),
-			KeyVersion: IntAt(fields.Value, AttrKeyVersion),
-			Ciphertext: BytesAt(fields.Value, AttrCiphertext),
-			ReceivedAt: TimeAt(fields.Value, AttrReceivedAt),
+			AuthorID:   dynamoutil.StringAt(fields.Value, AttrAuthorID),
+			KeyVersion: dynamoutil.IntAt(fields.Value, AttrKeyVersion),
+			Ciphertext: dynamoutil.BytesAt(fields.Value, AttrCiphertext),
+			ReceivedAt: dynamoutil.TimeAt(fields.Value, AttrReceivedAt),
 		})
 	}
 	return comments
@@ -201,13 +201,13 @@ func SortByReceivedAt(comments []circles.Comment) {
 func CircleFrom(circleID string, item map[string]types.AttributeValue) circles.Circle {
 	return circles.Circle{
 		ID:            circleID,
-		Name:          StringAt(item, AttrName),
-		CoverID:       StringAt(item, AttrCoverID),
-		KeyVersion:    IntAt(item, AttrKeyVersion),
-		RosterVersion: IntAt(item, AttrRosterVersion),
-		LastEntryAt:   TimeAt(item, AttrLastEntryAt),
-		CreatedBy:     StringAt(item, AttrCreatedBy),
-		CreatedAt:     TimeAt(item, AttrCreatedAt),
+		Name:          dynamoutil.StringAt(item, AttrName),
+		CoverID:       dynamoutil.StringAt(item, AttrCoverID),
+		KeyVersion:    dynamoutil.IntAt(item, AttrKeyVersion),
+		RosterVersion: dynamoutil.IntAt(item, AttrRosterVersion),
+		LastEntryAt:   dynamoutil.TimeAt(item, AttrLastEntryAt),
+		CreatedBy:     dynamoutil.StringAt(item, AttrCreatedBy),
+		CreatedAt:     dynamoutil.TimeAt(item, AttrCreatedAt),
 	}
 }
 
@@ -216,26 +216,26 @@ func MemberItem(circleID string, member circles.Member, joinedAt time.Time) map[
 		member.JoinedAt = joinedAt
 	}
 	return map[string]types.AttributeValue{
-		dynamoutil.PKAttr: Str(CirclePK(circleID)),
-		dynamoutil.SKAttr: Str(MemberKey(member.AccountID)),
+		dynamoutil.PKAttr: dynamoutil.Str(CirclePK(circleID)),
+		dynamoutil.SKAttr: dynamoutil.Str(MemberKey(member.AccountID)),
 		// Carried as its own attribute because the by-account index keys
 		// on it; the sort key holds it too, but an index cannot read part
 		// of a key.
-		AttrAccountID:   Str(member.AccountID),
-		AttrRole:        Str(member.Role),
-		AttrNotifyLevel: Str(member.NotifyLevel),
-		AttrNeedsRewrap: Bool(member.NeedsRewrap),
-		AttrJoinedAt:    Millis(member.JoinedAt),
+		AttrAccountID:   dynamoutil.Str(member.AccountID),
+		AttrRole:        dynamoutil.Str(member.Role),
+		AttrNotifyLevel: dynamoutil.Str(member.NotifyLevel),
+		AttrNeedsRewrap: dynamoutil.Bool(member.NeedsRewrap),
+		AttrJoinedAt:    dynamoutil.Millis(member.JoinedAt),
 	}
 }
 
 func MemberFrom(item map[string]types.AttributeValue) circles.Member {
 	return circles.Member{
-		AccountID:   StringAt(item, AttrAccountID),
-		Role:        StringAt(item, AttrRole),
-		NotifyLevel: StringAt(item, AttrNotifyLevel),
-		NeedsRewrap: BoolAt(item, AttrNeedsRewrap),
-		JoinedAt:    TimeAt(item, AttrJoinedAt),
+		AccountID:   dynamoutil.StringAt(item, AttrAccountID),
+		Role:        dynamoutil.StringAt(item, AttrRole),
+		NotifyLevel: dynamoutil.StringAt(item, AttrNotifyLevel),
+		NeedsRewrap: dynamoutil.BoolAt(item, AttrNeedsRewrap),
+		JoinedAt:    dynamoutil.TimeAt(item, AttrJoinedAt),
 	}
 }
 
@@ -245,7 +245,7 @@ func MemberFrom(item map[string]types.AttributeValue) circles.Member {
 func SealedKeysAttr(keys circles.SealedKeys) types.AttributeValue {
 	attr := make(map[string]types.AttributeValue, len(keys))
 	for version, sealed := range keys {
-		attr[strconv.FormatInt(version, 10)] = Binary(sealed)
+		attr[strconv.FormatInt(version, 10)] = dynamoutil.Binary(sealed)
 	}
 	return &types.AttributeValueMemberM{Value: attr}
 }
@@ -271,7 +271,7 @@ func SealedKeysFrom(item map[string]types.AttributeValue) circles.SealedKeys {
 // expiresAt is in seconds, not milliseconds: DynamoDB's own TTL reads it
 // and expects Unix seconds.
 func ExpiryFrom(item map[string]types.AttributeValue) time.Time {
-	seconds := IntAt(item, AttrExpiresAt)
+	seconds := dynamoutil.IntAt(item, AttrExpiresAt)
 	if seconds == 0 {
 		return time.Time{}
 	}

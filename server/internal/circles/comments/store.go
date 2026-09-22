@@ -27,15 +27,15 @@ func NewStore(table *dynamo.Table) *Store { return &Store{Table: table} }
 func (s *Store) AddComment(ctx context.Context, circleID string, comment circles.Comment) (circles.Entry, error) {
 	comment.ReceivedAt = s.Now()
 	item := map[string]types.AttributeValue{
-		dynamoutil.PKAttr:     dynamo.Str(dynamo.CirclePK(circleID)),
-		dynamoutil.SKAttr:     dynamo.Str(dynamo.CommentKey(comment.PostID, comment.ID)),
-		dynamo.AttrAuthorID:   dynamo.Str(comment.AuthorID),
-		dynamo.AttrKeyVersion: dynamo.Num(comment.KeyVersion),
-		dynamo.AttrCiphertext: dynamo.Binary(comment.Ciphertext),
-		dynamo.AttrReceivedAt: dynamo.Millis(comment.ReceivedAt),
+		dynamoutil.PKAttr:     dynamoutil.Str(dynamo.CirclePK(circleID)),
+		dynamoutil.SKAttr:     dynamoutil.Str(dynamo.CommentKey(comment.PostID, comment.ID)),
+		dynamo.AttrAuthorID:   dynamoutil.Str(comment.AuthorID),
+		dynamo.AttrKeyVersion: dynamoutil.Num(comment.KeyVersion),
+		dynamo.AttrCiphertext: dynamoutil.Binary(comment.Ciphertext),
+		dynamo.AttrReceivedAt: dynamoutil.Millis(comment.ReceivedAt),
 	}
 	if comment.ParentCommentID != "" {
-		item[dynamo.AttrParentComment] = dynamo.Str(comment.ParentCommentID)
+		item[dynamo.AttrParentComment] = dynamoutil.Str(comment.ParentCommentID)
 	}
 
 	err := dynamo.WithRetry(func() error {
@@ -55,11 +55,11 @@ func (s *Store) AddComment(ctx context.Context, circleID string, comment circles
 					ExpressionAttributeNames: map[string]string{"#author": comment.AuthorID},
 					ConditionExpression:      aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
 					ExpressionAttributeValues: map[string]types.AttributeValue{
-						":one":    dynamo.Num(1),
-						":now":    dynamo.Millis(comment.ReceivedAt),
-						":key":    dynamo.Str(circles.IndexKey(circles.TypePost, comment.ReceivedAt, comment.PostID)),
+						":one":    dynamoutil.Num(1),
+						":now":    dynamoutil.Millis(comment.ReceivedAt),
+						":key":    dynamoutil.Str(circles.IndexKey(circles.TypePost, comment.ReceivedAt, comment.PostID)),
 						":recent": &types.AttributeValueMemberL{Value: []types.AttributeValue{dynamo.RecentItem(comment)}},
-						":yes":    dynamo.Bool(true),
+						":yes":    dynamoutil.Bool(true),
 					},
 				}},
 				{Update: s.TouchCircle(circleID, comment.ReceivedAt)},
@@ -68,10 +68,10 @@ func (s *Store) AddComment(ctx context.Context, circleID string, comment circles
 		return err
 	})
 	switch {
-	case dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:
 		// The same comment id again: already written, nothing to add.
 		return s.GetPost(ctx, circleID, comment.PostID, "")
-	case dynamo.CancelledFor(err, 1) == dynamo.ConditionalCheckFailed:
+	case dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed:
 		return circles.Entry{}, circles.ErrEntryNotFound
 	case err != nil:
 		return circles.Entry{}, err
@@ -90,9 +90,9 @@ func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID s
 	now := s.Now()
 	update := "ADD " + dynamo.AttrCommentCount + " :minusOne SET " + dynamo.AttrUpdatedAt + " = :now, " + dynamo.ByTypeUpdatedKey + " = :key"
 	values := map[string]types.AttributeValue{
-		":minusOne": dynamo.Num(-1),
-		":now":      dynamo.Millis(now),
-		":key":      dynamo.Str(circles.IndexKey(circles.TypePost, now, postID)),
+		":minusOne": dynamoutil.Num(-1),
+		":now":      dynamoutil.Millis(now),
+		":key":      dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
 	}
 	if onShow(post.RecentComments, commentID) {
 		survivors, err := s.newestComments(ctx, circleID, postID, commentID)
@@ -115,7 +115,7 @@ func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID s
 					// stripped, so without this a repeat would subtract from
 					// the post's count a second time.
 					ConditionExpression:       aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
-					ExpressionAttributeValues: map[string]types.AttributeValue{":now": dynamo.Millis(now)},
+					ExpressionAttributeValues: map[string]types.AttributeValue{":now": dynamoutil.Millis(now)},
 				}},
 				{Update: &types.Update{
 					TableName:                 aws.String(s.Name),
@@ -128,7 +128,7 @@ func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID s
 		})
 		return err
 	})
-	if dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return circles.Entry{}, circles.ErrEntryNotFound
 	}
 	if err != nil {
