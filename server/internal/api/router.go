@@ -19,6 +19,7 @@ import (
 	"mimoza-relay/internal/auth/http/google"
 	"mimoza-relay/internal/auth/http/logout"
 	"mimoza-relay/internal/auth/oidcverify"
+	"mimoza-relay/internal/circles/blobs"
 	"mimoza-relay/internal/circles/circle"
 	"mimoza-relay/internal/circles/comments"
 	"mimoza-relay/internal/circles/dynamo"
@@ -27,6 +28,7 @@ import (
 	"mimoza-relay/internal/circles/posts"
 	"mimoza-relay/internal/circles/reactions"
 	"mimoza-relay/internal/circles/requests"
+	circless3 "mimoza-relay/internal/circles/s3"
 	"mimoza-relay/internal/invite"
 	"mimoza-relay/internal/push"
 	pushhttp "mimoza-relay/internal/push/http"
@@ -63,9 +65,12 @@ type Deps struct {
 	// it, lasts.
 	InviteRetention time.Duration
 	Log             synclog.LogStore
-	Blob            synclog.BlobStore
-	Auth            auth.Store
-	Invite          invite.Store
+	// Blobs is the bucket the encrypted photos live in. The relay never
+	// carries the bytes: it signs a URL and the device talks to S3 or
+	// the CDN directly.
+	Blobs  *circless3.Store
+	Auth   auth.Store
+	Invite invite.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.
 	WriteLimit ratelimit.Store
 	ReadLimit  ratelimit.Store
@@ -107,12 +112,22 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// its own routes and carries the read or write budget that route
 	// needs; the session check wraps all of them at once.
 	circlesMux := http.NewServeMux()
-	circle.Register(circlesMux, &circle.Service{Store: circle.NewStore(deps.Circles)}, readLimit, writeLimit)
+	circle.Register(circlesMux, &circle.Service{
+		Store: circle.NewStore(deps.Circles),
+		Blobs: deps.Blobs,
+	}, readLimit, writeLimit)
 	members.Register(circlesMux, &members.Service{
 		Store:    members.NewStore(deps.Circles),
 		Profiles: deps.Accounts,
 	}, readLimit, writeLimit)
-	posts.Register(circlesMux, &posts.Service{Store: posts.NewStore(deps.Circles)}, readLimit, writeLimit)
+	posts.Register(circlesMux, &posts.Service{
+		Store: posts.NewStore(deps.Circles),
+		Blobs: deps.Blobs,
+	}, readLimit, writeLimit)
+	blobs.Register(circlesMux, &blobs.Service{
+		Store:  blobs.NewStore(deps.Circles),
+		Bucket: deps.Blobs,
+	}, readLimit, writeLimit)
 	comments.Register(circlesMux, &comments.Service{Store: comments.NewStore(deps.Circles)}, writeLimit)
 	reactions.Register(circlesMux, &reactions.Service{Store: reactions.NewStore(deps.Circles)}, writeLimit)
 	circleinvites.Register(circlesMux, &circleinvites.Service{

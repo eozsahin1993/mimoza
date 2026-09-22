@@ -27,12 +27,12 @@ import (
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
 	circlesdynamo "mimoza-relay/internal/circles/dynamo"
+	circless3 "mimoza-relay/internal/circles/s3"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	pushdynamodb "mimoza-relay/internal/push/dynamodb"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
 	"mimoza-relay/internal/synclog/cdn"
 	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
-	blobs3 "mimoza-relay/internal/synclog/s3"
 )
 
 const (
@@ -87,7 +87,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	// Whether downloads actually come from CloudFront is decided at
 	// runtime by whether its settings parameter exists — see
 	// internal/synclog/cdn. Nothing to configure per environment.
-	blob := blobs3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize).WithDownloads(cdn.New(cdn.Config{
+	blob := circless3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize).WithDownloads(cdn.New(cdn.Config{
 		SettingsParameter: cfg.BlobCDNSettingsParameter,
 		KeyParameter:      cfg.BlobCDNSigningKeyParameter,
 	}, awsCfg))
@@ -109,7 +109,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		Circles:         circlesdynamo.NewTable(dynamo(), cfg.CirclesTableName),
 		InviteRetention: time.Duration(cfg.InviteRetentionDays) * 24 * time.Hour,
 		Log:             logdynamodb.New(dynamo(), cfg.TableName),
-		Blob:            blob,
+		Blobs:           blob,
 		Auth:            authdynamodb.New(dynamo(), cfg.SessionsTableName),
 		Invite:          invitedynamodb.New(dynamo(), cfg.InviteTableName, cfg.InviteRetentionDays),
 		WriteLimit:      limit("write", cfg.RateLimitWriteMaxRequests),

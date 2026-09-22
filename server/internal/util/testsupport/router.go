@@ -27,7 +27,7 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 		Accounts:   NewAccountTable(t),
 		Circles:    NewCircleTable(t),
 		Log:        NewLogStore(t),
-		Blob:       NewBlobStore(t),
+		Blobs:      NewBlobBucket(t),
 		Auth:       NewAuthStore(t),
 		Invite:     NewInviteStore(t, 0),
 		WriteLimit: NewRateLimitStore(t, "write", testRateLimitMaxRequests, time.Hour),

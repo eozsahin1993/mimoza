@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"log/slog"
 	"time"
 
 	"mimoza-relay/internal/circles"
@@ -21,8 +22,16 @@ type store interface {
 	DeleteCircle(ctx context.Context, circleID string) error
 }
 
+// blobs is the bucket. Deleting a circle is the one thing this slice
+// does to it, and it does it to the whole prefix at once.
+type blobs interface {
+	DeleteCircle(ctx context.Context, circleID string) error
+}
+
 type Service struct {
 	Store store
+	// Blobs is nil in tests that do not care about bytes.
+	Blobs blobs
 }
 
 // Create mints the circle id rather than taking one: it is the relay's
@@ -82,7 +91,20 @@ func (s *Service) Delete(ctx context.Context, circleID, accountID string) error 
 	if err := s.requireAdmin(ctx, circleID, accountID); err != nil {
 		return err
 	}
-	return s.Store.DeleteCircle(ctx, circleID)
+	if err := s.Store.DeleteCircle(ctx, circleID); err != nil {
+		return err
+	}
+	// Every photo and every cover the circle ever had, in one sweep of
+	// its prefix. The rows are already gone, so a failure here leaves
+	// bytes nothing can name or reach.
+	if s.Blobs == nil {
+		return nil
+	}
+	if err := s.Blobs.DeleteCircle(ctx, circleID); err != nil {
+		slog.ErrorContext(ctx, "deleted a circle but not its photos",
+			"reason", "blobs_not_deleted", "error", err, "circleId", circleID)
+	}
+	return nil
 }
 
 // List is where a sync starts: every circle this account is in, with the

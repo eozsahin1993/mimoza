@@ -2,8 +2,10 @@ package posts
 
 import (
 	"context"
+	"log/slog"
 
 	"mimoza-relay/internal/circles"
+	"mimoza-relay/internal/circles/s3"
 )
 
 type store interface {
@@ -18,8 +20,17 @@ type store interface {
 	CountEntries(ctx context.Context, circleID, entryType string) (int64, error)
 }
 
+// blobs is the bucket, for the one thing this slice does to it: a
+// deleted post's photo has to go with it.
+type blobs interface {
+	Delete(ctx context.Context, key string) error
+}
+
 type Service struct {
 	Store store
+	// Blobs is nil in tests that do not care about bytes; a post with no
+	// photo never reaches it either way.
+	Blobs blobs
 }
 
 // Put writes a post. The key version is checked against the circle's
@@ -80,7 +91,22 @@ func (s *Service) Delete(ctx context.Context, circleID, postID, accountID string
 	if err := s.authorOrAdmin(ctx, circleID, postID, accountID); err != nil {
 		return circles.Entry{}, err
 	}
-	return s.Store.DeletePost(ctx, circleID, postID)
+	post, err := s.Store.DeletePost(ctx, circleID, postID)
+	if err != nil {
+		return circles.Entry{}, err
+	}
+	// The row goes first and the bytes after: the row is what a walk
+	// delivers and what refuses a signed URL, so a photo whose row is
+	// gone is already unreachable. A failed delete here leaks bytes
+	// nobody can ask for, which is worth reporting but not worth
+	// failing a deletion the caller can see happened.
+	if s.Blobs != nil && post.HasBlob {
+		if err := s.Blobs.Delete(ctx, s3.PostKey(circleID, postID)); err != nil {
+			slog.ErrorContext(ctx, "deleted a post but not its photo",
+				"reason", "blob_not_deleted", "error", err, "circleId", circleID, "entryId", postID)
+		}
+	}
+	return post, nil
 }
 
 func (s *Service) authorOrAdmin(ctx context.Context, circleID, postID, accountID string) error {

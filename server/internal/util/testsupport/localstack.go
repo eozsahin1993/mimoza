@@ -41,6 +41,7 @@ import (
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
 	"mimoza-relay/internal/circles/dynamo"
+	circless3 "mimoza-relay/internal/circles/s3"
 	"mimoza-relay/internal/config"
 	"mimoza-relay/internal/invite"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
@@ -267,6 +268,46 @@ func NewBlobStore(t testing.TB) synclog.BlobStore {
 	return blobs3.New(client, bucketName, 0)
 }
 
+// NewBlobBucket returns the circles column's blob storage against
+// LocalStack, sharing the one test bucket.
+func NewBlobBucket(t testing.TB) *circless3.Store {
+	t.Helper()
+	return circless3.New(blobClient(t), bucketName, 0)
+}
+
+// NewBlobBucketWithCDN is NewBlobBucket with downloads signed for
+// CloudFront, with the settings and signing key put in LocalStack's SSM
+// exactly as Terraform and an operator would.
+//
+// CloudFront itself is not emulated, so this proves the parts that live
+// here — that the relay finds its settings, parses the key and hands out
+// a signed CDN URL rather than an S3 one — not that CloudFront accepts
+// the signature. That only shows up in staging.
+func NewBlobBucketWithCDN(t testing.TB, prefix string) *circless3.Store {
+	t.Helper()
+	awsCfg := loadConfig(t)
+	putCDNParameters(t, awsCfg, prefix)
+	return NewBlobBucket(t).WithDownloads(cdn.New(cdn.Config{
+		SettingsParameter: "/" + prefix + "/cdn",
+		KeyParameter:      "/" + prefix + "/cloudfront-signing-key",
+	}, awsCfgWithEndpoint(awsCfg)))
+}
+
+// blobClient is the one S3 client both blob helpers share, creating the
+// test bucket once per test binary run.
+func blobClient(t testing.TB) *awss3.Client {
+	t.Helper()
+	client := awss3.NewFromConfig(loadConfig(t), func(o *awss3.Options) {
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
+		o.UsePathStyle = true
+	})
+	bucketOnce.Do(func() { bucketErr = localstack.CreateBucket(context.Background(), client, bucketName) })
+	if bucketErr != nil {
+		unreachable(t, "S3", bucketErr)
+	}
+	return client
+}
+
 // NewBlobStoreWithCDN returns a blob store whose downloads are signed for
 // CloudFront, with the settings and signing key put in LocalStack's SSM
 // exactly as Terraform and the operator would.
@@ -279,6 +320,19 @@ func NewBlobStoreWithCDN(t testing.TB, prefix string) synclog.BlobStore {
 	t.Helper()
 
 	awsCfg := loadConfig(t)
+	putCDNParameters(t, awsCfg, prefix)
+
+	store := NewBlobStore(t).(*blobs3.Store)
+	return store.WithDownloads(cdn.New(cdn.Config{
+		SettingsParameter: "/" + prefix + "/cdn",
+		KeyParameter:      "/" + prefix + "/cloudfront-signing-key",
+	}, awsCfgWithEndpoint(awsCfg)))
+}
+
+// putCDNParameters writes what the signer reads at runtime: where the
+// distribution is, and the key to sign with.
+func putCDNParameters(t testing.TB, awsCfg aws.Config, prefix string) {
+	t.Helper()
 	ssmClient := awsssm.NewFromConfig(awsCfg, func(o *awsssm.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
@@ -301,12 +355,6 @@ func NewBlobStoreWithCDN(t testing.TB, prefix string) synclog.BlobStore {
 	}
 	put("/"+prefix+"/cdn", `{"baseUrl":"https://cdn.example.com","keyPairId":"K123","distributionId":"E123"}`, "String")
 	put("/"+prefix+"/cloudfront-signing-key", string(keyPEM), "SecureString")
-
-	store := NewBlobStore(t).(*blobs3.Store)
-	return store.WithDownloads(cdn.New(cdn.Config{
-		SettingsParameter: "/" + prefix + "/cdn",
-		KeyParameter:      "/" + prefix + "/cloudfront-signing-key",
-	}, awsCfgWithEndpoint(awsCfg)))
 }
 
 // The signer builds its own clients from an aws.Config, so LocalStack has
@@ -447,10 +495,18 @@ func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window t
 // recorded on it, one to delete it.
 func UploadBlob(t testing.TB, target synclog.UploadTarget, payload []byte) {
 	t.Helper()
+	PostBlob(t, target.URL, target.Fields, payload)
+}
+
+// PostBlob sends the bytes the way a device does: a multipart form to
+// the presigned URL, with the signed fields alongside them, so S3 itself
+// applies the policy the relay signed.
+func PostBlob(t testing.TB, url string, fields map[string]string, payload []byte) {
+	t.Helper()
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	for key, value := range target.Fields {
+	for key, value := range fields {
 		if err := writer.WriteField(key, value); err != nil {
 			t.Fatalf("WriteField(%s): %v", key, err)
 		}
@@ -466,7 +522,7 @@ func UploadBlob(t testing.TB, target synclog.UploadTarget, payload []byte) {
 		t.Fatalf("close multipart writer: %v", err)
 	}
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, target.URL, &body)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, &body)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}

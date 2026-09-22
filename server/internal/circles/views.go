@@ -129,7 +129,8 @@ func Status(err error) (int, string) {
 	case errors.Is(err, ErrNotMember), errors.Is(err, ErrNotAdmin),
 		errors.Is(err, ErrNotTheAuthor):
 		return http.StatusForbidden, err.Error()
-	case errors.Is(err, ErrAlreadyExists), errors.Is(err, ErrCircleFull),
+	case errors.Is(err, ErrAlreadyExists), errors.Is(err, ErrBlobExists),
+		errors.Is(err, ErrCircleFull),
 		errors.Is(err, ErrStaleKeyVersion), errors.Is(err, ErrVersionMoved),
 		errors.Is(err, ErrWouldEmptyAdmins):
 		return http.StatusConflict, err.Error()

@@ -23,6 +23,11 @@ var (
 	ErrInviteNotFound   = errors.New("circles: no such invite")
 	ErrRequestNotFound  = errors.New("circles: no such join request")
 	ErrBadCursor        = errors.New("circles: unreadable cursor")
+	// ErrBlobExists means something is already stored at this key. Blobs
+	// are written once: a second upload to the same key would replace a
+	// photo with one that still decrypts, which membership alone must
+	// not allow.
+	ErrBlobExists = errors.New("circles: a blob is already stored for this entry")
 	// ErrNoPublicKey means the account asking to join has published no
 	// key to seal the circle's content keys to, so admitting it would
 	// admit someone who could not read a word of the circle.

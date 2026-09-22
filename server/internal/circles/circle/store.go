@@ -106,11 +106,14 @@ func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actor
 	sets := []string{}
 	values := map[string]types.AttributeValue{}
 	// Through a placeholder: "name" is a reserved word in an update
-	// expression, and naming it directly fails the whole write.
-	names := map[string]string{}
+	// expression, and naming it directly fails the whole write. The map
+	// stays nil when nothing needs one — DynamoDB rejects an empty map
+	// outright, so a cover-only change would fail on the map rather than
+	// on anything it was asked to do.
+	var names map[string]string
 	if name != "" {
 		sets = append(sets, "#name = :name")
-		names["#name"] = dynamo.AttrName
+		names = map[string]string{"#name": dynamo.AttrName}
 		values[":name"] = dynamoutil.Str(name)
 	}
 	if coverID != "" {

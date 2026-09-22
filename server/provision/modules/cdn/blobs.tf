@@ -92,21 +92,6 @@ resource "aws_cloudfront_distribution" "blobs" {
     trusted_key_groups = [aws_cloudfront_key_group.blobs[0].id]
   }
 
-  # A circle's cover is overwritten in place at <syncId>/cover, so it is
-  # the one key whose bytes change under a stable URL. Uncached until the
-  # content hash moves into the path (cover_photo_set already carries it)
-  # — otherwise members keep seeing the previous cover until the TTL.
-  ordered_cache_behavior {
-    path_pattern           = "*/cover"
-    target_origin_id       = local.blob_origin_id
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = false
-    cache_policy_id        = data.aws_cloudfront_cache_policy.disabled.id
-    trusted_key_groups     = [aws_cloudfront_key_group.blobs[0].id]
-  }
-
   viewer_certificate {
     acm_certificate_arn      = var.certificate_arn
     ssl_support_method       = "sni-only"
