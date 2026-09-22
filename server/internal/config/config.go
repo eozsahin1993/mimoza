@@ -16,45 +16,42 @@ import (
 // Eviction itself is DynamoDB's TTL; this only sets what expiresAt says.
 const DefaultInviteRetentionDays = 7
 
-// Every table, the blob bucket and both push-credential parameters are
-// named from one RESOURCE_PREFIX (mimoza-<env>), under the same
-// "<prefix>-<suffix>" convention server/provision/modules/storage and
-// modules/lambda create them with. A rename on either side has to happen
-// on both — nothing checks the two against each other.
+// Resources names every table and the blob bucket one environment uses.
+// All of them come from its prefix (mimoza-<env> in AWS, test-style
+// prefixes against LocalStack) under the "<prefix>-<suffix>" convention
+// server/provision/modules/storage creates them with; a rename there has
+// to happen in ResourcesFor too.
+type Resources struct {
+	TableName            string // sync log
+	BucketName           string
+	SessionsTableName    string
+	AccountsTableName    string
+	AccountsOldTableName string // pre-rewrite accounts, until nothing reads it
+	CirclesTableName     string
+	InviteTableName      string
+	RateLimitTableName   string
+	PushTableName        string
+}
+
+// ResourcesFor derives every resource name from one prefix.
+func ResourcesFor(prefix string) Resources {
+	return Resources{
+		TableName:            prefix + "-sync-log",
+		BucketName:           prefix + "-blobs",
+		SessionsTableName:    prefix + "-sessions",
+		AccountsTableName:    prefix + "-accounts",
+		AccountsOldTableName: prefix + "-accounts-old",
+		CirclesTableName:     prefix + "-circles",
+		InviteTableName:      prefix + "-invites",
+		RateLimitTableName:   prefix + "-rate-limit",
+		PushTableName:        prefix + "-push",
+	}
+}
+
+// Config is everything the relay reads from its environment. The push
+// credential parameters are named from the same prefix as Resources.
 type Config struct {
-	TableName  string
-	BucketName string
-	// SessionsTableName is the standalone bearer-token session table — see
-	// server/provision/modules/storage/sessions_table.tf. Not circle-scoped, so it's a
-	// separate table from TableName; also separate from AccountsTableName
-	// (token-lookup vs account-lookup are different access patterns).
-	SessionsTableName string
-	// AccountsTableName is one partition per account — profile, devices,
-	// linked sign-in providers — see
-	// server/provision/modules/storage/accounts_table.tf.
-	AccountsTableName string
-	// AccountsOldTableName is the pre-rewrite single-key accounts table
-	// (the encrypted recovery manifest and the Apple refresh token), kept
-	// under a new name until nothing reads it — see accounts_old_table.tf.
-	AccountsOldTableName string
-	// CirclesTableName is one partition per circle: membership, sealed
-	// keys, invites, posts, activity — see circles_table.tf.
-	CirclesTableName string
-	// InviteTableName is the standalone invite/join-request table: pk =
-	// hash(invite code), with one row for the invite itself and one row
-	// per pending join request under it — see
-	// server/provision/modules/storage/dynamodb.tf's invites resource.
-	InviteTableName string
-	// RateLimitTableName is the standalone per-account request-budget
-	// table — see server/provision/modules/storage/rate_limit_table.tf. Shared by the write
-	// and read budgets below; ratelimitdynamodb.New's keyPrefix keeps their
-	// rows from colliding.
-	RateLimitTableName string
-	// PushTableName is the standalone push routing table — routing id
-	// prefs plus one row per device. Separate from every other table for
-	// the same reason the others are: different lifecycle, different
-	// access pattern, and nothing joins across them.
-	PushTableName string
+	Resources
 	// FCMCredentialParameter is the SSM SecureString holding the FCM
 	// service-account key. Created by hand, never by Terraform — a
 	// Terraform-managed value lands in state as plaintext.
@@ -164,15 +161,7 @@ type Config struct {
 func Load() Config {
 	prefix := mustEnv("RESOURCE_PREFIX")
 	return Config{
-		TableName:                  prefix + "-sync-log",
-		BucketName:                 prefix + "-blobs",
-		SessionsTableName:          prefix + "-sessions",
-		AccountsTableName:          prefix + "-accounts",
-		AccountsOldTableName:       prefix + "-accounts-old",
-		CirclesTableName:           prefix + "-circles",
-		InviteTableName:            prefix + "-invites",
-		RateLimitTableName:         prefix + "-rate-limit",
-		PushTableName:              prefix + "-push",
+		Resources:                  ResourcesFor(prefix),
 		FCMCredentialParameter:     "/" + prefix + "/fcm-service-account",
 		FCMCredentialFile:          os.Getenv("FCM_CREDENTIAL_FILE"),
 		APNSAuthKeyParameter:       "/" + prefix + "/apns-auth-key",

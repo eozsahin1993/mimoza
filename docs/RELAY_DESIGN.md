@@ -69,8 +69,8 @@ through the `lookup` row.
 | `circle#<id>` | `key#<accountId>` | keys `{ "<v>": sealedKey }`, updatedAt |
 | `circle#<id>` | `invite#<code>` | createdBy, createdAt, expiresAt |
 | `circle#<id>` | `request#<requestId>` | accountId, pubkey, status `pending\|approved\|denied`, createdAt, expiresAt |
-| `circle#<id>` | `entry#<postId>` | type `post`, authorId, keyVersion, ciphertext, hasBlob, visibility, commentCount, reactionCounts `{ tag: n }`, recentComments, receivedAt, updatedAt, deletedAt, gsi1sk, gsi3sk |
-| `circle#<id>` | `entry#<activityId>` | type `activity`, event, actorId, subjectId, subjectName, receivedAt, gsi1sk |
+| `circle#<id>` | `entry#<postId>` | type `post`, authorId, keyVersion, ciphertext, hasBlob, visibility, commentCount, reactionCounts `{ tag: n }`, recentComments, receivedAt, updatedAt, deletedAt, typeReceivedKey, typeUpdatedKey |
+| `circle#<id>` | `entry#<activityId>` | type `activity`, event, actorId, subjectId, subjectName, receivedAt, typeReceivedKey |
 | `circle#<id>` | `child#<postId>#comment#<commentId>` | authorId, parentCommentId, keyVersion, ciphertext, receivedAt, deletedAt |
 | `circle#<id>` | `child#<postId>#reaction#<accountId>` | tag, keyVersion, ciphertext, receivedAt |
 | `invite#<code>` | `meta` | circleId |
@@ -82,8 +82,8 @@ through the `lookup` row.
 
 | index | hash | range | used for |
 |---|---|---|---|
-| `by-type-received` | `pk` | `gsi1sk = <type>#<receivedAt:013d>#<id>` | posts backward in creation order; activity |
-| `by-type-updated` | `pk` | `gsi3sk = post#<updatedAt:013d>#<postId>` | posts forward, including changed ones |
+| `by-type-received` | `pk` | `typeReceivedKey = <type>#<receivedAt:013d>#<id>` | posts backward in creation order; activity |
+| `by-type-updated` | `pk` | `typeUpdatedKey = post#<updatedAt:013d>#<postId>` | posts forward, including changed ones |
 | `by-account` | `accountId` | `sk` | every circle an account is in |
 
 Blobs live in S3 at `<circleId>/<postId>` and `<circleId>/cover/<coverId>`.

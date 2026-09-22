@@ -58,14 +58,15 @@ import (
 // Resource names and schemas come from internal/util/localstack, which
 // cmd/testrelay uses too — one definition, so a table this suite creates
 // can't differ in shape from the one the relay is served against.
-const (
-	tableName            = localstack.LogTable
-	bucketName           = localstack.BlobBucket
-	sessionsTableName    = localstack.SessionsTable
-	accountsOldTableName = localstack.AccountsOldTable
-	inviteTableName      = localstack.InviteTable
-	rateLimitTableName   = localstack.RateLimitTable
-	pushTableName        = localstack.PushTable
+var (
+	shared               = localstack.Shared()
+	tableName            = shared.TableName
+	bucketName           = shared.BucketName
+	sessionsTableName    = shared.SessionsTableName
+	accountsOldTableName = shared.AccountsOldTableName
+	inviteTableName      = shared.InviteTableName
+	rateLimitTableName   = shared.RateLimitTableName
+	pushTableName        = shared.PushTableName
 )
 
 var (

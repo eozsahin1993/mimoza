@@ -9,7 +9,7 @@ const (
 	// ByTypeReceivedIndex orders posts and activity by arrival, for history
 	// paging and the activity walk.
 	ByTypeReceivedIndex = "by-type-received"
-	ByTypeReceivedSK    = "gsi1sk"
+	ByTypeReceivedKey   = "typeReceivedKey"
 
 	// ByAccountIndex lists every circle an account is a member of.
 	ByAccountIndex = "by-account"
@@ -17,5 +17,5 @@ const (
 
 	// ByTypeUpdatedIndex orders posts by last change, for the forward walk.
 	ByTypeUpdatedIndex = "by-type-updated"
-	ByTypeUpdatedSK    = "gsi3sk"
+	ByTypeUpdatedKey   = "typeUpdatedKey"
 )

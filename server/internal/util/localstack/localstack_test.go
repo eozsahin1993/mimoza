@@ -38,22 +38,22 @@ func TestProvisionSet_CreatesTheNewTablesWithTheirKeysAndIndexes(t *testing.T) {
 	}
 	t.Cleanup(func() { localstack.TeardownSet(context.Background(), ddb, s3, names) })
 
-	accounts := describe(t, ddb, names.AccountsTable)
-	assertKeys(t, names.AccountsTable, accounts.KeySchema, "pk", "sk")
+	accounts := describe(t, ddb, names.AccountsTableName)
+	assertKeys(t, names.AccountsTableName, accounts.KeySchema, "pk", "sk")
 
-	old := describe(t, ddb, names.AccountsOldTable)
-	assertKeys(t, names.AccountsOldTable, old.KeySchema, "pk", "")
+	old := describe(t, ddb, names.AccountsOldTableName)
+	assertKeys(t, names.AccountsOldTableName, old.KeySchema, "pk", "")
 
-	circles := describe(t, ddb, names.CirclesTable)
-	assertKeys(t, names.CirclesTable, circles.KeySchema, "pk", "sk")
+	circles := describe(t, ddb, names.CirclesTableName)
+	assertKeys(t, names.CirclesTableName, circles.KeySchema, "pk", "sk")
 
 	want := map[string]struct {
 		hash, rangeKey string
 		projection     ddbtypes.ProjectionType
 	}{
-		circlesdynamodb.ByTypeReceivedIndex: {"pk", circlesdynamodb.ByTypeReceivedSK, ddbtypes.ProjectionTypeAll},
+		circlesdynamodb.ByTypeReceivedIndex: {"pk", circlesdynamodb.ByTypeReceivedKey, ddbtypes.ProjectionTypeAll},
 		circlesdynamodb.ByAccountIndex:      {circlesdynamodb.ByAccountPK, "sk", ddbtypes.ProjectionTypeKeysOnly},
-		circlesdynamodb.ByTypeUpdatedIndex:  {"pk", circlesdynamodb.ByTypeUpdatedSK, ddbtypes.ProjectionTypeAll},
+		circlesdynamodb.ByTypeUpdatedIndex:  {"pk", circlesdynamodb.ByTypeUpdatedKey, ddbtypes.ProjectionTypeAll},
 	}
 	if len(circles.GlobalSecondaryIndexes) != len(want) {
 		t.Fatalf("circles table has %d indexes, want %d", len(circles.GlobalSecondaryIndexes), len(want))
@@ -99,5 +99,35 @@ func assertKeys(t *testing.T, what string, schema []ddbtypes.KeySchemaElement, h
 	}
 	if gotHash != hash || gotRange != rangeKey {
 		t.Errorf("%s keys = (%q, %q), want (%q, %q)", what, gotHash, gotRange, hash, rangeKey)
+	}
+}
+
+func TestCreateTable_RefusesAnExistingTableWithADifferentKeySchema(t *testing.T) {
+	ctx := context.Background()
+	cfg, err := localstack.Config(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ddb := awsdynamodb.NewFromConfig(cfg)
+	if _, err := ddb.ListTables(ctx, &awsdynamodb.ListTablesInput{Limit: aws.Int32(1)}); err != nil {
+		if localstack.Required() {
+			t.Fatalf("LocalStack unreachable: %v", err)
+		}
+		t.Skipf("LocalStack unreachable: %v", err)
+	}
+
+	name := fmt.Sprintf("schema-guard-%d", time.Now().UnixNano())
+	if err := localstack.CreateTable(ctx, ddb, name, localstack.HashOnly); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = ddb.DeleteTable(context.Background(), &awsdynamodb.DeleteTableInput{TableName: aws.String(name)})
+	})
+
+	if err := localstack.CreateTable(ctx, ddb, name, localstack.HashOnly); err != nil {
+		t.Fatalf("same schema again: %v", err)
+	}
+	if err := localstack.CreateTable(ctx, ddb, name, localstack.WithSortKey); err == nil {
+		t.Fatal("a sorted table over an existing hash-only one was accepted")
 	}
 }
