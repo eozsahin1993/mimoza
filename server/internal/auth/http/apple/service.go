@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/oidcverify"
@@ -19,8 +20,10 @@ type Service struct {
 	// Sign in with Apple key configured — see appleid.NewClient. Sign-in
 	// works either way; without them, deleting an account can't revoke the
 	// Apple grant behind it.
-	AppleID     *appleid.Client
-	Credentials auth.AppleCredentialStore
+	AppleID *appleid.Client
+	// Accounts resolves the sign-in to an account id, and holds the
+	// refresh token against the provider row it came from.
+	Accounts accounts.Store
 }
 
 // providerName namespaces the accountID so Google's and Apple's sub
@@ -43,8 +46,11 @@ func (s *Service) SignIn(ctx context.Context, idToken, authorizationCode string)
 		return "", err
 	}
 
-	accountID := providerName + ":" + claims.Sub
-	s.rememberGrant(ctx, accountID, authorizationCode)
+	accountID, _, err := s.Accounts.Resolve(ctx, accounts.Provider{Name: providerName, Subject: claims.Sub})
+	if err != nil {
+		return "", err
+	}
+	s.rememberGrant(ctx, accountID, claims.Sub, authorizationCode)
 	return auth.Issue(ctx, s.AuthStore, accountID)
 }
 
@@ -57,8 +63,8 @@ func (s *Service) SignIn(ctx context.Context, idToken, authorizationCode string)
 // Best-effort on purpose: Apple being unreachable, or a key not yet
 // configured, must not stop someone signing in. The cost of failing here
 // is that deletion has nothing to revoke — logged, not raised.
-func (s *Service) rememberGrant(ctx context.Context, accountID, authorizationCode string) {
-	if s.AppleID == nil || s.Credentials == nil {
+func (s *Service) rememberGrant(ctx context.Context, accountID, subject, authorizationCode string) {
+	if s.AppleID == nil || s.Accounts == nil {
 		return
 	}
 
@@ -68,7 +74,7 @@ func (s *Service) rememberGrant(ctx context.Context, accountID, authorizationCod
 			"reason", appleid.Reason(err), "error", err)
 		return
 	}
-	if err := s.Credentials.SaveAppleRefreshToken(ctx, accountID, refreshToken); err != nil {
+	if err := s.Accounts.SaveRefreshToken(ctx, accountID, providerName, subject, refreshToken); err != nil {
 		slog.WarnContext(ctx, "could not store the Apple refresh token",
 			"reason", "apple_refresh_token_not_stored", "error", err)
 	}

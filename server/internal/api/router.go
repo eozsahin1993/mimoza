@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"mimoza-relay/internal/account/http/deleteaccount"
+	"mimoza-relay/internal/accounts"
+	"mimoza-relay/internal/accounts/devices"
+	"mimoza-relay/internal/accounts/profile"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/http/apple"
@@ -49,6 +52,9 @@ type PushDeps struct {
 // in for a write one with nothing to catch it. PushDeps was already a
 // struct for the same reason; this finishes the job.
 type Deps struct {
+	// Accounts is who is signed in: profiles, devices, and the sign-ins
+	// that resolve to an account.
+	Accounts accounts.Store
 	// Circles is the table every circles slice builds its own store on;
 	// the slices share key shapes and a few reads, not a store type.
 	Circles *dynamo.Table
@@ -64,13 +70,12 @@ type Deps struct {
 	ReadLimit  ratelimit.Store
 	Google     *oidcverify.Verifier
 	Apple      *oidcverify.Verifier
-	// AppleID and AppleCredentials are nil unless this environment has a
-	// Sign in with Apple key configured — see appleid.NewClient. Without
-	// them, sign-in and deletion both still work; deletion just can't
-	// revoke the Apple grant behind the account (Guideline 5.1.1(v)).
-	AppleID          *appleid.Client
-	AppleCredentials auth.AppleCredentialStore
-	Push             PushDeps
+	// AppleID is nil unless this environment has a Sign in with Apple key
+	// configured — see appleid.NewClient. Without it, sign-in and
+	// deletion both still work; deletion just cannot revoke the grant
+	// behind an Apple account (Guideline 5.1.1(v)).
+	AppleID *appleid.Client
+	Push    PushDeps
 }
 
 func NewRouter(deps Deps) *http.ServeMux {
@@ -118,9 +123,18 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, httputil.LogRoutes(circlesMux)))
 	mux.Handle("/invites/", auth.RequireSession(deps.Auth, httputil.LogRoutes(circlesMux)))
 
-	deleteAccountService := &deleteaccount.Service{AuthStore: deps.Auth}
+	// The account itself: its profile, its public key, its devices.
+	accountMux := http.NewServeMux()
+	profile.Register(accountMux, &profile.Service{
+		Store:   deps.Accounts,
+		Circles: members.NewStore(deps.Circles),
+	}, readLimit, writeLimit)
+	devices.Register(accountMux, &devices.Service{Store: deps.Accounts}, writeLimit)
+	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
+	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
+
+	deleteAccountService := &deleteaccount.Service{AuthStore: deps.Auth, Accounts: deps.Accounts}
 	if deps.AppleID != nil {
-		deleteAccountService.AppleCredentials = deps.AppleCredentials
 		deleteAccountService.RevokeApple = deps.AppleID.Revoke
 	}
 	deleteaccount.Register(mux, deleteAccountService, func(h http.Handler) http.Handler {
@@ -145,8 +159,8 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		pushhttp.RegisterFanout(mux, &pushhttp.FanoutHandler{Service: pushService, Dispatch: dispatch})
 	}
 
-	google.Register(mux, &google.Service{AuthStore: deps.Auth, Verifier: deps.Google})
-	apple.Register(mux, &apple.Service{AuthStore: deps.Auth, Verifier: deps.Apple, AppleID: deps.AppleID, Credentials: deps.AppleCredentials})
+	google.Register(mux, &google.Service{AuthStore: deps.Auth, Verifier: deps.Google, Accounts: deps.Accounts})
+	apple.Register(mux, &apple.Service{AuthStore: deps.Auth, Verifier: deps.Apple, AppleID: deps.AppleID, Accounts: deps.Accounts})
 	logout.Register(mux, &logout.Service{AuthStore: deps.Auth})
 
 	return mux

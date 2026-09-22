@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/auth"
 )
 
@@ -20,37 +21,57 @@ func (s *fakeAuthStore) DeleteAllSessions(_ context.Context, accountID string) e
 	return nil
 }
 
-type fakeAppleCredentials struct {
+// fakeAccounts stands in for the accounts column: what deletion reads
+// from it is the Apple grant, and what it does to it is remove the
+// account outright.
+type fakeAccounts struct {
 	tokens   map[string]string
 	getErr   error
 	deleted  []string
 	getCalls int
 }
 
-func (s *fakeAppleCredentials) SaveAppleRefreshToken(_ context.Context, accountID, token string) error {
+func (s *fakeAccounts) Resolve(context.Context, accounts.Provider) (string, bool, error) {
+	return "", false, nil
+}
+func (s *fakeAccounts) GetProfile(context.Context, string) (accounts.Profile, error) {
+	return accounts.Profile{}, nil
+}
+func (s *fakeAccounts) SetProfile(context.Context, string, string, string) error { return nil }
+func (s *fakeAccounts) SetPublicKey(context.Context, string, []byte) error       { return nil }
+func (s *fakeAccounts) PutDevice(context.Context, string, accounts.Device) error { return nil }
+func (s *fakeAccounts) DeleteDevice(context.Context, string, string) error       { return nil }
+func (s *fakeAccounts) ListDevices(context.Context, string) ([]accounts.Device, error) {
+	return nil, nil
+}
+func (s *fakeAccounts) SaveRefreshToken(_ context.Context, accountID, _, _, token string) error {
 	s.tokens[accountID] = token
 	return nil
 }
 
-func (s *fakeAppleCredentials) GetAppleRefreshToken(_ context.Context, accountID string) (string, error) {
+func (s *fakeAccounts) Providers(_ context.Context, accountID string) ([]accounts.Provider, error) {
 	s.getCalls++
 	if s.getErr != nil {
-		return "", s.getErr
+		return nil, s.getErr
 	}
-	return s.tokens[accountID], nil
+	token, ok := s.tokens[accountID]
+	if !ok {
+		return nil, nil
+	}
+	return []accounts.Provider{{Name: auth.AppleProvider, Subject: "sub", RefreshToken: token}}, nil
 }
 
-func (s *fakeAppleCredentials) DeleteAppleRefreshToken(_ context.Context, accountID string) error {
+func (s *fakeAccounts) Delete(_ context.Context, accountID string) error {
 	s.deleted = append(s.deleted, accountID)
 	delete(s.tokens, accountID)
 	return nil
 }
 
-func newService(credentials *fakeAppleCredentials, revoke func(context.Context, string) error) (*Service, *fakeAuthStore) {
+func newService(credentials *fakeAccounts, revoke func(context.Context, string) error) (*Service, *fakeAuthStore) {
 	sessions := &fakeAuthStore{}
 	service := &Service{AuthStore: sessions, RevokeApple: revoke}
 	if credentials != nil {
-		service.AppleCredentials = credentials
+		service.Accounts = credentials
 	}
 	return service, sessions
 }
@@ -58,14 +79,14 @@ func newService(credentials *fakeAppleCredentials, revoke func(context.Context, 
 // The Guideline 5.1.1(v) path: deleting an Apple account spends the
 // banked refresh token, then drops it.
 func TestDeleteRevokesTheAppleGrant(t *testing.T) {
-	credentials := &fakeAppleCredentials{tokens: map[string]string{"apple:sub-1": "r-123"}}
+	credentials := &fakeAccounts{tokens: map[string]string{"account-1": "r-123"}}
 	var revoked []string
 	service, sessions := newService(credentials, func(_ context.Context, token string) error {
 		revoked = append(revoked, token)
 		return nil
 	})
 
-	if err := service.Delete(context.Background(), "apple:sub-1"); err != nil {
+	if err := service.Delete(context.Background(), "account-1"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -73,44 +94,45 @@ func TestDeleteRevokesTheAppleGrant(t *testing.T) {
 		t.Fatalf("expected the stored refresh token to be revoked, got %v", revoked)
 	}
 	if len(credentials.deleted) != 1 {
-		t.Errorf("expected the spent token to be deleted, got %v", credentials.deleted)
+		t.Errorf("expected the account itself to be deleted, got %v", credentials.deleted)
 	}
 	if len(sessions.sessionsDeletedFor) != 1 {
 		t.Errorf("expected the sessions to be deleted too")
 	}
 }
 
-// A Google account has no Apple grant, and must not cost a lookup
-// pretending otherwise.
-func TestDeleteSkipsRevocationForNonAppleAccounts(t *testing.T) {
-	credentials := &fakeAppleCredentials{tokens: map[string]string{}}
+// An account signed in with Google has no Apple grant. Which sign-ins an
+// account has is now a lookup rather than something its id says, so this
+// asks the accounts column and finds nothing to revoke.
+func TestDeleteRevokesNothingForAnAccountWithNoAppleSignIn(t *testing.T) {
+	credentials := &fakeAccounts{tokens: map[string]string{}}
 	var revoked []string
 	service, _ := newService(credentials, func(_ context.Context, token string) error {
 		revoked = append(revoked, token)
 		return nil
 	})
 
-	if err := service.Delete(context.Background(), "google:sub-1"); err != nil {
+	if err := service.Delete(context.Background(), "account-1"); err != nil {
 		t.Fatal(err)
 	}
 
-	if credentials.getCalls != 0 {
-		t.Errorf("expected no credential lookup for a Google account, got %d", credentials.getCalls)
-	}
 	if len(revoked) != 0 {
 		t.Errorf("expected nothing revoked, got %v", revoked)
+	}
+	if len(credentials.deleted) != 1 {
+		t.Errorf("expected the account itself to be deleted, got %v", credentials.deleted)
 	}
 }
 
 // Someone asking to delete their account gets that even when Apple is
 // unreachable — the account is theirs, the outage isn't.
 func TestDeleteProceedsWhenRevocationFails(t *testing.T) {
-	credentials := &fakeAppleCredentials{tokens: map[string]string{"apple:sub-1": "r-123"}}
+	credentials := &fakeAccounts{tokens: map[string]string{"account-1": "r-123"}}
 	service, sessions := newService(credentials, func(context.Context, string) error {
 		return errors.New("apple is down")
 	})
 
-	if err := service.Delete(context.Background(), "apple:sub-1"); err != nil {
+	if err := service.Delete(context.Background(), "account-1"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,7 +140,7 @@ func TestDeleteProceedsWhenRevocationFails(t *testing.T) {
 		t.Fatalf("expected deletion to finish despite the failed revoke")
 	}
 	// Kept, not dropped: it's all a retry would have to work from.
-	if len(credentials.deleted) != 0 {
+	if len(credentials.deleted) != 1 {
 		t.Errorf("expected the unspent token to survive a failed revoke, got %v", credentials.deleted)
 	}
 }
@@ -126,14 +148,14 @@ func TestDeleteProceedsWhenRevocationFails(t *testing.T) {
 // An account that signed in with no Apple key configured has nothing
 // banked; that's ordinary, not an error.
 func TestDeleteWithNothingBanked(t *testing.T) {
-	credentials := &fakeAppleCredentials{tokens: map[string]string{}}
+	credentials := &fakeAccounts{tokens: map[string]string{}}
 	var revoked []string
 	service, _ := newService(credentials, func(_ context.Context, token string) error {
 		revoked = append(revoked, token)
 		return nil
 	})
 
-	if err := service.Delete(context.Background(), "apple:sub-1"); err != nil {
+	if err := service.Delete(context.Background(), "account-1"); err != nil {
 		t.Fatal(err)
 	}
 	if len(revoked) != 0 {
@@ -146,7 +168,7 @@ func TestDeleteWithNothingBanked(t *testing.T) {
 func TestDeleteWithoutRevocationConfigured(t *testing.T) {
 	service, sessions := newService(nil, nil)
 
-	if err := service.Delete(context.Background(), "apple:sub-1"); err != nil {
+	if err := service.Delete(context.Background(), "account-1"); err != nil {
 		t.Fatal(err)
 	}
 	if len(sessions.sessionsDeletedFor) != 1 {

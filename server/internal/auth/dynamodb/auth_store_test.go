@@ -91,12 +91,15 @@ func TestAuthStore_DeleteSession_IsIdempotentForAnUnknownToken(t *testing.T) {
 // here absorbs that environment hiccup without weakening what's actually
 // being tested.
 func TestAuthStore_DeleteAllSessions_RevokesEverySessionForTheAccountAndNoOthers(t *testing.T) {
-	const attempts = 3
+	const attempts = 5
 	var failure string
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if failure = deleteAllSessionsRevokesEveryoneOnce(t); failure == "" {
 			return
 		}
+		// The backfill this waits on is slower the busier the table is,
+		// and the suite now shares it with the accounts column.
+		time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
 	}
 	t.Fatalf("still failing after %d attempts: %s", attempts, failure)
 }

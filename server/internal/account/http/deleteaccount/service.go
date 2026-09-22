@@ -9,23 +9,31 @@ import (
 	"context"
 	"log/slog"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/auth/appleid"
 )
 
 type Service struct {
 	AuthStore auth.Store
-	// AppleCredentials and RevokeApple are both nil unless this
-	// environment has a Sign in with Apple key configured — see
-	// appleid.NewClient. Deletion works either way.
-	AppleCredentials auth.AppleCredentialStore
-	RevokeApple      func(ctx context.Context, refreshToken string) error
+	// Accounts holds the profile, devices and provider rows deletion
+	// removes, and the Apple grant it revokes on the way.
+	Accounts accounts.Store
+	// RevokeApple is nil unless this environment has a Sign in with Apple
+	// key configured — see appleid.NewClient. Deletion works either way.
+	RevokeApple func(ctx context.Context, refreshToken string) error
 }
 
-// Delete revokes Apple first, since it needs the credential row that the
-// rest of this then removes, and drops every session last.
+// Delete revokes Apple first, since it needs the provider row the rest
+// of this then removes, and drops every session last: a signed-in device
+// must not outlive the account it belonged to.
 func (s *Service) Delete(ctx context.Context, accountID string) error {
 	s.revokeAppleGrant(ctx, accountID)
+	if s.Accounts != nil {
+		if err := s.Accounts.Delete(ctx, accountID); err != nil {
+			return err
+		}
+	}
 	return s.AuthStore.DeleteAllSessions(ctx, accountID)
 }
 
@@ -40,11 +48,11 @@ func (s *Service) Delete(ctx context.Context, accountID string) error {
 // one trace of the account worth keeping, since it's all a retry would
 // have to work from.
 func (s *Service) revokeAppleGrant(ctx context.Context, accountID string) {
-	if s.AppleCredentials == nil || s.RevokeApple == nil || !auth.IsAppleAccount(accountID) {
+	if s.Accounts == nil || s.RevokeApple == nil {
 		return
 	}
 
-	refreshToken, err := s.AppleCredentials.GetAppleRefreshToken(ctx, accountID)
+	refreshToken, err := s.appleRefreshToken(ctx, accountID)
 	if err != nil {
 		slog.ErrorContext(ctx, "could not read the Apple refresh token while deleting an account",
 			"reason", "apple_refresh_token_unreadable", "error", err)
@@ -67,8 +75,21 @@ func (s *Service) revokeAppleGrant(ctx context.Context, accountID string) {
 	}
 	slog.InfoContext(ctx, "revoked a Sign in with Apple grant", "reason", "apple_grant_revoked")
 
-	if err := s.AppleCredentials.DeleteAppleRefreshToken(ctx, accountID); err != nil {
-		slog.ErrorContext(ctx, "could not delete the spent Apple refresh token",
-			"reason", "apple_refresh_token_not_deleted", "error", err)
+	// The spent token goes with the account itself, a moment later.
+}
+
+// appleRefreshToken is the grant banked at sign-in, if this account has
+// an Apple sign-in at all. An account with only Google has none, which
+// is ordinary rather than an error.
+func (s *Service) appleRefreshToken(ctx context.Context, accountID string) (string, error) {
+	providers, err := s.Accounts.Providers(ctx, accountID)
+	if err != nil {
+		return "", err
 	}
+	for _, provider := range providers {
+		if provider.Name == auth.AppleProvider {
+			return provider.RefreshToken, nil
+		}
+	}
+	return "", nil
 }

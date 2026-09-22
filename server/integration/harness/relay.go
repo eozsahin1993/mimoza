@@ -32,6 +32,7 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/api"
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth"
@@ -59,6 +60,10 @@ type Relay struct {
 	// registerTestOnly in cmd/testrelay, which every RELAY_URL target is
 	// expected to expose.
 	sessions auth.Store
+	// accounts is where an account id comes from, as it does for a real
+	// sign-in: minting a session against an id the accounts column never
+	// issued would leave a device with no profile.
+	accounts accounts.Store
 }
 
 // Start builds a relay of this test's own and registers its teardown.
@@ -93,7 +98,7 @@ func Start(t *testing.T) *Relay {
 	server := httptest.NewServer(api.NewRouter(deps))
 	t.Cleanup(server.Close)
 
-	return &Relay{t: t, baseURL: server.URL, sessions: deps.Auth}
+	return &Relay{t: t, baseURL: server.URL, sessions: deps.Auth, accounts: deps.Accounts}
 }
 
 // unreachable skips, or fails when the environment says a missing
@@ -127,10 +132,17 @@ func (d *Device) AccountID() string { return d.accountID }
 // that requests carry a credential the relay accepts.
 func (r *Relay) SignIn() *Device {
 	r.t.Helper()
-	accountID := "test:" + Suffix()
-	d := &Device{relay: r, token: Suffix(), accountID: accountID, identity: NewAuthority(r.t)}
+	subject := Suffix()
+	d := &Device{relay: r, token: Suffix(), identity: NewAuthority(r.t)}
 
 	if r.sessions != nil {
+		accountID, _, err := r.accounts.Resolve(context.Background(),
+			accounts.Provider{Name: "testonly", Subject: subject})
+		if err != nil {
+			r.t.Fatalf("failed to resolve an account: %v", err)
+		}
+		d.accountID = accountID
+
 		session := auth.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
 		if err := r.sessions.SaveSession(context.Background(), d.token, session); err != nil {
 			r.t.Fatalf("failed to mint a session: %v", err)
@@ -139,10 +151,14 @@ func (r *Relay) SignIn() *Device {
 	}
 
 	// RELAY_URL mode: this process holds no store the target relay reads
-	// from, so the session has to be minted on its side — see
-	// registerTestOnly in cmd/testrelay, which is POST, not PUT.
-	r.Anon().Post("/testonly/session", Body{"accountId": accountID, "token": d.token}).
-		Expect(http.StatusNoContent)
+	// from, so both the account and the session are made on its side —
+	// see registerTestOnly in cmd/testrelay.
+	var minted struct {
+		AccountID string `json:"accountId"`
+	}
+	r.Anon().Post("/testonly/session", Body{"subject": subject, "token": d.token}).
+		Expect(http.StatusOK).Decode(&minted)
+	d.accountID = minted.AccountID
 	return d
 }
 

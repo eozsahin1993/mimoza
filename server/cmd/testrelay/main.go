@@ -15,6 +15,7 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/api"
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth"
@@ -44,7 +45,7 @@ func main() {
 	// the ones internal/util/testsupport already expects to find.
 	deps := app.Deps(localstack.RelayConfig(localstack.Shared()), awsCfg)
 	mux := api.NewRouter(deps)
-	registerTestOnly(mux, deps.Auth)
+	registerTestOnly(mux, deps.Auth, deps.Accounts)
 
 	address := addr()
 	log.Printf("testrelay listening on %s against LocalStack at %s", address, localstack.Endpoint())
@@ -83,23 +84,33 @@ func addr() string {
 // testing the fake's JWKS round-trip rather than the relay. Real provider
 // verification is covered where it belongs, by internal/api's own tests
 // against testsupport.FakeOIDCProvider.
-func registerTestOnly(mux *http.ServeMux, sessions auth.Store) {
+func registerTestOnly(mux *http.ServeMux, sessions auth.Store, accountStore accounts.Store) {
 	mux.HandleFunc("POST /testonly/session", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			AccountID string `json:"accountId"`
-			Token     string `json:"token"`
+			// Subject stands in for what a provider would have verified.
+			// The account id comes back from the accounts column, the
+			// same way a real sign-in gets one.
+			Subject string `json:"subject"`
+			Token   string `json:"token"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AccountID == "" || body.Token == "" {
-			http.Error(w, `{"error":"accountId and token are both required"}`, http.StatusBadRequest)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Subject == "" || body.Token == "" {
+			http.Error(w, `{"error":"subject and token are both required"}`, http.StatusBadRequest)
 			return
 		}
 
-		session := auth.Session{AccountID: body.AccountID, ExpiresAt: time.Now().Add(sessionTTL)}
+		accountID, _, err := accountStore.Resolve(r.Context(), accounts.Provider{Name: "testonly", Subject: body.Subject})
+		if err != nil {
+			http.Error(w, `{"error":"could not resolve the account"}`, http.StatusInternalServerError)
+			return
+		}
+
+		session := auth.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
 		if err := sessions.SaveSession(r.Context(), body.Token, session); err != nil {
 			http.Error(w, `{"error":"could not save the session"}`, http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"accountId": accountID})
 	})
 }
 

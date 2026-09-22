@@ -24,6 +24,7 @@ import (
 	"mimoza-relay/internal/push/apns"
 	"mimoza-relay/internal/push/fcm"
 
+	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
 	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
@@ -104,6 +105,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	}
 
 	return api.Deps{
+		Accounts:        accountsdynamo.New(dynamo(), cfg.AccountsTableName),
 		Circles:         circlesdynamo.NewTable(dynamo(), cfg.CirclesTableName),
 		InviteRetention: time.Duration(cfg.InviteRetentionDays) * 24 * time.Hour,
 		Log:             logdynamodb.New(dynamo(), cfg.TableName),
@@ -116,8 +118,6 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		Apple:           oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS)),
 		AppleID:         appleID,
 		// Shares the accounts table rather than taking one of its own —
-		// see auth/dynamodb's AppleCredentialStore for the key spacing.
-		AppleCredentials: authdynamodb.NewAppleCredentialStore(dynamo(), cfg.AccountsTableName),
 		Push: api.PushDeps{
 			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName, cfg.InviteRetentionDays),
 			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),
