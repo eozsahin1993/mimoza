@@ -25,12 +25,21 @@ func New(client *dynamodb.Client, tableName string) *Store {
 
 var _ account.Store = (*Store)(nil)
 
+// manifestSK is fixed: the accounts table has a sort key, and the
+// manifest is the only row under its bare account-id partition.
+const manifestSK = "manifest"
+
+func manifestKey(accountID string) map[string]types.AttributeValue {
+	return map[string]types.AttributeValue{
+		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: accountID},
+		dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: manifestSK},
+	}
+}
+
 func (s *Store) GetManifest(ctx context.Context, accountID string) (account.Manifest, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.tableName),
-		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: accountID},
-		},
+		TableName:      aws.String(s.tableName),
+		Key:            manifestKey(accountID),
 		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
@@ -67,13 +76,12 @@ func (s *Store) PutManifest(ctx context.Context, accountID string, blob []byte, 
 		values = nil
 	}
 
+	item := manifestKey(accountID)
+	item["blob"] = &types.AttributeValueMemberB{Value: blob}
+	item["version"] = &types.AttributeValueMemberN{Value: strconv.FormatInt(expectedVersion+1, 10)}
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(s.tableName),
-		Item: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: accountID},
-			"blob":            &types.AttributeValueMemberB{Value: blob},
-			"version":         &types.AttributeValueMemberN{Value: strconv.FormatInt(expectedVersion+1, 10)},
-		},
+		TableName:                 aws.String(s.tableName),
+		Item:                      item,
 		ConditionExpression:       aws.String(condition),
 		ExpressionAttributeValues: values,
 	})
@@ -88,9 +96,7 @@ func (s *Store) PutManifest(ctx context.Context, accountID string, blob []byte, 
 func (s *Store) DeleteManifest(ctx context.Context, accountID string) error {
 	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
-		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: accountID},
-		},
+		Key:       manifestKey(accountID),
 	})
 	return err
 }

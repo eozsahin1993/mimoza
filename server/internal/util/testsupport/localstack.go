@@ -59,14 +59,14 @@ import (
 // cmd/testrelay uses too — one definition, so a table this suite creates
 // can't differ in shape from the one the relay is served against.
 var (
-	shared               = localstack.Shared()
-	tableName            = shared.TableName
-	bucketName           = shared.BucketName
-	sessionsTableName    = shared.SessionsTableName
-	accountsOldTableName = shared.AccountsOldTableName
-	inviteTableName      = shared.InviteTableName
-	rateLimitTableName   = shared.RateLimitTableName
-	pushTableName        = shared.PushTableName
+	shared             = localstack.Shared()
+	tableName          = shared.TableName
+	bucketName         = shared.BucketName
+	sessionsTableName  = shared.SessionsTableName
+	accountsTableName  = shared.AccountsTableName
+	inviteTableName    = shared.InviteTableName
+	rateLimitTableName = shared.RateLimitTableName
+	pushTableName      = shared.PushTableName
 )
 
 var (
@@ -293,7 +293,7 @@ func NewAuthStore(t testing.TB) auth.Store {
 // NewManifestStore returns a real dynamodb-backed account.Store
 // against LocalStack, creating the accounts table once per test binary
 // run — a genuinely separate table from sessions (see
-// server/provision/modules/storage/accounts_old_table.tf).
+// server/provision/modules/storage/accounts_table.tf).
 func NewManifestStore(t testing.TB) account.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
@@ -301,13 +301,13 @@ func NewManifestStore(t testing.TB) account.Store {
 	})
 
 	accountsTableOnce.Do(func() {
-		accountsTableErr = localstack.CreateTable(context.Background(), client, accountsOldTableName, localstack.HashOnly)
+		accountsTableErr = localstack.CreateTable(context.Background(), client, accountsTableName, localstack.WithSortKey)
 	})
 	if accountsTableErr != nil {
 		unreachable(t, "DynamoDB", accountsTableErr)
 	}
 
-	return manifestdynamodb.New(client, accountsOldTableName)
+	return manifestdynamodb.New(client, accountsTableName)
 }
 
 // NewInviteStore returns a real dynamodb-backed invite.Store

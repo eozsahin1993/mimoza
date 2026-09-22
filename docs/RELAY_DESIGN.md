@@ -86,8 +86,17 @@ through the `lookup` row.
 | `by-type-updated` | `pk` | `typeUpdatedKey = post#<updatedAt:013d>#<postId>` | posts forward, including changed ones |
 | `by-account` | `accountId` | `sk` | every circle an account is in |
 
-Blobs live in S3 at `<circleId>/<postId>` and `<circleId>/cover/<coverId>`.
-Every key is written once, so the CDN caches all of them indefinitely.
+Blobs live in S3 at `<circleId>/<postId>` and `<circleId>/cover/<coverId>`,
+delivered as CloudFront URLs signed for an hour. Every key is written
+once, so a cached object is never stale and the cache TTL is free to be
+long.
+
+Deletion is the exception, and needs all three of: delete the object,
+invalidate that path, and refuse to sign a URL for an entry whose row
+carries `deletedAt`. Invalidation is best-effort — the bytes are already
+gone — so the signing check is what actually stops a deleted photo being
+fetched, and the signed-URL TTL bounds how long an already-issued link
+outlives it.
 
 ## Writes
 
@@ -95,12 +104,22 @@ Every key is written once, so the CDN caches all of them indefinitely.
 |---|---|
 | create circle | one transaction: `meta`, founder `member#` (admin), founder `key#` with v1, `activity{created}` |
 | post | conditional put of `entry#<postId>`; duplicate id returns the existing entry |
-| comment | one transaction: conditional put of the child, `ADD commentCount 1`, prepend to `recentComments`; then trim to N |
+| comment | one transaction: conditional put of the child, `ADD commentCount 1`, and set `recentComments` (see below) |
 | react / unreact | read own slot; one transaction: put or delete the slot conditioned on what was read, `ADD` −1/+1 on the old and new tag |
 | delete post | strip ciphertext, set `deletedAt` and `updatedAt`, delete the blob |
 | approve join | one transaction: `member#`, the joiner's `key#` with every version, `rosterVersion + 1`, request approved, `activity{joined}` |
 | kick | one transaction: delete `member#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1}` conditioned on the version read, `activity{removed}` |
 | leave, role change, rename, cover | row update with an admin check, `rosterVersion + 1` where membership changes, matching activity |
+
+**`recentComments` at N = 1** is a plain `SET` of the new comment, so
+concurrent comments resolve to whichever transaction commits last, which
+is the newest. Raising N means prepending with `list_append` and removing
+the tail index in a second update, which is not a read-modify-write and
+so cannot lose a comment, but can transiently hold N+1 entries, or drop a
+middle one while two prepends interleave. It converges on the next
+comment, and the post screen's own fetch is authoritative either way. A
+preview that must be exact at N > 1 would have to be rebuilt from a query
+instead.
 
 Counts only ever change by `ADD` deltas, so concurrent reactions and
 comments compose in any order. The kick is the only write conditioned on
@@ -144,10 +163,18 @@ position in an index:
 | posts backward | `by-type-received`, descending | `t#id` |
 | activity | `by-type-received`, either direction | as above |
 
-The 30-second step back at the start of a sync covers a write that
-landed late or an index that lagged; the device ignores entries it
-already holds. A post's `updatedAt` only moves forward, so a changed post
-re-enters the walk ahead of the cursor and is never skipped behind it.
+The 30-second step back at the start of a sync covers a write that landed
+late or an index that lagged; the device ignores entries it already
+holds. A post's `updatedAt` only moves forward, so a changed post
+re-enters the walk ahead of the cursor rather than behind it.
+
+**That rewind is an optimization, not the completeness guarantee.** Index
+propagation is asynchronous and has no documented bound, so a write can
+surface after any fixed window. `meta.lastEntryAt` is what closes it: it
+is written in the same transaction as the entry and read straight from
+the table, so a device that finishes a walk holding a `receivedAt` older
+than `lastEntryAt` knows it is missing something, and re-walks from
+before that point rather than trusting its cursor.
 
 ## Push
 

@@ -133,7 +133,6 @@ func tables(n config.Resources) []struct {
 		{n.AccountsTableName, WithSortKey},
 		{n.CirclesTableName, WithSortKey},
 		{n.SessionsTableName, HashOnly},
-		{n.AccountsOldTableName, HashOnly},
 		{n.RateLimitTableName, HashOnly},
 	}
 }

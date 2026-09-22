@@ -18,6 +18,10 @@ import (
 // accountID, so the prefix is what stops the two colliding.
 const applePKPrefix = "apple-refresh#"
 
+// The accounts table has a sort key; this row is alone in its partition,
+// so a fixed one is enough.
+const appleSK = "apple-refresh"
+
 // AppleCredentialStore implements auth.AppleCredentialStore against the
 // accounts table. Deliberately not folded into account.Store: what it
 // holds is a sign-in provider credential, which belongs to the auth
@@ -36,6 +40,7 @@ var _ auth.AppleCredentialStore = (*AppleCredentialStore)(nil)
 func (s *AppleCredentialStore) key(accountID string) map[string]types.AttributeValue {
 	return map[string]types.AttributeValue{
 		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: applePKPrefix + accountID},
+		dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: appleSK},
 	}
 }
 

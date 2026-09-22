@@ -22,29 +22,27 @@ const DefaultInviteRetentionDays = 7
 // server/provision/modules/storage creates them with; a rename there has
 // to happen in ResourcesFor too.
 type Resources struct {
-	TableName            string // sync log
-	BucketName           string
-	SessionsTableName    string
-	AccountsTableName    string
-	AccountsOldTableName string // pre-rewrite accounts, until nothing reads it
-	CirclesTableName     string
-	InviteTableName      string
-	RateLimitTableName   string
-	PushTableName        string
+	TableName          string // sync log
+	BucketName         string
+	SessionsTableName  string
+	AccountsTableName  string
+	CirclesTableName   string
+	InviteTableName    string
+	RateLimitTableName string
+	PushTableName      string
 }
 
 // ResourcesFor derives every resource name from one prefix.
 func ResourcesFor(prefix string) Resources {
 	return Resources{
-		TableName:            prefix + "-sync-log",
-		BucketName:           prefix + "-blobs",
-		SessionsTableName:    prefix + "-sessions",
-		AccountsTableName:    prefix + "-accounts",
-		AccountsOldTableName: prefix + "-accounts-old",
-		CirclesTableName:     prefix + "-circles",
-		InviteTableName:      prefix + "-invites",
-		RateLimitTableName:   prefix + "-rate-limit",
-		PushTableName:        prefix + "-push",
+		TableName:          prefix + "-sync-log",
+		BucketName:         prefix + "-blobs",
+		SessionsTableName:  prefix + "-sessions",
+		AccountsTableName:  prefix + "-accounts",
+		CirclesTableName:   prefix + "-circles",
+		InviteTableName:    prefix + "-invites",
+		RateLimitTableName: prefix + "-rate-limit",
+		PushTableName:      prefix + "-push",
 	}
 }
 

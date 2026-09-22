@@ -3,9 +3,9 @@
 # identity (provider#<provider>:<sub>) maps a sign-in back to its account,
 # so account ids can be internal rather than the provider's own subject.
 #
-# Recreated with a sort key, since DynamoDB can't add one in place; the
-# old single-key table lives on as accounts_old_table.tf until nothing
-# reads it.
+# The pre-rewrite rows the current relay still writes — the encrypted
+# recovery manifest and the Apple refresh token — sit in their own
+# partitions here under a fixed sort key until they're removed.
 resource "aws_dynamodb_table" "accounts" {
   name         = "${var.name_prefix}-accounts"
   billing_mode = "PAY_PER_REQUEST"

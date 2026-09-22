@@ -42,14 +42,6 @@ output "accounts_table_arn" {
   value = aws_dynamodb_table.accounts.arn
 }
 
-output "accounts_old_table_name" {
-  value = aws_dynamodb_table.accounts_old.name
-}
-
-output "accounts_old_table_arn" {
-  value = aws_dynamodb_table.accounts_old.arn
-}
-
 output "circles_table_name" {
   value = aws_dynamodb_table.circles.name
 }
@@ -81,7 +73,6 @@ output "table_names" {
     aws_dynamodb_table.invites.name,
     aws_dynamodb_table.sessions.name,
     aws_dynamodb_table.accounts.name,
-    aws_dynamodb_table.accounts_old.name,
     aws_dynamodb_table.circles.name,
     aws_dynamodb_table.rate_limit.name,
     aws_dynamodb_table.push.name,

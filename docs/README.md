@@ -6,7 +6,8 @@ to double as both a map of the code and a design history.
 
 - [RELAY_DESIGN.md](RELAY_DESIGN.md) — the relay-owned design being
   built: accounts and circles tables, sealed keys, cursors, push,
-  recovery. Replaces the five docs below once built.
+  recovery. Replaces `SYNC_DESIGN.md`, `PUSH_DESIGN.md`, `INVITE_FLOW.md`
+  and `ACCOUNT_RECOVERY.md` once built.
 - [DESIGN.md](DESIGN.md) — the relay's overall architecture: blindness,
   storage, auth.
 - [SYNC_DESIGN.md](SYNC_DESIGN.md) — the append-only per-circle log: entry

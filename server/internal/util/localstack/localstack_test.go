@@ -41,9 +41,6 @@ func TestProvisionSet_CreatesTheNewTablesWithTheirKeysAndIndexes(t *testing.T) {
 	accounts := describe(t, ddb, names.AccountsTableName)
 	assertKeys(t, names.AccountsTableName, accounts.KeySchema, "pk", "sk")
 
-	old := describe(t, ddb, names.AccountsOldTableName)
-	assertKeys(t, names.AccountsOldTableName, old.KeySchema, "pk", "")
-
 	circles := describe(t, ddb, names.CirclesTableName)
 	assertKeys(t, names.CirclesTableName, circles.KeySchema, "pk", "sk")
 
