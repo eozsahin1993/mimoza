@@ -100,37 +100,34 @@ func (s *Store) DeletePost(ctx context.Context, circleID, postID string) (circle
 // Entries is one page of a walk: the next rows after the cursor's
 // position, in the index that cursor belongs to.
 func (s *Store) ListEntries(ctx context.Context, circleID, readerID string, cursor circles.Cursor, limit int32) (circles.Page, error) {
-	index, key := dynamo.ByTypeReceivedIndex, dynamo.ByTypeReceivedKey
+	index, partition, key := dynamo.ByTypeReceivedIndex, dynamo.ByTypeReceivedPK, dynamo.ByTypeReceivedKey
 	forward := cursor.Direction == circles.Forward
 	if cursor.Type == circles.TypePost && forward {
-		index, key = dynamo.ByTypeUpdatedIndex, dynamo.ByTypeUpdatedKey
+		index, partition, key = dynamo.ByTypeUpdatedIndex, dynamo.ByTypeUpdatedPK, dynamo.ByTypeUpdatedKey
 	}
 
-	condition := "pk = :pk AND " + key + " < :position"
+	condition := partition + " = :pk AND " + key + " < :position"
 	if forward {
-		condition = "pk = :pk AND " + key + " > :position"
+		condition = partition + " = :pk AND " + key + " > :position"
 	}
 	position := cursor.Position()
 	if cursor.IsZero() {
-		// No cursor: the newest page, read backward from the end.
+		// No cursor: the newest page, read backward from the end of this
+		// type's own partition.
 		forward = false
-		condition = "pk = :pk AND begins_with(" + key + ", :position)"
-		position = circles.TypePrefix(cursor.Type)
+		condition = partition + " = :pk"
 	}
 
 	projection, names := dynamo.ProjectionFor(readerID)
 	out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.Name),
-		IndexName:              aws.String(index),
-		KeyConditionExpression: aws.String(condition),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":       dynamo.Str(dynamo.CirclePK(circleID)),
-			":position": dynamo.Str(position),
-		},
-		ProjectionExpression:     projection,
-		ExpressionAttributeNames: names,
-		ScanIndexForward:         aws.Bool(forward),
-		Limit:                    aws.Int32(limit),
+		TableName:                 aws.String(s.Name),
+		IndexName:                 aws.String(index),
+		KeyConditionExpression:    aws.String(condition),
+		ExpressionAttributeValues: values(dynamo.TypePartition(circleID, cursor.Type), position, cursor.IsZero()),
+		ProjectionExpression:      projection,
+		ExpressionAttributeNames:  names,
+		ScanIndexForward:          aws.Bool(forward),
+		Limit:                     aws.Int32(limit),
 	})
 	if err != nil {
 		return circles.Page{}, err
@@ -200,10 +197,9 @@ func (s *Store) CountEntries(ctx context.Context, circleID, entryType string) (i
 		out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
 			TableName:              aws.String(s.Name),
 			IndexName:              aws.String(dynamo.ByTypeReceivedIndex),
-			KeyConditionExpression: aws.String("pk = :pk AND begins_with(" + dynamo.ByTypeReceivedKey + ", :prefix)"),
+			KeyConditionExpression: aws.String(dynamo.ByTypeReceivedPK + " = :pk"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":pk":     dynamo.Str(dynamo.CirclePK(circleID)),
-				":prefix": dynamo.Str(circles.TypePrefix(entryType)),
+				":pk": dynamo.Str(dynamo.TypePartition(circleID, entryType)),
 			},
 			Select:            types.SelectCount,
 			ExclusiveStartKey: start,
@@ -216,5 +212,17 @@ func (s *Store) CountEntries(ctx context.Context, circleID, entryType string) (i
 			return total, nil
 		}
 		start = out.LastEvaluatedKey
+	}
+}
+
+// values is the query's bindings: a first read has no position, and
+// binding one DynamoDB never sees is rejected.
+func values(partition, position string, atStart bool) map[string]types.AttributeValue {
+	if atStart {
+		return map[string]types.AttributeValue{":pk": dynamo.Str(partition)}
+	}
+	return map[string]types.AttributeValue{
+		":pk":       dynamo.Str(partition),
+		":position": dynamo.Str(position),
 	}
 }

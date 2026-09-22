@@ -204,6 +204,8 @@ func api(path string) string { return "/v1" + path }
 type entryView struct {
 	EntryID        string           `json:"entryId"`
 	AuthorID       string           `json:"authorId"`
+	Ciphertext     string           `json:"ciphertext"`
+	DeletedAt      int64            `json:"deletedAt"`
 	CommentCount   int64            `json:"commentCount"`
 	ReactionCounts map[string]int64 `json:"reactionCounts"`
 	RecentComments []struct {

@@ -159,10 +159,11 @@ func (r *Relay) Anon() *Device {
 // "invalid request body".
 type Body map[string]any
 
-func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
-func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodPut, path, b) }
-func (d *Device) Post(path string, b Body) Response { return d.send(http.MethodPost, path, b) }
-func (d *Device) Delete(path string) Response       { return d.send(http.MethodDelete, path, nil) }
+func (d *Device) Get(path string) Response           { return d.send(http.MethodGet, path, nil) }
+func (d *Device) Put(path string, b Body) Response   { return d.send(http.MethodPut, path, b) }
+func (d *Device) Patch(path string, b Body) Response { return d.send(http.MethodPatch, path, b) }
+func (d *Device) Post(path string, b Body) Response  { return d.send(http.MethodPost, path, b) }
+func (d *Device) Delete(path string) Response        { return d.send(http.MethodDelete, path, nil) }
 
 // PostRequest sends a struct rather than a Body — for the endpoints this
 // package models field for field (see circle.go), where a map would drop

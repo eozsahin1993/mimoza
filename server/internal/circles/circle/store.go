@@ -105,14 +105,24 @@ func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actor
 
 	sets := []string{}
 	values := map[string]types.AttributeValue{}
+	// Through a placeholder: "name" is a reserved word in an update
+	// expression, and naming it directly fails the whole write.
+	names := map[string]string{}
 	if name != "" {
-		sets = append(sets, dynamo.AttrName+" = :name")
+		sets = append(sets, "#name = :name")
+		names["#name"] = dynamo.AttrName
 		values[":name"] = dynamo.Str(name)
 	}
 	if coverID != "" {
 		sets = append(sets, dynamo.AttrCoverID+" = :cover")
 		values[":cover"] = dynamo.Str(coverID)
 	}
+
+	// lastEntryAt rides on this same update: a transaction cannot write
+	// one item twice, and a separate touch would be a second write to
+	// the circle's own row.
+	sets = append(sets, dynamo.AttrLastEntryAt+" = :now")
+	values[":now"] = dynamo.Millis(s.Now())
 
 	update := "SET " + sets[0]
 	for _, set := range sets[1:] {
@@ -126,9 +136,9 @@ func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actor
 			Key:                       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
 			UpdateExpression:          aws.String(update),
 			ConditionExpression:       aws.String("attribute_exists(pk)"),
+			ExpressionAttributeNames:  names,
 			ExpressionAttributeValues: values,
 		}},
-		{Update: s.TouchCircle(circleID, now)},
 	}
 	// One request can change both, and the wall shows them as two
 	// different things, so each gets its own row.

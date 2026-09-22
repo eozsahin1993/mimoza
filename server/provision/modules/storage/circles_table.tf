@@ -20,7 +20,17 @@ resource "aws_dynamodb_table" "circles" {
   }
 
   attribute {
+    name = "typeReceivedPk"
+    type = "S"
+  }
+
+  attribute {
     name = "typeReceivedKey"
+    type = "S"
+  }
+
+  attribute {
+    name = "typeUpdatedPk"
     type = "S"
   }
 
@@ -34,12 +44,14 @@ resource "aws_dynamodb_table" "circles" {
     type = "S"
   }
 
-  # Posts and activity in arrival order: history paging backward, and the
-  # activity walk. Only those two item kinds set typeReceivedKey, so the
-  # index is sparse.
+  # One circle's entries of one type, in arrival order: history paging
+  # backward, and the activity walk. The type is in the hash key rather
+  # than a prefix on the range key, so a range cannot run past its own
+  # type into the next one. Only entries set these, so the index is
+  # sparse.
   global_secondary_index {
     name            = "by-type-received"
-    hash_key        = "pk"
+    hash_key        = "typeReceivedPk"
     range_key       = "typeReceivedKey"
     projection_type = "ALL"
   }
@@ -58,7 +70,7 @@ resource "aws_dynamodb_table" "circles" {
   # do this because receivedAt never moves.
   global_secondary_index {
     name            = "by-type-updated"
-    hash_key        = "pk"
+    hash_key        = "typeUpdatedPk"
     range_key       = "typeUpdatedKey"
     projection_type = "ALL"
   }

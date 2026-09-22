@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -285,7 +286,9 @@ func putPost(ctx context.Context, ddb *awsdynamodb.Client, table, circle, postID
 			"receivedAt":                    n(at.UnixMilli()),
 			"updatedAt":                     n(at.UnixMilli()),
 			"commentCount":                  n(0),
+			circlesdynamo.ByTypeReceivedPK:  s(circlesdynamo.TypePartition(circleFrom(circle), "post")),
 			circlesdynamo.ByTypeReceivedKey: s(position{at: at, id: postID}.key("post")),
+			circlesdynamo.ByTypeUpdatedPK:   s(circlesdynamo.TypePartition(circleFrom(circle), "post")),
 			circlesdynamo.ByTypeUpdatedKey:  s(position{at: at, id: postID}.key("post")),
 		},
 		ConditionExpression: aws.String("attribute_not_exists(sk)"),
@@ -362,9 +365,9 @@ func walk(ctx context.Context, t *testing.T, ddb *awsdynamodb.Client, table, cir
 	out, err := ddb.Query(ctx, &awsdynamodb.QueryInput{
 		TableName:              aws.String(table),
 		IndexName:              aws.String(circlesdynamo.ByTypeUpdatedIndex),
-		KeyConditionExpression: aws.String("pk = :pk AND " + circlesdynamo.ByTypeUpdatedKey + " > :from"),
+		KeyConditionExpression: aws.String(circlesdynamo.ByTypeUpdatedPK + " = :pk AND " + circlesdynamo.ByTypeUpdatedKey + " > :from"),
 		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":pk":   s(circle),
+			":pk":   s(circlesdynamo.TypePartition(circleFrom(circle), "post")),
 			":from": s(from.key("post")),
 		},
 		ScanIndexForward: aws.Bool(true),
@@ -419,6 +422,12 @@ func table(t *testing.T) (string, *awsdynamodb.Client) {
 		t.Fatal(err)
 	}
 	return names.CirclesTableName, ddb
+}
+
+// circleFrom strips the key prefix back off, since these tests hold the
+// partition key rather than the circle id the store's helpers take.
+func circleFrom(partitionKey string) string {
+	return strings.TrimPrefix(partitionKey, "circle#")
 }
 
 func unique(what string) string {
@@ -540,10 +549,9 @@ func countPosts(ctx context.Context, t *testing.T, ddb *awsdynamodb.Client, tabl
 		out, err := ddb.Query(ctx, &awsdynamodb.QueryInput{
 			TableName:              aws.String(table),
 			IndexName:              aws.String(circlesdynamo.ByTypeReceivedIndex),
-			KeyConditionExpression: aws.String("pk = :pk AND begins_with(" + circlesdynamo.ByTypeReceivedKey + ", :prefix)"),
+			KeyConditionExpression: aws.String(circlesdynamo.ByTypeReceivedPK + " = :pk"),
 			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-				":pk":     s(circle),
-				":prefix": s("post#"),
+				":pk": s(circlesdynamo.TypePartition(circleFrom(circle), "post")),
 			},
 			Select:            ddbtypes.SelectCount,
 			ExclusiveStartKey: start,
@@ -566,10 +574,9 @@ func walkBackward(ctx context.Context, t *testing.T, ddb *awsdynamodb.Client, ta
 	out, err := ddb.Query(ctx, &awsdynamodb.QueryInput{
 		TableName:              aws.String(table),
 		IndexName:              aws.String(circlesdynamo.ByTypeReceivedIndex),
-		KeyConditionExpression: aws.String("pk = :pk AND begins_with(" + circlesdynamo.ByTypeReceivedKey + ", :prefix)"),
+		KeyConditionExpression: aws.String(circlesdynamo.ByTypeReceivedPK + " = :pk"),
 		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":pk":     s(circle),
-			":prefix": s("post#"),
+			":pk": s(circlesdynamo.TypePartition(circleFrom(circle), "post")),
 		},
 		ScanIndexForward: aws.Bool(false),
 		Limit:            aws.Int32(200),

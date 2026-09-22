@@ -121,19 +121,19 @@ func (c Cursor) Position() string {
 	return IndexKey(c.Type, c.At, c.ID)
 }
 
-// IndexKey is the sort key of both entry indexes: the type, the time
-// zero-padded so string order is time order, and the entry id to break
-// ties. Padding is 13 digits — milliseconds stay 13 digits until the year
-// 2286, and a shorter value would sort as smaller than a longer one.
+// IndexKey is the sort key of both entry indexes: the time zero-padded
+// so string order is time order, and the entry id to break ties. Padding
+// is 13 digits — milliseconds stay 13 digits until the year 2286, and a
+// shorter value would sort as smaller than a longer one.
+//
+// The type is not in here: it is the index's partition key, so a range
+// cannot run past one type's entries into another's.
 func IndexKey(entryType string, at time.Time, id string) string {
 	if id == "" {
-		return fmt.Sprintf("%s#%013d", entryType, at.UnixMilli())
+		return fmt.Sprintf("%013d", at.UnixMilli())
 	}
-	return fmt.Sprintf("%s#%013d#%s", entryType, at.UnixMilli(), id)
+	return fmt.Sprintf("%013d#%s", at.UnixMilli(), id)
 }
-
-// TypePrefix is every key of one entry type, for a count or a full walk.
-func TypePrefix(entryType string) string { return entryType + "#" }
 
 // Advance returns the cursor to hand back after a page: resuming exactly
 // after the last row, and continuing only while pages stay full, since a

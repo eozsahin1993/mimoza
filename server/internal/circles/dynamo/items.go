@@ -81,7 +81,9 @@ func PostItem(circleID string, entry circles.Entry) map[string]types.AttributeVa
 		AttrCommenters:     &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{}},
 		AttrReceivedAt:     Millis(entry.ReceivedAt),
 		AttrUpdatedAt:      Millis(entry.ReceivedAt),
+		ByTypeReceivedPK:   Str(TypePartition(circleID, circles.TypePost)),
 		ByTypeReceivedKey:  Str(circles.IndexKey(circles.TypePost, entry.ReceivedAt, entry.ID)),
+		ByTypeUpdatedPK:    Str(TypePartition(circleID, circles.TypePost)),
 		ByTypeUpdatedKey:   Str(circles.IndexKey(circles.TypePost, entry.ReceivedAt, entry.ID)),
 	}
 	return item
@@ -100,6 +102,7 @@ func ActivityItem(circleID string, entry circles.Entry) map[string]types.Attribu
 		AttrSubjectID:     Str(entry.SubjectID),
 		AttrSubjectName:   Str(entry.SubjectName),
 		AttrReceivedAt:    Millis(entry.ReceivedAt),
+		ByTypeReceivedPK:  Str(TypePartition(circleID, circles.TypeActivity)),
 		ByTypeReceivedKey: Str(circles.IndexKey(circles.TypeActivity, entry.ReceivedAt, entry.ID)),
 	}
 }
@@ -295,4 +298,11 @@ func TagOf(item map[string]types.AttributeValue) string {
 func HasCommented(item map[string]types.AttributeValue) bool {
 	raw, ok := item[AttrCommenters].(*types.AttributeValueMemberM)
 	return ok && len(raw.Value) == 1
+}
+
+// TypePartition is one circle's entries of one type: the partition both
+// entry indexes are keyed on, so a walk of posts can never read an
+// activity row and a count of one type counts only that type.
+func TypePartition(circleID, entryType string) string {
+	return CirclePK(circleID) + "#" + entryType
 }

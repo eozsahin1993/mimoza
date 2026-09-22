@@ -48,9 +48,9 @@ func TestProvisionSet_CreatesTheNewTablesWithTheirKeysAndIndexes(t *testing.T) {
 		hash, rangeKey string
 		projection     ddbtypes.ProjectionType
 	}{
-		circlesdynamo.ByTypeReceivedIndex: {"pk", circlesdynamo.ByTypeReceivedKey, ddbtypes.ProjectionTypeAll},
+		circlesdynamo.ByTypeReceivedIndex: {circlesdynamo.ByTypeReceivedPK, circlesdynamo.ByTypeReceivedKey, ddbtypes.ProjectionTypeAll},
 		circlesdynamo.ByAccountIndex:      {circlesdynamo.ByAccountPK, "sk", ddbtypes.ProjectionTypeKeysOnly},
-		circlesdynamo.ByTypeUpdatedIndex:  {"pk", circlesdynamo.ByTypeUpdatedKey, ddbtypes.ProjectionTypeAll},
+		circlesdynamo.ByTypeUpdatedIndex:  {circlesdynamo.ByTypeUpdatedPK, circlesdynamo.ByTypeUpdatedKey, ddbtypes.ProjectionTypeAll},
 	}
 	if len(circles.GlobalSecondaryIndexes) != len(want) {
 		t.Fatalf("circles table has %d indexes, want %d", len(circles.GlobalSecondaryIndexes), len(want))

@@ -6,9 +6,12 @@ package dynamo
 // server/provision/modules/storage/circles_table.tf. Each is sparse: only
 // the item kinds that set its range attribute appear in it.
 const (
-	// ByTypeReceivedIndex orders posts and activity by arrival, for history
-	// paging and the activity walk.
+	// ByTypeReceivedIndex orders one type's entries by arrival, for
+	// history paging and the activity walk. The type is in the partition
+	// key, not a prefix on the sort key: a range over a shared partition
+	// would otherwise run past its own type into the next one.
 	ByTypeReceivedIndex = "by-type-received"
+	ByTypeReceivedPK    = "typeReceivedPk"
 	ByTypeReceivedKey   = "typeReceivedKey"
 
 	// ByAccountIndex lists every circle an account is a member of.
@@ -17,5 +20,6 @@ const (
 
 	// ByTypeUpdatedIndex orders posts by last change, for the forward walk.
 	ByTypeUpdatedIndex = "by-type-updated"
+	ByTypeUpdatedPK    = "typeUpdatedPk"
 	ByTypeUpdatedKey   = "typeUpdatedKey"
 )
