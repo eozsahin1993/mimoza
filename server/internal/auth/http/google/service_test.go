@@ -18,7 +18,7 @@ func TestService_SignIn_ValidTokenIssuesASession(t *testing.T) {
 	authStore := testsupport.NewAuthStore(t)
 	svc := &google.Service{
 		AuthStore: authStore,
-		Accounts:  testsupport.NewAccountStore(t),
+		Accounts:  testsupport.NewAccountTable(t),
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
 
@@ -54,7 +54,7 @@ func TestService_SignIn_SameSubTwiceResolvesToTheSameAccount(t *testing.T) {
 	authStore := testsupport.NewAuthStore(t)
 	svc := &google.Service{
 		AuthStore: authStore,
-		Accounts:  testsupport.NewAccountStore(t),
+		Accounts:  testsupport.NewAccountTable(t),
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
 
@@ -102,7 +102,7 @@ func TestService_SignIn_DifferentEmailSameSubStillResolvesToTheSameAccount(t *te
 	authStore := testsupport.NewAuthStore(t)
 	svc := &google.Service{
 		AuthStore: authStore,
-		Accounts:  testsupport.NewAccountStore(t),
+		Accounts:  testsupport.NewAccountTable(t),
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
 
@@ -146,7 +146,7 @@ func TestService_SignIn_InvalidTokenIsRejected(t *testing.T) {
 	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
 	svc := &google.Service{
 		AuthStore: testsupport.NewAuthStore(t),
-		Accounts:  testsupport.NewAccountStore(t),
+		Accounts:  testsupport.NewAccountTable(t),
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
 
@@ -162,7 +162,7 @@ func TestService_SignIn_MissingEmailStillIssuesASession(t *testing.T) {
 	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
 	svc := &google.Service{
 		AuthStore: testsupport.NewAuthStore(t),
-		Accounts:  testsupport.NewAccountStore(t),
+		Accounts:  testsupport.NewAccountTable(t),
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
 

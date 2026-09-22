@@ -13,6 +13,15 @@ import (
 	"mimoza-relay/internal/auth/oidcverify"
 )
 
+// accountStore is what an Apple sign-in needs from the accounts column:
+// which account this subject is, and somewhere to bank the grant behind
+// it. Declared here rather than taken whole, so a change to any other
+// account operation can't reach this far.
+type accountStore interface {
+	Resolve(ctx context.Context, provider accounts.Provider) (accountID string, created bool, err error)
+	SaveRefreshToken(ctx context.Context, accountID, provider, subject, token string) error
+}
+
 type Service struct {
 	AuthStore auth.Store
 	Verifier  *oidcverify.Verifier
@@ -23,7 +32,7 @@ type Service struct {
 	AppleID *appleid.Client
 	// Accounts resolves the sign-in to an account id, and holds the
 	// refresh token against the provider row it came from.
-	Accounts accounts.Store
+	Accounts accountStore
 }
 
 // providerName namespaces the accountID so Google's and Apple's sub

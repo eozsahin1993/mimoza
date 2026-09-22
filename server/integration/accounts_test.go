@@ -46,6 +46,45 @@ func TestAccounts_ProfileBelongsToTheSession(t *testing.T) {
 	relay.Anon().Get(api("/account")).Expect(http.StatusUnauthorized)
 }
 
+// An account is created by the first sign-in and found again by every
+// one after it: the provider subject is a lookup onto the relay's own
+// id, so a returning device lands on the account it left, with the
+// profile and the circles still on it.
+func TestAccounts_ASecondSignInFindsTheSameAccount(t *testing.T) {
+	relay := harness.Start(t)
+	subject := "returning-" + harness.Suffix()
+
+	first := relay.SignInAs(subject)
+	first.Put(api("/account/profile"), harness.Body{"name": "Sarah"}).Expect(http.StatusOK)
+	circleID := createCircle(t, first, "Family")
+
+	// A second device for the same person: a new session, the same
+	// account underneath it.
+	second := relay.SignInAs(subject)
+	harness.AssertEqual(t, second.AccountID(), first.AccountID(), "the same sign-in is the same account")
+
+	var profile struct {
+		AccountID string `json:"accountId"`
+		Name      string `json:"name"`
+		CreatedAt int64  `json:"createdAt"`
+	}
+	second.Get(api("/account")).Expect(http.StatusOK).Decode(&profile)
+	harness.AssertEqual(t, profile.AccountID, first.AccountID(), "and reads the same profile")
+	harness.AssertEqual(t, profile.Name, "Sarah", "with the name the first device set")
+	harness.AssertTrue(t, profile.CreatedAt > 0, "stamped when the account was created")
+
+	// And what the account owns is listed on it, not on the device.
+	circles := listCircles(t, second)
+	harness.AssertEqual(t, len(circles), 1, "one circle")
+	harness.AssertEqual(t, circles[0].CircleID, circleID, "the one the first device created")
+	harness.AssertEqual(t, circles[0].Role, "admin", "still theirs to run")
+
+	// Someone else signing in is a different account with nothing on it.
+	stranger := relay.SignInAs("stranger-" + harness.Suffix())
+	harness.AssertTrue(t, stranger.AccountID() != first.AccountID(), "a different sign-in is a different account")
+	harness.AssertEqual(t, len(listCircles(t, stranger)), 0, "who is in no circles")
+}
+
 // The public key is what members seal content keys to. Replacing it as a
 // reset is how a device with no keychain gets back in, and it makes every
 // sealed copy stale until another member reseals them.

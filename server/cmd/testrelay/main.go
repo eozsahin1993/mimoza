@@ -16,6 +16,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"mimoza-relay/internal/accounts"
+	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/api"
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth"
@@ -84,7 +85,7 @@ func addr() string {
 // testing the fake's JWKS round-trip rather than the relay. Real provider
 // verification is covered where it belongs, by internal/api's own tests
 // against testsupport.FakeOIDCProvider.
-func registerTestOnly(mux *http.ServeMux, sessions auth.Store, accountStore accounts.Store) {
+func registerTestOnly(mux *http.ServeMux, sessions auth.Store, accountStore *accountsdynamo.Table) {
 	mux.HandleFunc("POST /testonly/session", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			// Subject stands in for what a provider would have verified.

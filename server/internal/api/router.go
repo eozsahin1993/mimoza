@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"mimoza-relay/internal/account/http/deleteaccount"
-	"mimoza-relay/internal/accounts"
+	"mimoza-relay/internal/accounts/deletion"
 	"mimoza-relay/internal/accounts/devices"
+	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/accounts/profile"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/auth/appleid"
@@ -52,9 +52,10 @@ type PushDeps struct {
 // in for a write one with nothing to catch it. PushDeps was already a
 // struct for the same reason; this finishes the job.
 type Deps struct {
-	// Accounts is who is signed in: profiles, devices, and the sign-ins
-	// that resolve to an account.
-	Accounts accounts.Store
+	// Accounts is the table every accounts slice builds its own store
+	// on, the same way Circles is: the slices share key shapes and the
+	// two reads other columns need, not a store type.
+	Accounts *accountsdynamo.Table
 	// Circles is the table every circles slice builds its own store on;
 	// the slices share key shapes and a few reads, not a store type.
 	Circles *dynamo.Table
@@ -126,18 +127,18 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// The account itself: its profile, its public key, its devices.
 	accountMux := http.NewServeMux()
 	profile.Register(accountMux, &profile.Service{
-		Store:   deps.Accounts,
+		Store:   profile.NewStore(deps.Accounts),
 		Circles: members.NewStore(deps.Circles),
 	}, readLimit, writeLimit)
-	devices.Register(accountMux, &devices.Service{Store: deps.Accounts}, writeLimit)
+	devices.Register(accountMux, &devices.Service{Store: devices.NewStore(deps.Accounts)}, writeLimit)
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 
-	deleteAccountService := &deleteaccount.Service{AuthStore: deps.Auth, Accounts: deps.Accounts}
+	deleteAccountService := &deletion.Service{AuthStore: deps.Auth, Store: deletion.NewStore(deps.Accounts)}
 	if deps.AppleID != nil {
 		deleteAccountService.RevokeApple = deps.AppleID.Revoke
 	}
-	deleteaccount.Register(mux, deleteAccountService, func(h http.Handler) http.Handler {
+	deletion.Register(mux, deleteAccountService, func(h http.Handler) http.Handler {
 		return auth.RequireSession(deps.Auth, h)
 	})
 

@@ -37,7 +37,6 @@ import (
 	awsssm "github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
-	"mimoza-relay/internal/accounts"
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
@@ -156,9 +155,10 @@ func loadConfig(t testing.TB) aws.Config {
 	return cfg
 }
 
-// NewAccountStore returns the accounts column against LocalStack: who
-// is signed in, their profile, and their devices.
-func NewAccountStore(t testing.TB) accounts.Store {
+// NewAccountTable returns the shared accounts table against LocalStack,
+// for the slices that build their stores on it. Shared across tests —
+// safe because each picks its own account.
+func NewAccountTable(t testing.TB) *accountsdynamo.Table {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -171,7 +171,7 @@ func NewAccountStore(t testing.TB) accounts.Store {
 		unreachable(t, "DynamoDB", accountsTableErr)
 	}
 
-	return accountsdynamo.New(client, shared.AccountsTableName)
+	return accountsdynamo.NewTable(client, shared.AccountsTableName)
 }
 
 // NewCircleTable returns the shared circles table against LocalStack,

@@ -8,18 +8,7 @@
 // every circle it belongs to.
 package accounts
 
-import (
-	"context"
-	"errors"
-	"time"
-)
-
-var (
-	ErrNotFound = errors.New("accounts: no such account")
-	// ErrProviderLinked means this sign-in already resolves to another
-	// account — linking it again would split one person in two.
-	ErrProviderLinked = errors.New("accounts: this sign-in belongs to another account")
-)
+import "time"
 
 // Profile is what other members see: a name, and a picture if there is
 // one. The public key is here too, since it is per account rather than
@@ -66,30 +55,4 @@ type Provider struct {
 	// code it comes from dies within minutes.
 	RefreshToken string
 	LinkedAt     time.Time
-}
-
-// Store is what the relay does with an account.
-type Store interface {
-	// Resolve finds the account a sign-in belongs to, minting one on
-	// first sight. The bool says which happened, so a caller can tell a
-	// returning person from a new one.
-	Resolve(ctx context.Context, provider Provider) (accountID string, created bool, err error)
-	GetProfile(ctx context.Context, accountID string) (Profile, error)
-	SetProfile(ctx context.Context, accountID, name, avatarKey string) error
-	SetPublicKey(ctx context.Context, accountID string, publicKey []byte) error
-
-	PutDevice(ctx context.Context, accountID string, device Device) error
-	DeleteDevice(ctx context.Context, accountID, deviceID string) error
-	ListDevices(ctx context.Context, accountID string) ([]Device, error)
-
-	Providers(ctx context.Context, accountID string) ([]Provider, error)
-	SaveRefreshToken(ctx context.Context, accountID, provider, subject, token string) error
-	Delete(ctx context.Context, accountID string) error
-}
-
-// Reader is the part other columns need: circles resolves a roster's
-// names and public keys through it, and push its devices.
-type Reader interface {
-	GetProfile(ctx context.Context, accountID string) (Profile, error)
-	ListDevices(ctx context.Context, accountID string) ([]Device, error)
 }

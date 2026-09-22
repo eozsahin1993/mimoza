@@ -33,6 +33,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"mimoza-relay/internal/accounts"
+	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/api"
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth"
@@ -63,7 +64,7 @@ type Relay struct {
 	// accounts is where an account id comes from, as it does for a real
 	// sign-in: minting a session against an id the accounts column never
 	// issued would leave a device with no profile.
-	accounts accounts.Store
+	accounts *accountsdynamo.Table
 }
 
 // Start builds a relay of this test's own and registers its teardown.
@@ -132,7 +133,14 @@ func (d *Device) AccountID() string { return d.accountID }
 // that requests carry a credential the relay accepts.
 func (r *Relay) SignIn() *Device {
 	r.t.Helper()
-	subject := Suffix()
+	return r.SignInAs(Suffix())
+}
+
+// SignInAs signs in as a particular person, which is what a returning
+// device is: the same provider subject twice must land on the account
+// the first sign-in minted, not a second one.
+func (r *Relay) SignInAs(subject string) *Device {
+	r.t.Helper()
 	d := &Device{relay: r, token: Suffix(), identity: NewAuthority(r.t)}
 
 	if r.sessions != nil {

@@ -57,16 +57,16 @@ func (s *Store) CreateCircle(ctx context.Context, circle circles.Circle, founder
 			{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:        dynamo.Str(dynamo.CirclePK(circle.ID)),
-					dynamoutil.SKAttr:        dynamo.Str(dynamo.MetaSK),
-					dynamo.AttrName:          dynamo.Str(circle.Name),
-					dynamo.AttrKeyVersion:    dynamo.Num(1),
-					dynamo.AttrRosterVersion: dynamo.Num(1),
-					dynamo.AttrMemberCount:   dynamo.Num(1),
-					dynamo.AttrAdminCount:    dynamo.Num(1),
-					dynamo.AttrLastEntryAt:   dynamo.Millis(now),
-					dynamo.AttrCreatedBy:     dynamo.Str(founder.AccountID),
-					dynamo.AttrCreatedAt:     dynamo.Millis(now),
+					dynamoutil.PKAttr:        dynamoutil.Str(dynamo.CirclePK(circle.ID)),
+					dynamoutil.SKAttr:        dynamoutil.Str(dynamo.MetaSK),
+					dynamo.AttrName:          dynamoutil.Str(circle.Name),
+					dynamo.AttrKeyVersion:    dynamoutil.Num(1),
+					dynamo.AttrRosterVersion: dynamoutil.Num(1),
+					dynamo.AttrMemberCount:   dynamoutil.Num(1),
+					dynamo.AttrAdminCount:    dynamoutil.Num(1),
+					dynamo.AttrLastEntryAt:   dynamoutil.Millis(now),
+					dynamo.AttrCreatedBy:     dynamoutil.Str(founder.AccountID),
+					dynamo.AttrCreatedAt:     dynamoutil.Millis(now),
 				},
 				ConditionExpression: aws.String("attribute_not_exists(pk)"),
 			}},
@@ -77,10 +77,10 @@ func (s *Store) CreateCircle(ctx context.Context, circle circles.Circle, founder
 			{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:    dynamo.Str(dynamo.CirclePK(circle.ID)),
-					dynamoutil.SKAttr:    dynamo.Str(dynamo.SealedKeyKey(founder.AccountID)),
+					dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circle.ID)),
+					dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(founder.AccountID)),
 					dynamo.AttrKeys:      dynamo.SealedKeysAttr(circles.SealedKeys{1: sealed}),
-					dynamo.AttrUpdatedAt: dynamo.Millis(now),
+					dynamo.AttrUpdatedAt: dynamoutil.Millis(now),
 				},
 			}},
 			{Put: &types.Put{
@@ -89,7 +89,7 @@ func (s *Store) CreateCircle(ctx context.Context, circle circles.Circle, founder
 			}},
 		},
 	})
-	if dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return circles.ErrAlreadyExists
 	}
 	return err
@@ -111,18 +111,18 @@ func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actor
 	if name != "" {
 		sets = append(sets, "#name = :name")
 		names["#name"] = dynamo.AttrName
-		values[":name"] = dynamo.Str(name)
+		values[":name"] = dynamoutil.Str(name)
 	}
 	if coverID != "" {
 		sets = append(sets, dynamo.AttrCoverID+" = :cover")
-		values[":cover"] = dynamo.Str(coverID)
+		values[":cover"] = dynamoutil.Str(coverID)
 	}
 
 	// lastEntryAt rides on this same update: a transaction cannot write
 	// one item twice, and a separate touch would be a second write to
 	// the circle's own row.
 	sets = append(sets, dynamo.AttrLastEntryAt+" = :now")
-	values[":now"] = dynamo.Millis(s.Now())
+	values[":now"] = dynamoutil.Millis(s.Now())
 
 	update := "SET " + sets[0]
 	for _, set := range sets[1:] {
@@ -150,7 +150,7 @@ func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actor
 	}
 
 	_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
-	if dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed {
+	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return circles.Circle{}, circles.ErrCircleNotFound
 	}
 	if err != nil {
@@ -171,7 +171,7 @@ func (s *Store) DeleteCircle(ctx context.Context, circleID string) error {
 	paginator := dynamodb.NewQueryPaginator(s.Client, &dynamodb.QueryInput{
 		TableName:                 aws.String(s.Name),
 		KeyConditionExpression:    aws.String("pk = :pk"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": dynamo.Str(dynamo.CirclePK(circleID))},
+		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": dynamoutil.Str(dynamo.CirclePK(circleID))},
 		ProjectionExpression:      aws.String("pk, sk"),
 	})
 	for paginator.HasMorePages() {
@@ -231,8 +231,8 @@ func (s *Store) inviteCodes(ctx context.Context, circleID string) ([]string, err
 		TableName:              aws.String(s.Name),
 		KeyConditionExpression: aws.String("pk = :pk AND begins_with(sk, :prefix)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     dynamo.Str(dynamo.CirclePK(circleID)),
-			":prefix": dynamo.Str(dynamo.InviteSK),
+			":pk":     dynamoutil.Str(dynamo.CirclePK(circleID)),
+			":prefix": dynamoutil.Str(dynamo.InviteSK),
 		},
 		ProjectionExpression: aws.String("sk"),
 	})
@@ -244,7 +244,7 @@ func (s *Store) inviteCodes(ctx context.Context, circleID string) ([]string, err
 			return nil, err
 		}
 		for _, item := range page.Items {
-			codes = append(codes, strings.TrimPrefix(dynamo.StringAt(item, dynamoutil.SKAttr), dynamo.InviteSK))
+			codes = append(codes, strings.TrimPrefix(dynamoutil.StringAt(item, dynamoutil.SKAttr), dynamo.InviteSK))
 		}
 	}
 	return codes, nil

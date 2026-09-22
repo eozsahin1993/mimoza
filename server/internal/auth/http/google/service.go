@@ -11,6 +11,13 @@ import (
 	"mimoza-relay/internal/auth/oidcverify"
 )
 
+// accountStore is the one thing sign-in needs from the accounts column:
+// which account this subject is. Declared here rather than taken whole,
+// so a change to any other account operation can't reach this far.
+type accountStore interface {
+	Resolve(ctx context.Context, provider accounts.Provider) (accountID string, created bool, err error)
+}
+
 type Service struct {
 	AuthStore auth.Store
 	Verifier  *oidcverify.Verifier
@@ -19,7 +26,7 @@ type Service struct {
 	// that id, not the id itself, so another sign-in method can be linked
 	// to the same account later without every circle it belongs to
 	// noticing.
-	Accounts accounts.Store
+	Accounts accountStore
 }
 
 // providerName names this sign-in method in the lookup that resolves it

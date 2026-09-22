@@ -105,7 +105,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	}
 
 	return api.Deps{
-		Accounts:        accountsdynamo.New(dynamo(), cfg.AccountsTableName),
+		Accounts:        accountsdynamo.NewTable(dynamo(), cfg.AccountsTableName),
 		Circles:         circlesdynamo.NewTable(dynamo(), cfg.CirclesTableName),
 		InviteRetention: time.Duration(cfg.InviteRetentionDays) * 24 * time.Hour,
 		Log:             logdynamodb.New(dynamo(), cfg.TableName),

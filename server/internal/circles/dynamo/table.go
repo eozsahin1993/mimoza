@@ -3,7 +3,6 @@ package dynamo
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -71,8 +70,8 @@ func ChildPrefix(postID string) string { return ChildSK + postID + "#" }
 
 func (t *Table) Key(pk, sk string) map[string]types.AttributeValue {
 	return map[string]types.AttributeValue{
-		dynamoutil.PKAttr: Str(pk),
-		dynamoutil.SKAttr: Str(sk),
+		dynamoutil.PKAttr: dynamoutil.Str(pk),
+		dynamoutil.SKAttr: dynamoutil.Str(sk),
 	}
 }
 
@@ -99,68 +98,6 @@ const (
 	AttrStatus        = "status"
 	AttrCircleID      = "circleId"
 )
-
-func Str(v string) types.AttributeValue { return &types.AttributeValueMemberS{Value: v} }
-
-func Num(v int64) types.AttributeValue {
-	return &types.AttributeValueMemberN{Value: strconv.FormatInt(v, 10)}
-}
-
-func Binary(v []byte) types.AttributeValue { return &types.AttributeValueMemberB{Value: v} }
-
-func Bool(v bool) types.AttributeValue { return &types.AttributeValueMemberBOOL{Value: v} }
-
-// Millis writes a time as an int64 of milliseconds, matching the
-// resolution the index keys sort on.
-func Millis(t time.Time) types.AttributeValue { return Num(t.UnixMilli()) }
-
-func TimeAt(item map[string]types.AttributeValue, attr string) time.Time {
-	v, err := dynamoutil.AttrInt(item, attr)
-	if err != nil || v == 0 {
-		return time.Time{}
-	}
-	return time.UnixMilli(v)
-}
-
-func IntAt(item map[string]types.AttributeValue, attr string) int64 {
-	v, _ := dynamoutil.AttrInt(item, attr)
-	return v
-}
-
-func StringAt(item map[string]types.AttributeValue, attr string) string {
-	v, _ := dynamoutil.AttrString(item, attr)
-	return v
-}
-
-func BoolAt(item map[string]types.AttributeValue, attr string) bool {
-	return dynamoutil.AttrBool(item, attr)
-}
-
-func BytesAt(item map[string]types.AttributeValue, attr string) []byte {
-	v, _ := dynamoutil.AttrBytes(item, attr)
-	return v
-}
-
-// ConditionFailed reports whether a write lost its condition — the row
-// already existed, or the value it was written against has moved.
-func ConditionFailed(err error) bool {
-	var failed *types.ConditionalCheckFailedException
-	return errors.As(err, &failed)
-}
-
-// CancelledFor returns the reason DynamoDB gave for the item at index i
-// of a transaction, or "" if the failure was not a cancellation. It is
-// what turns "the transaction failed" into which condition failed, so a
-// caller can tell a stale key version from a missing member.
-func CancelledFor(err error, i int) string {
-	var cancelled *types.TransactionCanceledException
-	if !errors.As(err, &cancelled) || i >= len(cancelled.CancellationReasons) {
-		return ""
-	}
-	return aws.ToString(cancelled.CancellationReasons[i].Code)
-}
-
-const ConditionalCheckFailed = "ConditionalCheckFailed"
 
 // Retryable reports whether every reason a transaction gave is
 // contention rather than a failed condition: worth another attempt,
