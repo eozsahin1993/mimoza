@@ -14,8 +14,7 @@ import (
 // applePKPrefix keeps these rows in their own key space inside whatever
 // table they share. They live in the accounts table, not the sessions
 // one, because sessions are TTL'd and these must outlive every session
-// the account ever has — but the account manifest is keyed on the bare
-// accountID, so the prefix is what stops the two colliding.
+// the account ever has.
 const applePKPrefix = "apple-refresh#"
 
 // The accounts table has a sort key; this row is alone in its partition,
@@ -23,9 +22,8 @@ const applePKPrefix = "apple-refresh#"
 const appleSK = "apple-refresh"
 
 // AppleCredentialStore implements auth.AppleCredentialStore against the
-// accounts table. Deliberately not folded into account.Store: what it
-// holds is a sign-in provider credential, which belongs to the auth
-// column even though it's account-keyed and shares that column's table.
+// accounts table. It holds a sign-in provider credential, so it belongs
+// to the auth column even though it is account-keyed.
 type AppleCredentialStore struct {
 	client    *dynamodb.Client
 	tableName string
