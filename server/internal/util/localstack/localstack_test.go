@@ -11,7 +11,7 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
-	circlesdynamodb "mimoza-relay/internal/circles/dynamodb"
+	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	"mimoza-relay/internal/util/localstack"
 )
 
@@ -48,9 +48,9 @@ func TestProvisionSet_CreatesTheNewTablesWithTheirKeysAndIndexes(t *testing.T) {
 		hash, rangeKey string
 		projection     ddbtypes.ProjectionType
 	}{
-		circlesdynamodb.ByTypeReceivedIndex: {"pk", circlesdynamodb.ByTypeReceivedKey, ddbtypes.ProjectionTypeAll},
-		circlesdynamodb.ByAccountIndex:      {circlesdynamodb.ByAccountPK, "sk", ddbtypes.ProjectionTypeKeysOnly},
-		circlesdynamodb.ByTypeUpdatedIndex:  {"pk", circlesdynamodb.ByTypeUpdatedKey, ddbtypes.ProjectionTypeAll},
+		circlesdynamo.ByTypeReceivedIndex: {"pk", circlesdynamo.ByTypeReceivedKey, ddbtypes.ProjectionTypeAll},
+		circlesdynamo.ByAccountIndex:      {circlesdynamo.ByAccountPK, "sk", ddbtypes.ProjectionTypeKeysOnly},
+		circlesdynamo.ByTypeUpdatedIndex:  {"pk", circlesdynamo.ByTypeUpdatedKey, ddbtypes.ProjectionTypeAll},
 	}
 	if len(circles.GlobalSecondaryIndexes) != len(want) {
 		t.Fatalf("circles table has %d indexes, want %d", len(circles.GlobalSecondaryIndexes), len(want))

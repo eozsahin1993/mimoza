@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -24,6 +25,7 @@ import (
 	"mimoza-relay/internal/push/fcm"
 
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	pushdynamodb "mimoza-relay/internal/push/dynamodb"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
@@ -102,15 +104,17 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	}
 
 	return api.Deps{
-		Log:        logdynamodb.New(dynamo(), cfg.TableName),
-		Blob:       blob,
-		Auth:       authdynamodb.New(dynamo(), cfg.SessionsTableName),
-		Invite:     invitedynamodb.New(dynamo(), cfg.InviteTableName, cfg.InviteRetentionDays),
-		WriteLimit: limit("write", cfg.RateLimitWriteMaxRequests),
-		ReadLimit:  limit("read", cfg.RateLimitReadMaxRequests),
-		Google:     oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb)),
-		Apple:      oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS)),
-		AppleID:    appleID,
+		Circles:         circlesdynamo.NewTable(dynamo(), cfg.CirclesTableName),
+		InviteRetention: time.Duration(cfg.InviteRetentionDays) * 24 * time.Hour,
+		Log:             logdynamodb.New(dynamo(), cfg.TableName),
+		Blob:            blob,
+		Auth:            authdynamodb.New(dynamo(), cfg.SessionsTableName),
+		Invite:          invitedynamodb.New(dynamo(), cfg.InviteTableName, cfg.InviteRetentionDays),
+		WriteLimit:      limit("write", cfg.RateLimitWriteMaxRequests),
+		ReadLimit:       limit("read", cfg.RateLimitReadMaxRequests),
+		Google:          oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb)),
+		Apple:           oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS)),
+		AppleID:         appleID,
 		// Shares the accounts table rather than taking one of its own —
 		// see auth/dynamodb's AppleCredentialStore for the key spacing.
 		AppleCredentials: authdynamodb.NewAppleCredentialStore(dynamo(), cfg.AccountsTableName),

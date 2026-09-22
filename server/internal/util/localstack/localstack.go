@@ -20,7 +20,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
-	circlesdynamodb "mimoza-relay/internal/circles/dynamodb"
+	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	"mimoza-relay/internal/config"
 	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 )
@@ -103,6 +103,7 @@ func RelayConfig(names config.Resources) config.Config {
 		RateLimitReadMaxRequests:  2000,
 		RateLimitPushMaxRequests:  500,
 		RateLimitWindowMinutes:    10,
+		InviteRetentionDays:       config.DefaultInviteRetentionDays,
 		// LocalStack doesn't resolve virtual-hosted-style bucket
 		// subdomains, so presigned URLs have to be path style.
 		S3ForcePathStyle: true,
@@ -245,9 +246,9 @@ func EnsureAccountIDIndex(ctx context.Context, client *awsdynamodb.Client, table
 // creation per UpdateTable call.
 func EnsureCircleIndexes(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
 	for _, idx := range []index{
-		{name: circlesdynamodb.ByTypeReceivedIndex, hash: "pk", rangeKey: circlesdynamodb.ByTypeReceivedKey, projection: ddbtypes.ProjectionTypeAll},
-		{name: circlesdynamodb.ByAccountIndex, hash: circlesdynamodb.ByAccountPK, rangeKey: "sk", projection: ddbtypes.ProjectionTypeKeysOnly},
-		{name: circlesdynamodb.ByTypeUpdatedIndex, hash: "pk", rangeKey: circlesdynamodb.ByTypeUpdatedKey, projection: ddbtypes.ProjectionTypeAll},
+		{name: circlesdynamo.ByTypeReceivedIndex, hash: "pk", rangeKey: circlesdynamo.ByTypeReceivedKey, projection: ddbtypes.ProjectionTypeAll},
+		{name: circlesdynamo.ByAccountIndex, hash: circlesdynamo.ByAccountPK, rangeKey: "sk", projection: ddbtypes.ProjectionTypeKeysOnly},
+		{name: circlesdynamo.ByTypeUpdatedIndex, hash: "pk", rangeKey: circlesdynamo.ByTypeUpdatedKey, projection: ddbtypes.ProjectionTypeAll},
 	} {
 		if err := ensureIndex(ctx, client, tableName, idx); err != nil {
 			return fmt.Errorf("%s: %w", idx.name, err)

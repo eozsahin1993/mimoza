@@ -5,7 +5,7 @@
 // in that index. What these tests are actually for is the claim the walk
 // rests on — a device that has caught up never misses an entry, however
 // the writes interleave.
-package dynamodb_test
+package dynamo_test
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
-	circlesdynamodb "mimoza-relay/internal/circles/dynamodb"
+	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	"mimoza-relay/internal/util/localstack"
 )
 
@@ -279,14 +279,14 @@ func putPost(ctx context.Context, ddb *awsdynamodb.Client, table, circle, postID
 	_, err := ddb.PutItem(ctx, &awsdynamodb.PutItemInput{
 		TableName: aws.String(table),
 		Item: map[string]ddbtypes.AttributeValue{
-			"pk":                              s(circle),
-			"sk":                              s("entry#" + postID),
-			"type":                            s("post"),
-			"receivedAt":                      n(at.UnixMilli()),
-			"updatedAt":                       n(at.UnixMilli()),
-			"commentCount":                    n(0),
-			circlesdynamodb.ByTypeReceivedKey: s(position{at: at, id: postID}.key("post")),
-			circlesdynamodb.ByTypeUpdatedKey:  s(position{at: at, id: postID}.key("post")),
+			"pk":                            s(circle),
+			"sk":                            s("entry#" + postID),
+			"type":                          s("post"),
+			"receivedAt":                    n(at.UnixMilli()),
+			"updatedAt":                     n(at.UnixMilli()),
+			"commentCount":                  n(0),
+			circlesdynamo.ByTypeReceivedKey: s(position{at: at, id: postID}.key("post")),
+			circlesdynamo.ByTypeUpdatedKey:  s(position{at: at, id: postID}.key("post")),
 		},
 		ConditionExpression: aws.String("attribute_not_exists(sk)"),
 	})
@@ -313,7 +313,7 @@ func comment(ctx context.Context, ddb *awsdynamodb.Client, table, circle, postID
 					TableName: aws.String(table),
 					Key:       map[string]ddbtypes.AttributeValue{"pk": s(circle), "sk": s("entry#" + postID)},
 					UpdateExpression: aws.String(
-						"ADD commentCount :one SET updatedAt = :at, " + circlesdynamodb.ByTypeUpdatedKey + " = :key",
+						"ADD commentCount :one SET updatedAt = :at, " + circlesdynamo.ByTypeUpdatedKey + " = :key",
 					),
 					ConditionExpression: aws.String("attribute_exists(sk) AND attribute_not_exists(deletedAt)"),
 					ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
@@ -361,8 +361,8 @@ func walk(ctx context.Context, t *testing.T, ddb *awsdynamodb.Client, table, cir
 	t.Helper()
 	out, err := ddb.Query(ctx, &awsdynamodb.QueryInput{
 		TableName:              aws.String(table),
-		IndexName:              aws.String(circlesdynamodb.ByTypeUpdatedIndex),
-		KeyConditionExpression: aws.String("pk = :pk AND " + circlesdynamodb.ByTypeUpdatedKey + " > :from"),
+		IndexName:              aws.String(circlesdynamo.ByTypeUpdatedIndex),
+		KeyConditionExpression: aws.String("pk = :pk AND " + circlesdynamo.ByTypeUpdatedKey + " > :from"),
 		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
 			":pk":   s(circle),
 			":from": s(from.key("post")),
@@ -539,8 +539,8 @@ func countPosts(ctx context.Context, t *testing.T, ddb *awsdynamodb.Client, tabl
 	for {
 		out, err := ddb.Query(ctx, &awsdynamodb.QueryInput{
 			TableName:              aws.String(table),
-			IndexName:              aws.String(circlesdynamodb.ByTypeReceivedIndex),
-			KeyConditionExpression: aws.String("pk = :pk AND begins_with(" + circlesdynamodb.ByTypeReceivedKey + ", :prefix)"),
+			IndexName:              aws.String(circlesdynamo.ByTypeReceivedIndex),
+			KeyConditionExpression: aws.String("pk = :pk AND begins_with(" + circlesdynamo.ByTypeReceivedKey + ", :prefix)"),
 			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
 				":pk":     s(circle),
 				":prefix": s("post#"),
@@ -565,8 +565,8 @@ func walkBackward(ctx context.Context, t *testing.T, ddb *awsdynamodb.Client, ta
 	t.Helper()
 	out, err := ddb.Query(ctx, &awsdynamodb.QueryInput{
 		TableName:              aws.String(table),
-		IndexName:              aws.String(circlesdynamodb.ByTypeReceivedIndex),
-		KeyConditionExpression: aws.String("pk = :pk AND begins_with(" + circlesdynamodb.ByTypeReceivedKey + ", :prefix)"),
+		IndexName:              aws.String(circlesdynamo.ByTypeReceivedIndex),
+		KeyConditionExpression: aws.String("pk = :pk AND begins_with(" + circlesdynamo.ByTypeReceivedKey + ", :prefix)"),
 		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
 			":pk":     s(circle),
 			":prefix": s("post#"),

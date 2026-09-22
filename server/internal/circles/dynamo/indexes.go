@@ -1,6 +1,6 @@
 // Package dynamodb is the circles column's DynamoDB adapter: one table,
 // one partition per circle.
-package dynamodb
+package dynamo
 
 // The circles table's three indexes, as provisioned by
 // server/provision/modules/storage/circles_table.tf. Each is sparse: only

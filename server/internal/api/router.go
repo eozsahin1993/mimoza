@@ -7,6 +7,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"mimoza-relay/internal/account/http/deleteaccount"
 	"mimoza-relay/internal/auth"
@@ -15,6 +16,14 @@ import (
 	"mimoza-relay/internal/auth/http/google"
 	"mimoza-relay/internal/auth/http/logout"
 	"mimoza-relay/internal/auth/oidcverify"
+	"mimoza-relay/internal/circles/circle"
+	"mimoza-relay/internal/circles/comments"
+	"mimoza-relay/internal/circles/dynamo"
+	circleinvites "mimoza-relay/internal/circles/invites"
+	"mimoza-relay/internal/circles/members"
+	"mimoza-relay/internal/circles/posts"
+	"mimoza-relay/internal/circles/reactions"
+	"mimoza-relay/internal/circles/requests"
 	"mimoza-relay/internal/invite"
 	invitehttp "mimoza-relay/internal/invite/http"
 	"mimoza-relay/internal/push"
@@ -54,10 +63,16 @@ type PushDeps struct {
 // in for a write one with nothing to catch it. PushDeps was already a
 // struct for the same reason; this finishes the job.
 type Deps struct {
-	Log    synclog.LogStore
-	Blob   synclog.BlobStore
-	Auth   auth.Store
-	Invite invite.Store
+	// Circles is the table every circles slice builds its own store on;
+	// the slices share key shapes and a few reads, not a store type.
+	Circles *dynamo.Table
+	// InviteRetention is how long a code, and an unanswered request under
+	// it, lasts.
+	InviteRetention time.Duration
+	Log             synclog.LogStore
+	Blob            synclog.BlobStore
+	Auth            auth.Store
+	Invite          invite.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.
 	WriteLimit ratelimit.Store
 	ReadLimit  ratelimit.Store
@@ -78,6 +93,11 @@ func NewRouter(deps Deps) *http.ServeMux {
 	// by whichever mux matched, and StripPrefix hands the inner one its own
 	// copy of the request — from out here every route would read "/v1/".
 	mux.Handle("/v1/", http.StripPrefix("/v1", httputil.LogRequests(newV1Mux(deps))))
+	// The relay-owned circles answer under their own prefix while the
+	// routes they replace still answer under /v1.
+	if deps.Circles != nil {
+		mux.Handle("/v2/", http.StripPrefix("/v2", httputil.LogRequests(newV2Mux(deps))))
+	}
 	return mux
 }
 
@@ -170,5 +190,32 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	apple.Register(mux, &apple.Service{AuthStore: deps.Auth, Verifier: deps.Apple, AppleID: deps.AppleID, Credentials: deps.AppleCredentials})
 	logout.Register(mux, &logout.Service{AuthStore: deps.Auth})
 
+	return mux
+}
+
+// newV2Mux is the relay-owned circles: one slice per resource, each
+// registering its own routes. Every route here takes a session, and the
+// same read and write budgets the v1 circle routes take.
+func newV2Mux(deps Deps) *http.ServeMux {
+	mux := http.NewServeMux()
+	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
+	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
+
+	slices := http.NewServeMux()
+	circle.Register(slices, &circle.Service{Store: circle.NewStore(deps.Circles)}, readLimit, writeLimit)
+	members.Register(slices, &members.Service{Store: members.NewStore(deps.Circles)}, readLimit, writeLimit)
+	posts.Register(slices, &posts.Service{Store: posts.NewStore(deps.Circles)}, readLimit, writeLimit)
+	comments.Register(slices, &comments.Service{Store: comments.NewStore(deps.Circles)}, writeLimit)
+	reactions.Register(slices, &reactions.Service{Store: reactions.NewStore(deps.Circles)}, writeLimit)
+	circleinvites.Register(slices, &circleinvites.Service{
+		Store:     circleinvites.NewStore(deps.Circles),
+		Retention: deps.InviteRetention,
+	}, readLimit, writeLimit)
+	requests.Register(slices, &requests.Service{
+		Store:     requests.NewStore(deps.Circles),
+		Retention: deps.InviteRetention,
+	}, readLimit, writeLimit)
+
+	mux.Handle("/", auth.RequireSession(deps.Auth, httputil.LogRoutes(slices)))
 	return mux
 }
