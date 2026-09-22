@@ -75,6 +75,7 @@ data "aws_iam_policy_document" "lambda_storage_access" {
         var.storage.table_arn,
         var.storage.sessions_table_arn,
         var.storage.accounts_table_arn,
+        var.storage.circles_table_arn,
         var.storage.invite_table_arn,
         var.storage.rate_limit_table_arn,
         var.storage.push_table_arn,

@@ -37,8 +37,6 @@ import (
 	awsssm "github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
-	"mimoza-relay/internal/account"
-	manifestdynamodb "mimoza-relay/internal/account/dynamodb"
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
 	"mimoza-relay/internal/config"
@@ -58,14 +56,14 @@ import (
 // Resource names and schemas come from internal/util/localstack, which
 // cmd/testrelay uses too — one definition, so a table this suite creates
 // can't differ in shape from the one the relay is served against.
-const (
-	tableName          = localstack.LogTable
-	bucketName         = localstack.BlobBucket
-	sessionsTableName  = localstack.SessionsTable
-	accountsTableName  = localstack.AccountsTable
-	inviteTableName    = localstack.InviteTable
-	rateLimitTableName = localstack.RateLimitTable
-	pushTableName      = localstack.PushTable
+var (
+	shared             = localstack.Shared()
+	tableName          = shared.TableName
+	bucketName         = shared.BucketName
+	sessionsTableName  = shared.SessionsTableName
+	inviteTableName    = shared.InviteTableName
+	rateLimitTableName = shared.RateLimitTableName
+	pushTableName      = shared.PushTableName
 )
 
 var (
@@ -77,9 +75,6 @@ var (
 
 	sessionsTableOnce sync.Once
 	sessionsTableErr  error
-
-	accountsTableOnce sync.Once
-	accountsTableErr  error
 
 	inviteTableOnce sync.Once
 	inviteTableErr  error
@@ -287,26 +282,6 @@ func NewAuthStore(t testing.TB) auth.Store {
 	}
 
 	return authdynamodb.New(client, sessionsTableName)
-}
-
-// NewManifestStore returns a real dynamodb-backed account.Store
-// against LocalStack, creating the accounts table once per test binary
-// run — a genuinely separate table from sessions (see
-// server/provision/modules/storage/accounts_table.tf).
-func NewManifestStore(t testing.TB) account.Store {
-	t.Helper()
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-
-	accountsTableOnce.Do(func() {
-		accountsTableErr = localstack.CreateTable(context.Background(), client, accountsTableName, localstack.HashOnly)
-	})
-	if accountsTableErr != nil {
-		unreachable(t, "DynamoDB", accountsTableErr)
-	}
-
-	return manifestdynamodb.New(client, accountsTableName)
 }
 
 // NewInviteStore returns a real dynamodb-backed invite.Store

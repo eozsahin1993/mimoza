@@ -4,8 +4,6 @@
 package api_test
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +11,7 @@ import (
 	"mimoza-relay/internal/util/testsupport"
 )
 
-func TestEndToEnd_DeleteAccount_RemovesTheManifestAndRevokesTheSession(t *testing.T) {
+func TestEndToEnd_DeleteAccount_RevokesTheSession(t *testing.T) {
 	mux, google, _ := testsupport.NewRouterWithAuth(t)
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -23,40 +21,25 @@ func TestEndToEnd_DeleteAccount_RemovesTheManifestAndRevokesTheSession(t *testin
 	claims["iss"] = google.Issuer
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
-	blob := base64.StdEncoding.EncodeToString([]byte("pretend-encrypted-circle-list"))
-	putResp := authedRequest(t, http.MethodPut, server.URL+"/v1/account/manifest", token, `{"blob":"`+blob+`"}`)
-	putResp.Body.Close()
-
 	deleteResp := authedRequest(t, http.MethodDelete, server.URL+"/v1/account", token, "")
-	defer deleteResp.Body.Close()
+	deleteResp.Body.Close()
 	if deleteResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from DELETE, got %d", deleteResp.StatusCode)
 	}
 
 	// The session died with the account.
-	afterResp := authedRequest(t, http.MethodGet, server.URL+"/v1/account/manifest", token, "")
+	afterResp := authedRequest(t, http.MethodDelete, server.URL+"/v1/account", token, "")
 	defer afterResp.Body.Close()
 	if afterResp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 after account deletion, got %d", afterResp.StatusCode)
 	}
 
-	// A fresh sign-in with the same identity starts blank — the manifest
-	// really is gone, not just unreachable. Same sub: accountID is
-	// "google:<sub>", and validClaims mints a unique one per call.
+	// Signing in again with the same identity still works.
 	claims2 := validClaims(t, email, testsupport.TestGoogleClientID)
 	claims2["iss"] = google.Issuer
 	claims2["sub"] = claims["sub"]
-	token2 := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims2)))
-	getResp := authedRequest(t, http.MethodGet, server.URL+"/v1/account/manifest", token2, "")
-	defer getResp.Body.Close()
-	var body struct {
-		Blob *string `json:"blob"`
-	}
-	if err := json.NewDecoder(getResp.Body).Decode(&body); err != nil {
-		t.Fatal(err)
-	}
-	if body.Blob != nil {
-		t.Fatalf("expected a null blob after account deletion, got %q", *body.Blob)
+	if token2 := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims2))); token2 == "" {
+		t.Fatal("expected a session from signing in again")
 	}
 }
 
@@ -84,7 +67,7 @@ func TestEndToEnd_DeleteAccount_RevokesEveryDevicesSession(t *testing.T) {
 		t.Fatalf("expected 200 from DELETE, got %d", deleteResp.StatusCode)
 	}
 
-	bResp := authedRequest(t, http.MethodGet, server.URL+"/v1/account/manifest", deviceB, "")
+	bResp := authedRequest(t, http.MethodDelete, server.URL+"/v1/account", deviceB, "")
 	defer bResp.Body.Close()
 	if bResp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected device B's session to be revoked too, got %d", bResp.StatusCode)

@@ -1,23 +1,20 @@
 // Package deleteaccount is the vertical slice for DELETE /account — the
 // final relay call an account ever makes. Revokes the Sign in with Apple
-// grant behind the account if there is one, deletes the manifest (the one
-// piece of account-keyed storage) and revokes every session for the
-// account, not just the one making this call — another signed-in device
-// must not be able to outlive the account it belonged to.
+// grant behind the account if there is one, and revokes every session for
+// the account, not just the one making this call — another signed-in
+// device must not be able to outlive the account it belonged to.
 package deleteaccount
 
 import (
 	"context"
 	"log/slog"
 
-	"mimoza-relay/internal/account"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/auth/appleid"
 )
 
 type Service struct {
-	ManifestStore account.Store
-	AuthStore     auth.Store
+	AuthStore auth.Store
 	// AppleCredentials and RevokeApple are both nil unless this
 	// environment has a Sign in with Apple key configured — see
 	// appleid.NewClient. Deletion works either way.
@@ -25,16 +22,10 @@ type Service struct {
 	RevokeApple      func(ctx context.Context, refreshToken string) error
 }
 
-// Delete revokes Apple first (it needs the credential row that the rest
-// of this then removes), manifest second, sessions last — reversed, a
-// failure between the last two would leave a signed-out account whose
-// manifest survives with no session left to retry the delete under.
+// Delete revokes Apple first, since it needs the credential row that the
+// rest of this then removes, and drops every session last.
 func (s *Service) Delete(ctx context.Context, accountID string) error {
 	s.revokeAppleGrant(ctx, accountID)
-
-	if err := s.ManifestStore.DeleteManifest(ctx, accountID); err != nil {
-		return err
-	}
 	return s.AuthStore.DeleteAllSessions(ctx, accountID)
 }
 

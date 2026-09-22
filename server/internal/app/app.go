@@ -23,7 +23,6 @@ import (
 	"mimoza-relay/internal/push/apns"
 	"mimoza-relay/internal/push/fcm"
 
-	manifestdynamodb "mimoza-relay/internal/account/dynamodb"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	pushdynamodb "mimoza-relay/internal/push/dynamodb"
@@ -106,7 +105,6 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		Log:        logdynamodb.New(dynamo(), cfg.TableName),
 		Blob:       blob,
 		Auth:       authdynamodb.New(dynamo(), cfg.SessionsTableName),
-		Manifest:   manifestdynamodb.New(dynamo(), cfg.AccountsTableName),
 		Invite:     invitedynamodb.New(dynamo(), cfg.InviteTableName, cfg.InviteRetentionDays),
 		WriteLimit: limit("write", cfg.RateLimitWriteMaxRequests),
 		ReadLimit:  limit("read", cfg.RateLimitReadMaxRequests),

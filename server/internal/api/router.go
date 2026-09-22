@@ -8,9 +8,7 @@ package api
 import (
 	"net/http"
 
-	"mimoza-relay/internal/account"
 	"mimoza-relay/internal/account/http/deleteaccount"
-	"mimoza-relay/internal/account/http/manifest"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/http/apple"
@@ -56,11 +54,10 @@ type PushDeps struct {
 // in for a write one with nothing to catch it. PushDeps was already a
 // struct for the same reason; this finishes the job.
 type Deps struct {
-	Log      synclog.LogStore
-	Blob     synclog.BlobStore
-	Auth     auth.Store
-	Manifest account.Store
-	Invite   invite.Store
+	Log    synclog.LogStore
+	Blob   synclog.BlobStore
+	Auth   auth.Store
+	Invite invite.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.
 	WriteLimit ratelimit.Store
 	ReadLimit  ratelimit.Store
@@ -119,12 +116,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, httputil.LogRoutes(circleMux)))
 
-	// Account-scoped, not circle-scoped — its own sub-mux, same
-	// RequireSession wrapping as circleMux above.
-	accountMux := http.NewServeMux()
-	manifest.Register(accountMux, &manifest.Service{ManifestStore: deps.Manifest})
-	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
-	deleteAccountService := &deleteaccount.Service{ManifestStore: deps.Manifest, AuthStore: deps.Auth}
+	deleteAccountService := &deleteaccount.Service{AuthStore: deps.Auth}
 	if deps.AppleID != nil {
 		deleteAccountService.AppleCredentials = deps.AppleCredentials
 		deleteAccountService.RevokeApple = deps.AppleID.Revoke
