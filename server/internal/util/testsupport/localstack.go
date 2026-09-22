@@ -39,6 +39,7 @@ import (
 
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	"mimoza-relay/internal/circles/dynamo"
 	"mimoza-relay/internal/config"
 	"mimoza-relay/internal/invite"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
@@ -67,6 +68,9 @@ var (
 )
 
 var (
+	circlesTableOnce sync.Once
+	circlesTableErr  error
+
 	tableOnce sync.Once
 	tableErr  error
 
@@ -145,6 +149,35 @@ func loadConfig(t testing.TB) aws.Config {
 		t.Fatalf("failed to load AWS config: %v", err)
 	}
 	return cfg
+}
+
+// NewCircleTable returns the shared circles table against LocalStack,
+// with its indexes, for the slices that build their stores on it. Shared
+// across tests — safe because each picks its own circle id.
+func NewCircleTable(t testing.TB) *dynamo.Table {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
+	})
+
+	circlesTableOnce.Do(func() {
+		circlesTableErr = localstack.CreateTable(context.Background(), client, shared.CirclesTableName, localstack.WithSortKey)
+		if circlesTableErr == nil {
+			circlesTableErr = localstack.EnsureCircleIndexes(context.Background(), client, shared.CirclesTableName)
+		}
+	})
+	if circlesTableErr != nil {
+		unreachable(t, "DynamoDB", circlesTableErr)
+	}
+
+	return dynamo.NewTable(client, shared.CirclesTableName)
+}
+
+// UniqueCircleID keeps one test's circle out of every other test's way,
+// the shared table being shared.
+func UniqueCircleID(t testing.TB) string {
+	t.Helper()
+	return fmt.Sprintf("circle-%s-%d", t.Name(), time.Now().UnixNano())
 }
 
 // NewLogStore returns a real dynamodb-backed LogStore against LocalStack,

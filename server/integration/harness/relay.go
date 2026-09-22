@@ -110,10 +110,17 @@ func unreachable(t *testing.T, err error) {
 // Device is one caller of the relay. Named for what it is on the relay's
 // side: an account with a session, holding no circle state of its own.
 type Device struct {
-	relay    *Relay
-	token    string
-	identity Authority
+	relay *Relay
+	token string
+	// accountID is what the relay knows this device by — the value a
+	// response carries as an author, a member or a recipient.
+	accountID string
+	identity  Authority
 }
+
+// AccountID is who the relay thinks this device is, for assertions about
+// authorship and membership.
+func (d *Device) AccountID() string { return d.accountID }
 
 // SignIn mints a session for a fresh account, skipping Google and Apple.
 // Provider verification is internal/api's business; what matters here is
@@ -121,7 +128,7 @@ type Device struct {
 func (r *Relay) SignIn() *Device {
 	r.t.Helper()
 	accountID := "test:" + Suffix()
-	d := &Device{relay: r, token: Suffix(), identity: NewAuthority(r.t)}
+	d := &Device{relay: r, token: Suffix(), accountID: accountID, identity: NewAuthority(r.t)}
 
 	if r.sessions != nil {
 		session := auth.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
@@ -152,10 +159,11 @@ func (r *Relay) Anon() *Device {
 // "invalid request body".
 type Body map[string]any
 
-func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
-func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodPut, path, b) }
-func (d *Device) Post(path string, b Body) Response { return d.send(http.MethodPost, path, b) }
-func (d *Device) Delete(path string) Response       { return d.send(http.MethodDelete, path, nil) }
+func (d *Device) Get(path string) Response           { return d.send(http.MethodGet, path, nil) }
+func (d *Device) Put(path string, b Body) Response   { return d.send(http.MethodPut, path, b) }
+func (d *Device) Patch(path string, b Body) Response { return d.send(http.MethodPatch, path, b) }
+func (d *Device) Post(path string, b Body) Response  { return d.send(http.MethodPost, path, b) }
+func (d *Device) Delete(path string) Response        { return d.send(http.MethodDelete, path, nil) }
 
 // PostRequest sends a struct rather than a Body — for the endpoints this
 // package models field for field (see circle.go), where a map would drop

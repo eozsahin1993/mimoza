@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,7 +21,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
-	circlesdynamodb "mimoza-relay/internal/circles/dynamodb"
+	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	"mimoza-relay/internal/config"
 	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 )
@@ -103,6 +104,7 @@ func RelayConfig(names config.Resources) config.Config {
 		RateLimitReadMaxRequests:  2000,
 		RateLimitPushMaxRequests:  500,
 		RateLimitWindowMinutes:    10,
+		InviteRetentionDays:       config.DefaultInviteRetentionDays,
 		// LocalStack doesn't resolve virtual-hosted-style bucket
 		// subdomains, so presigned URLs have to be path style.
 		S3ForcePathStyle: true,
@@ -245,9 +247,9 @@ func EnsureAccountIDIndex(ctx context.Context, client *awsdynamodb.Client, table
 // creation per UpdateTable call.
 func EnsureCircleIndexes(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
 	for _, idx := range []index{
-		{name: circlesdynamodb.ByTypeReceivedIndex, hash: "pk", rangeKey: circlesdynamodb.ByTypeReceivedKey, projection: ddbtypes.ProjectionTypeAll},
-		{name: circlesdynamodb.ByAccountIndex, hash: circlesdynamodb.ByAccountPK, rangeKey: "sk", projection: ddbtypes.ProjectionTypeKeysOnly},
-		{name: circlesdynamodb.ByTypeUpdatedIndex, hash: "pk", rangeKey: circlesdynamodb.ByTypeUpdatedKey, projection: ddbtypes.ProjectionTypeAll},
+		{name: circlesdynamo.ByTypeReceivedIndex, hash: circlesdynamo.ByTypeReceivedPK, rangeKey: circlesdynamo.ByTypeReceivedKey, projection: ddbtypes.ProjectionTypeAll},
+		{name: circlesdynamo.ByAccountIndex, hash: circlesdynamo.ByAccountPK, rangeKey: "sk", projection: ddbtypes.ProjectionTypeKeysOnly},
+		{name: circlesdynamo.ByTypeUpdatedIndex, hash: circlesdynamo.ByTypeUpdatedPK, rangeKey: circlesdynamo.ByTypeUpdatedKey, projection: ddbtypes.ProjectionTypeAll},
 	} {
 		if err := ensureIndex(ctx, client, tableName, idx); err != nil {
 			return fmt.Errorf("%s: %w", idx.name, err)
@@ -274,9 +276,17 @@ func ensureIndex(ctx context.Context, client *awsdynamodb.Client, tableName stri
 		return err
 	}
 	for _, gsi := range describe.Table.GlobalSecondaryIndexes {
-		if aws.ToString(gsi.IndexName) == indexName {
-			return nil
+		if aws.ToString(gsi.IndexName) != indexName {
+			continue
 		}
+		// Same name, different keys: a LocalStack that outlived a schema
+		// change, which would otherwise hand tests an index they cannot
+		// query the way the code does.
+		if hash, rangeKey := indexKeys(gsi); hash != idx.hash || rangeKey != idx.rangeKey {
+			return fmt.Errorf("%s exists on %s keyed (%s, %s), want (%s, %s); delete the table or restart LocalStack",
+				indexName, tableName, hash, rangeKey, idx.hash, idx.rangeKey)
+		}
+		return nil
 	}
 
 	keys := []ddbtypes.KeySchemaElement{{AttributeName: aws.String(idx.hash), KeyType: ddbtypes.KeyTypeHash}}
@@ -300,11 +310,15 @@ func ensureIndex(ctx context.Context, client *awsdynamodb.Client, tableName stri
 		},
 	})
 	if err != nil {
+		// Two test binaries provisioning the shared table at once: one
+		// wins, and the other is told so — as ResourceInUse for the
+		// table, but as a plain ValidationException for an index, which
+		// is why the message is checked as well as the type.
 		var inUse *ddbtypes.ResourceInUseException
-		if !errors.As(err, &inUse) {
+		if !errors.As(err, &inUse) && !strings.Contains(err.Error(), "already exists") {
 			return err
 		}
-		// Racing test binary already adding it — fall through to the poll.
+		// Fall through to the poll: the index is on its way.
 	}
 
 	// No SDK waiter for GSI-active like NewTableExistsWaiter — poll directly.
@@ -338,4 +352,18 @@ func CreateBucket(ctx context.Context, client *awss3.Client, name string) error 
 		return err
 	}
 	return nil
+}
+
+// indexKeys reads an index's hash and range attributes, the range empty
+// for a hash-only index.
+func indexKeys(gsi ddbtypes.GlobalSecondaryIndexDescription) (hash, rangeKey string) {
+	for _, element := range gsi.KeySchema {
+		switch element.KeyType {
+		case ddbtypes.KeyTypeHash:
+			hash = aws.ToString(element.AttributeName)
+		case ddbtypes.KeyTypeRange:
+			rangeKey = aws.ToString(element.AttributeName)
+		}
+	}
+	return hash, rangeKey
 }

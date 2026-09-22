@@ -1,8 +1,10 @@
 # Relay design
 
-Status: **being built.** The relay running today is described by
-`SYNC_DESIGN.md`, `PUSH_DESIGN.md`, `INVITE_FLOW.md` and
-`ACCOUNT_RECOVERY.md`; this document replaces them once built.
+Status: **being built.** The circles half is built and answers under
+`/v1`, replacing the routes `SYNC_DESIGN.md` and `INVITE_FLOW.md`
+describe. Accounts, push and blobs are still as `PUSH_DESIGN.md` and
+`ACCOUNT_RECOVERY.md` describe them; this document replaces those two as
+they land.
 
 The relay owns accounts, circles, membership, roles, devices and invites
 in plaintext. Content is end-to-end encrypted: photos, captions, comments,
@@ -64,18 +66,20 @@ through the `lookup` row.
 
 | pk | sk | attributes |
 |---|---|---|
-| `circle#<id>` | `meta` | name, coverId, keyVersion, rosterVersion, lastEntryAt, createdBy, createdAt |
+| `circle#<id>` | `meta` | name, coverId, keyVersion, rosterVersion, memberCount, lastEntryAt, createdBy, createdAt |
 | `circle#<id>` | `member#<accountId>` | accountId, role `admin\|member`, notifyLevel, needsRewrap, joinedAt |
 | `circle#<id>` | `key#<accountId>` | keys `{ "<v>": sealedKey }`, updatedAt |
 | `circle#<id>` | `invite#<code>` | createdBy, createdAt, expiresAt |
-| `circle#<id>` | `request#<requestId>` | accountId, pubkey, status `pending\|approved\|denied`, createdAt, expiresAt |
-| `circle#<id>` | `entry#<postId>` | type `post`, authorId, keyVersion, ciphertext, hasBlob, visibility, commentCount, reactionCounts `{ tag: n }`, recentComments, receivedAt, updatedAt, deletedAt, typeReceivedKey, typeUpdatedKey |
-| `circle#<id>` | `entry#<activityId>` | type `activity`, event, actorId, subjectId, subjectName, receivedAt, typeReceivedKey |
+| `circle#<id>` | `request#<requestId>` | requesterId, publicKey, status `pending\|approved\|denied`, createdAt, expiresAt. Named requesterId, not accountId, so a pending ask stays out of the by-account index, which answers membership |
+| `circle#<id>` | `entry#<postId>` | type `post`, authorId, keyVersion, ciphertext, hasBlob, visibility, commentCount, reactionCounts `{ tag: n }`, reactors `{ accountId: tag }`, commenters `{ accountId: true }`, recentComments, receivedAt, updatedAt, deletedAt, typeReceivedKey, typeUpdatedKey |
+| `circle#<id>` | `entry#<activityId>` | type `activity`, event, authorId (who did it), subjectId, subjectName, receivedAt, typeReceivedKey |
 | `circle#<id>` | `child#<postId>#comment#<commentId>` | authorId, parentCommentId, keyVersion, ciphertext, receivedAt, deletedAt |
 | `circle#<id>` | `child#<postId>#reaction#<accountId>` | tag, keyVersion, ciphertext, receivedAt |
-| `invite#<code>` | `meta` | circleId |
+| `invite#<code>` | `meta` | circleId, createdBy, createdAt, expiresAt |
 
 - `recentComments` is the newest N comments, `{commentId, authorId, keyVersion, ciphertext, receivedAt}`, N a relay constant.
+- `reactors` and `commenters` are what a card says about **you**: your reaction's tag, and whether you have commented. Bounded by the member cap, and a read projects only the caller's own entry, so a page of 200 posts carries 200 tags rather than every reactor in the circle. They also mean neither answer costs a second read.
+- `memberCount` exists so the member cap is a condition on the write rather than a count read beforehand, which two admins approving at once would both pass.
 - `needsRewrap` means the member replaced their keypair and their `key#` item is unreadable until another member re-seals it.
 - Activity events: `created`, `joined`, `left`, `removed`, `account_deleted`, `promoted`, `demoted`, `renamed`, `cover_changed`. The relay writes each one in the same transaction as the change it records.
 - Invites and requests carry `expiresAt`; nothing else expires.
@@ -108,8 +112,14 @@ outlives it.
 | react / unreact | read own slot; one transaction: put or delete the slot conditioned on what was read, `ADD` −1/+1 on the old and new tag |
 | delete post | strip ciphertext, set `deletedAt` and `updatedAt`, delete the blob |
 | approve join | one transaction: `member#`, the joiner's `key#` with every version, `rosterVersion + 1`, request approved, `activity{joined}` |
-| kick | one transaction: delete `member#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1}` conditioned on the version read, `activity{removed}` |
-| leave, role change, rename, cover | row update with an admin check, `rosterVersion + 1` where membership changes, matching activity |
+| kick | one transaction: delete `member#` and the leaver's `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read, `activity{removed}` |
+| leave | delete own `member#` and `key#`, `meta{rosterVersion + 1, memberCount − 1}`, `activity{left}`. No rotation: a leaver must not be able to churn everyone's keys |
+| role change, rename, cover | row update with an admin check, `rosterVersion + 1` where membership changes, matching activity. A request that sets both a name and a cover records both |
+| notification level | the member's own row, no activity — nobody else needs to know — but `rosterVersion + 1`, so that account's other devices refetch |
+| visibility, delete post, delete comment | see Reads: each stamps `updatedAt` and the forward index key, so the change reaches every device through the walk |
+| delete circle | every row in the partition, in batches, plus the lookup row each invite code owns |
+
+Every write moves `meta.lastEntryAt`, activity included, so a device can skip a circle where nothing has happened.
 
 **`recentComments` at N = 1** is a plain `SET` of the new comment, so
 concurrent comments resolve to whichever transaction commits last, which
@@ -134,9 +144,13 @@ replace its local copy at once.
 ## Reads
 
 ```
-GET /me
-  → profile, and per circle: name, role, keyVersion, rosterVersion,
-    lastEntryAt, notifyLevel, needsRewrap; pending join requests
+GET /circles
+  → per circle: name, role, keyVersion, rosterVersion, lastEntryAt,
+    notifyLevel, needsRewrap; and this account's pending join requests
+
+GET /account
+  → the caller's own profile. No account id in the path: the session is
+    what says whose it is, and it is the only one they may read
 
 GET /circles/{id}/roster
   → rosterVersion, members [accountId, name, avatarKey, pubkey, role,
@@ -149,9 +163,10 @@ GET /circles/{id}/entries/{postId}/children
   → comments, reactions
 ```
 
-A post entry in a page carries its counts, `recentComments` and the
-caller's own reaction, so the feed renders from posts alone. Comments and
-reactions beyond that are fetched when a post is opened.
+A post entry in a page carries its counts, `recentComments`, and what the
+caller themselves did — `myTag` and `iCommented`, projected from the two
+maps above — so the feed renders from posts alone. Comments and reactions
+beyond that are fetched when a post is opened.
 
 **Cursor.** `base64url({v, type, t, id, d: fwd|back, cont})`, read only
 by the relay. Every page is one Query for the next 200 rows after a
@@ -161,20 +176,38 @@ position in an index:
 |---|---|---|
 | posts forward | `by-type-updated`, ascending | `t#id` exactly when continuing a page run; `t − 30 s` at the start of a sync |
 | posts backward | `by-type-received`, descending | `t#id` |
-| activity | `by-type-received`, either direction | as above |
+| activity | `by-type-received`, either direction | as above, and a forward walk rewinds the same 30 s: an activity row cannot change, but it can still land behind a cursor |
+
+A page hands back two cursors, and each takes the entry that is last in
+**its own** index — the greatest `updatedAt` for forward, the smallest
+`receivedAt` for backward — not the last row of the page, which is only
+ordered by whichever index that read happened to use.
 
 The 30-second step back at the start of a sync covers a write that landed
 late or an index that lagged; the device ignores entries it already
 holds. A post's `updatedAt` only moves forward, so a changed post
 re-enters the walk ahead of the cursor rather than behind it.
 
-**That rewind is an optimization, not the completeness guarantee.** Index
-propagation is asynchronous and has no documented bound, so a write can
-surface after any fixed window. `meta.lastEntryAt` is what closes it: it
-is written in the same transaction as the entry and read straight from
-the table, so a device that finishes a walk holding a `receivedAt` older
-than `lastEntryAt` knows it is missing something, and re-walks from
-before that point rather than trusting its cursor.
+**That rewind is a window, and a window can always be beaten.** A write
+can land behind it — the handler stamps a post before the write commits,
+so a slow write commits after a faster one with an earlier stamp, and
+index propagation has no documented bound either. Measured on a burst of
+20 concurrent posts, a walk that never rewinds missed 9 of them, and the
+rewind recovered every one (`spike_test.go`).
+
+What catches the rest is a count, not a wider window:
+
+```
+GET /circles/{id}/entries?type=post&count=1  → { count }
+```
+
+The device compares it with the posts it holds. Both sides are read
+through the same index, so a post that has not propagated yet is missing
+from both and raises no false alarm; once it propagates the counts
+disagree, and the device pages **backward** through `by-type-received`,
+where a key never moves, until the two agree again. `lastEntryAt` is only
+a hint that something happened at all, since a late write stamps an
+older time than one already seen.
 
 ## Push
 
@@ -194,7 +227,7 @@ so members' devices sync.
 
 ## New device
 
-- With the keypair in the synced keychain: sign in, `/me`, fetch rosters, open sealed keys.
+- With the keypair in the synced keychain: sign in, list the circles, fetch rosters, open sealed keys.
 - Without it: the device makes a new keypair and sends it with `reset`. The relay marks every membership `needsRewrap` and pushes the other members silently. The first member device to sync seals every version it holds to the new pubkey; the relay stores it and clears the flag.
 
 A relay that swapped in its own pubkey could have a member seal keys to
