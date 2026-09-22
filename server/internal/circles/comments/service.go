@@ -56,6 +56,10 @@ func (s *Service) Delete(ctx context.Context, circleID, postID, commentID, accou
 		if comment.AuthorID != accountID && !member.IsAdmin() {
 			return circles.Entry{}, circles.ErrNotTheAuthor
 		}
+		if !comment.DeletedAt.IsZero() {
+			// Already gone: hand back the post rather than deleting twice.
+			return s.Store.GetPost(ctx, circleID, postID, "")
+		}
 		return s.Store.DeleteComment(ctx, circleID, postID, commentID)
 	}
 	return circles.Entry{}, circles.ErrEntryNotFound

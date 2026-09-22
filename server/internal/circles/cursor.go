@@ -112,11 +112,13 @@ func ParseCursor(encoded, entryType string) (Cursor, error) {
 // read after (forward) or before (backward). A cursor that is not
 // continuing a page run is the start of a sync, so it rewinds.
 func (c Cursor) Position() string {
-	at := c.At
 	if c.Direction == Forward && !c.Continuing {
-		at = at.Add(-Rewind)
+		// The id breaks ties at c.At, and means nothing at an earlier
+		// time: carrying it would exclude entries at exactly the rewound
+		// moment whose ids sort below it.
+		return IndexKey(c.Type, c.At.Add(-Rewind), "")
 	}
-	return IndexKey(c.Type, at, c.ID)
+	return IndexKey(c.Type, c.At, c.ID)
 }
 
 // IndexKey is the sort key of both entry indexes: the type, the time

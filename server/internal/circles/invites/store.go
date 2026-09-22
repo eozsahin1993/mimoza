@@ -129,11 +129,19 @@ func (s *Store) RevokeInvite(ctx context.Context, circleID, code string) error {
 				TableName: aws.String(s.Name),
 				Key:       s.Key(dynamo.CirclePK(circleID), dynamo.InviteKey(code)),
 			}},
+			// Keyed by the code alone, so without this an admin of one
+			// circle could revoke another circle's code by sending it.
 			{Delete: &types.Delete{
-				TableName: aws.String(s.Name),
-				Key:       s.Key(dynamo.InvitePK(code), dynamo.MetaSK),
+				TableName:                 aws.String(s.Name),
+				Key:                       s.Key(dynamo.InvitePK(code), dynamo.MetaSK),
+				ConditionExpression:       aws.String(dynamo.AttrCircleID + " = :circleId"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{":circleId": dynamo.Str(circleID)},
 			}},
 		},
 	})
+	if dynamo.CancelledFor(err, 1) == dynamo.ConditionalCheckFailed {
+		// The code belongs to another circle, or is already gone.
+		return circles.ErrInviteNotFound
+	}
 	return err
 }

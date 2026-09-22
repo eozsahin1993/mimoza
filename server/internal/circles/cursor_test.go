@@ -61,8 +61,10 @@ func TestParseCursor_RejectsWhatItCannotTrust(t *testing.T) {
 func TestCursor_PositionRewindsOnlyAtTheStartOfASync(t *testing.T) {
 	at := time.UnixMilli(1758470400000)
 
+	// No id on the rewound position: it belongs to the original moment,
+	// and would exclude entries at the rewound one.
 	start := circles.Cursor{Type: circles.TypePost, At: at, ID: "post-1", Direction: circles.Forward}
-	if got, want := start.Position(), circles.IndexKey(circles.TypePost, at.Add(-circles.Rewind), "post-1"); got != want {
+	if got, want := start.Position(), circles.IndexKey(circles.TypePost, at.Add(-circles.Rewind), ""); got != want {
 		t.Errorf("first read of a sync = %q, want %q", got, want)
 	}
 

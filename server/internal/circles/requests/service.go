@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	"mimoza-relay/internal/circles"
@@ -35,9 +36,13 @@ func (s *Service) Create(ctx context.Context, code, accountID string, publicKey 
 		return circles.Request{}, err
 	}
 	// Already in: nothing to ask for, and an admin should not have to
-	// answer it.
-	if _, err := s.Store.GetMember(ctx, invite.CircleID, accountID); err == nil {
+	// answer it. Anything other than "not a member" is a storage failure,
+	// which must not read as permission to ask.
+	switch _, err := s.Store.GetMember(ctx, invite.CircleID, accountID); {
+	case err == nil:
 		return circles.Request{}, circles.ErrAlreadyExists
+	case !errors.Is(err, circles.ErrNotMember):
+		return circles.Request{}, err
 	}
 
 	now := time.Now()

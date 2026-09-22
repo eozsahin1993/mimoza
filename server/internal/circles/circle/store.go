@@ -63,6 +63,7 @@ func (s *Store) CreateCircle(ctx context.Context, circle circles.Circle, founder
 					dynamo.AttrKeyVersion:    dynamo.Num(1),
 					dynamo.AttrRosterVersion: dynamo.Num(1),
 					dynamo.AttrMemberCount:   dynamo.Num(1),
+					dynamo.AttrAdminCount:    dynamo.Num(1),
 					dynamo.AttrLastEntryAt:   dynamo.Millis(now),
 					dynamo.AttrCreatedBy:     dynamo.Str(founder.AccountID),
 					dynamo.AttrCreatedAt:     dynamo.Millis(now),

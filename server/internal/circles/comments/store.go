@@ -111,7 +111,10 @@ func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID s
 					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.CommentKey(postID, commentID)),
 					UpdateExpression: aws.String("SET " + dynamo.AttrDeletedAt + " = :now REMOVE " +
 						dynamo.AttrCiphertext),
-					ConditionExpression:       aws.String("attribute_exists(sk)"),
+					// Deleted already: the row survives with its ciphertext
+					// stripped, so without this a repeat would subtract from
+					// the post's count a second time.
+					ConditionExpression:       aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
 					ExpressionAttributeValues: map[string]types.AttributeValue{":now": dynamo.Millis(now)},
 				}},
 				{Update: &types.Update{

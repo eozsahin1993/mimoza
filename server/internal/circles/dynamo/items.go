@@ -39,7 +39,11 @@ const (
 	// AttrMemberCount is kept on the circle so the member cap can be a
 	// condition rather than a count read beforehand, which two admins
 	// approving at once would both pass.
-	AttrMemberCount   = "memberCount"
+	AttrMemberCount = "memberCount"
+	// AttrAdminCount is what keeps a circle governable: demoting or
+	// leaving is conditioned on it, so two admins going at once cannot
+	// both pass a check that read the roster before either wrote.
+	AttrAdminCount    = "adminCount"
 	AttrRecent        = "recentComments"
 	AttrReceivedAt    = "receivedAt"
 	AttrDeletedAt     = "deletedAt"

@@ -49,7 +49,11 @@ func (s *Store) ClearReaction(ctx context.Context, circleID, postID, accountID s
 	return s.set(ctx, circleID, postID, accountID, nil)
 }
 func (s *Store) set(ctx context.Context, circleID, postID, accountID string, next *circles.Reaction) (circles.Entry, error) {
-	err := dynamo.WithRetry(func() error {
+	// The slot condition failing means this member's reaction moved
+	// between the read and the write — another device of theirs. That is
+	// a stale read, so it is worth rerunning; the post condition failing
+	// is not, and is mapped below.
+	err := dynamo.WithRetryOn(staleSlot, func() error {
 		previous, err := s.GetReaction(ctx, circleID, postID, accountID)
 		if err != nil {
 			return err
@@ -150,4 +154,11 @@ func reactorSet(next *circles.Reaction) string {
 		return " REMOVE " + dynamo.AttrReactors + ".#reactor"
 	}
 	return ", " + dynamo.AttrReactors + ".#reactor = :tag"
+}
+
+// staleSlot reports whether the only thing that failed is the reaction
+// slot's own condition, at index 0 of the transaction.
+func staleSlot(err error) bool {
+	return dynamo.CancelledFor(err, 0) == dynamo.ConditionalCheckFailed &&
+		dynamo.CancelledFor(err, 1) != dynamo.ConditionalCheckFailed
 }

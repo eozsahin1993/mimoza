@@ -189,9 +189,21 @@ const MaxAttempts = 5
 
 // WithRetry runs a transaction, retrying only DynamoDB's own contention.
 func WithRetry(write func() error) error {
+	return WithRetryOn(nil, write)
+}
+
+// WithRetryOn also reruns when alsoRetry says the failure was a stale
+// read of the caller's own — a condition written against a value that
+// moved, which rereading resolves. Everything else is left alone: a
+// failed condition is usually an answer, not a hiccup.
+func WithRetryOn(alsoRetry func(error) bool, write func() error) error {
 	var err error
 	for attempt := range MaxAttempts {
-		if err = write(); err == nil || !Retryable(err) {
+		err = write()
+		if err == nil {
+			return nil
+		}
+		if !Retryable(err) && (alsoRetry == nil || !alsoRetry(err)) {
 			return err
 		}
 		time.Sleep(time.Duration(attempt+1) * 10 * time.Millisecond)

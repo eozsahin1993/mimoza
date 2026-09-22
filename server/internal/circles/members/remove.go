@@ -37,8 +37,10 @@ func (h *RemoveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sealed := make(map[string][]byte, len(body.Sealed))
 	for accountID, encoded := range body.Sealed {
 		key, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil {
-			httputil.WriteError(w, http.StatusBadRequest, "sealed keys must be base64")
+		// Empty is valid base64 and would install a key that opens
+		// nothing, leaving that member unable to read what comes next.
+		if err != nil || len(key) == 0 {
+			httputil.WriteError(w, http.StatusBadRequest, "sealed keys must be non-empty base64")
 			return
 		}
 		sealed[accountID] = key

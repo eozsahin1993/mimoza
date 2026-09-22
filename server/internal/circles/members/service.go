@@ -105,8 +105,17 @@ func (s *Service) Rewrap(ctx context.Context, circleID, subjectID, actorID strin
 	if err := s.requireMember(ctx, circleID, subjectID); err != nil {
 		return err
 	}
-	if len(sealed) == 0 {
-		return circles.ErrIncompleteKeys
+	// The whole map is replaced, so a missing version is not "left
+	// alone", it is gone: every version this circle has ever had must be
+	// in here, or the subject loses the history sealed under it.
+	circle, err := s.Store.GetCircle(ctx, circleID)
+	if err != nil {
+		return err
+	}
+	for version := int64(1); version <= circle.KeyVersion; version++ {
+		if len(sealed[version]) == 0 {
+			return circles.ErrIncompleteKeys
+		}
 	}
 	return s.Store.ReplaceSealedKeys(ctx, circleID, subjectID, sealed)
 }

@@ -84,13 +84,14 @@ func (s *Store) ListRequests(ctx context.Context, circleID string) ([]circles.Re
 	})
 
 	var requests []circles.Request
+	now := s.Now()
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, item := range page.Items {
-			requests = append(requests, circles.Request{
+			request := circles.Request{
 				ID:        strings.TrimPrefix(dynamo.StringAt(item, dynamoutil.SKAttr), dynamo.RequestSK),
 				CircleID:  circleID,
 				AccountID: dynamo.StringAt(item, dynamo.AttrRequesterID),
@@ -98,7 +99,13 @@ func (s *Store) ListRequests(ctx context.Context, circleID string) ([]circles.Re
 				Status:    dynamo.StringAt(item, dynamo.AttrStatus),
 				CreatedAt: dynamo.TimeAt(item, dynamo.AttrCreatedAt),
 				ExpiresAt: dynamo.ExpiryFrom(item),
-			})
+			}
+			// TTL sweeps these eventually; until it does, an expired ask
+			// is one an admin must not be able to answer.
+			if !request.ExpiresAt.IsZero() && request.ExpiresAt.Before(now) {
+				continue
+			}
+			requests = append(requests, request)
 		}
 	}
 	return requests, nil
@@ -133,14 +140,21 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 	_, err = s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
 			{Update: &types.Update{
-				TableName:                aws.String(s.Name),
-				Key:                      s.Key(dynamo.CirclePK(circleID), dynamo.RequestKey(requestID)),
-				UpdateExpression:         aws.String("SET #status = :status"),
-				ConditionExpression:      aws.String("attribute_exists(sk) AND #status = :pending"),
-				ExpressionAttributeNames: map[string]string{"#status": dynamo.AttrStatus},
+				TableName:        aws.String(s.Name),
+				Key:              s.Key(dynamo.CirclePK(circleID), dynamo.RequestKey(requestID)),
+				UpdateExpression: aws.String("SET #status = :status"),
+				// Still open, and still in date: a request can expire
+				// between an admin listing it and answering it.
+				ConditionExpression: aws.String("attribute_exists(sk) AND #status = :pending AND " +
+					"(attribute_not_exists(#expiresAt) OR #expiresAt > :now)"),
+				ExpressionAttributeNames: map[string]string{
+					"#status":    dynamo.AttrStatus,
+					"#expiresAt": dynamo.AttrExpiresAt,
+				},
 				ExpressionAttributeValues: map[string]types.AttributeValue{
 					":status":  dynamo.Str(circles.RequestApproved),
 					":pending": dynamo.Str(circles.RequestPending),
+					":now":     dynamo.Num(now.Unix()),
 				},
 			}},
 			{Put: &types.Put{
@@ -196,13 +210,16 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 
 func (s *Store) DenyRequest(ctx context.Context, circleID, requestID string) error {
 	_, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                aws.String(s.Name),
-		Key:                      s.Key(dynamo.CirclePK(circleID), dynamo.RequestKey(requestID)),
-		UpdateExpression:         aws.String("SET #status = :status"),
-		ConditionExpression:      aws.String("attribute_exists(sk)"),
+		TableName:        aws.String(s.Name),
+		Key:              s.Key(dynamo.CirclePK(circleID), dynamo.RequestKey(requestID)),
+		UpdateExpression: aws.String("SET #status = :status"),
+		// Only an open request: a denial arriving after an approval must
+		// not mark a granted membership's request as refused.
+		ConditionExpression:      aws.String("attribute_exists(sk) AND #status = :pending"),
 		ExpressionAttributeNames: map[string]string{"#status": dynamo.AttrStatus},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":status": dynamo.Str(circles.RequestDenied),
+			":status":  dynamo.Str(circles.RequestDenied),
+			":pending": dynamo.Str(circles.RequestPending),
 		},
 	})
 	if dynamo.ConditionFailed(err) {
