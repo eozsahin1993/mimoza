@@ -5,6 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+
 	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/accounts/deletion"
 	"mimoza-relay/internal/accounts/devices"
@@ -111,6 +114,52 @@ func TestStore_DeleteKeepsAnUnrevokedGrant(t *testing.T) {
 	}
 	if !created || next == accountID {
 		t.Fatalf("expected the sign-in to land on a new account, got %q (created=%v)", next, created)
+	}
+}
+
+// A deletion interrupted between the lookup row and the provider row
+// leaves the subject free to sign in again. The retry still walks the
+// stale provider row, and must not take the new account's lookup with
+// it — that account is live, and would lose its sign-in.
+func TestStore_DeleteRetryLeavesANewAccountAlone(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewAccountTable(t)
+	store := deletion.NewStore(table)
+	subject := testsupport.UniqueAccountID(t)
+	signIn := accounts.Provider{Name: "google", Subject: subject}
+
+	old, _, err := table.Resolve(ctx, signIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Where an interrupted deletion leaves things: the lookup gone, the
+	// provider row under the old account still there.
+	if _, err := table.Client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(table.Name),
+		Key:       table.Key(dynamo.ProviderPK(signIn.Name, signIn.Subject), dynamo.LookupSK),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	fresh, created, err := table.Resolve(ctx, signIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !created {
+		t.Fatalf("expected the sign-in to mint a new account, got %q", fresh)
+	}
+
+	if err := store.Delete(ctx, old, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	again, created, err := table.Resolve(ctx, signIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created || again != fresh {
+		t.Fatalf("expected the new account %q to keep its sign-in, got %q (created=%v)", fresh, again, created)
 	}
 }
 

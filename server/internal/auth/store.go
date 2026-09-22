@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"strings"
 	"time"
 )
 
@@ -42,14 +41,8 @@ type Store interface {
 	DeleteAllSessions(ctx context.Context, accountID string) error
 }
 
-// AppleProvider namespaces Apple-issued account ids — see auth/http/apple
-// for why identity is keyed "<provider>:<sub>". Named here rather than
-// there so account deletion can recognize an Apple account without
-// importing a sign-in endpoint's package for a string.
+// AppleProvider names the sign-in method, on the provider rows the
+// accounts column keys by it. Named here rather than in auth/http/apple
+// so account deletion can recognize an Apple sign-in without importing a
+// sign-in endpoint's package for a string.
 const AppleProvider = "apple"
-
-// IsAppleAccount reports whether accountID came from Sign in with Apple,
-// and so may have a grant to revoke when the account is deleted.
-func IsAppleAccount(accountID string) bool {
-	return strings.HasPrefix(accountID, AppleProvider+":")
-}

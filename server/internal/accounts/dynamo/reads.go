@@ -60,9 +60,14 @@ func (t *Table) ListDevices(ctx context.Context, accountID string) ([]accounts.D
 // Query reads one partition, or the part of it under a sort-key prefix.
 // An account's partition holds a profile, a handful of devices and a
 // sign-in or two, so it always fits a page or three.
+//
+// Consistently, because deletion walks this to find the lookup rows it
+// has to chase: a provider row written moments earlier and missed here
+// would leave a sign-in resolving to an account that is gone.
 func (t *Table) Query(ctx context.Context, pk, prefix string) ([]map[string]types.AttributeValue, error) {
 	input := &dynamodb.QueryInput{
 		TableName:              aws.String(t.Name),
+		ConsistentRead:         aws.Bool(true),
 		KeyConditionExpression: aws.String("pk = :pk"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":pk": dynamoutil.Str(pk),

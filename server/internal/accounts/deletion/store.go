@@ -5,7 +5,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/util/dynamoutil"
 )
@@ -38,7 +40,7 @@ func (s *Store) Delete(ctx context.Context, accountID, keep string) error {
 		return err
 	}
 	for _, provider := range providers {
-		if err := s.remove(ctx, dynamo.ProviderPK(provider.Name, provider.Subject), dynamo.LookupSK); err != nil {
+		if err := s.detach(ctx, provider, accountID); err != nil {
 			return err
 		}
 	}
@@ -57,6 +59,26 @@ func (s *Store) Delete(ctx context.Context, accountID, keep string) error {
 		}
 	}
 	return nil
+}
+
+// detach drops the lookup row for one sign-in, but only while it still
+// resolves here. A deletion interrupted after the lookup went and before
+// the provider row did leaves the subject free to sign in again and mint
+// a second account; the retry then walks the stale provider row, and
+// without this condition it would take the new account's lookup with it.
+func (s *Store) detach(ctx context.Context, provider accounts.Provider, accountID string) error {
+	_, err := s.Client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName:                 aws.String(s.Name),
+		Key:                       s.Key(dynamo.ProviderPK(provider.Name, provider.Subject), dynamo.LookupSK),
+		ConditionExpression:       aws.String(dynamo.AttrAccountID + " = :account"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":account": dynamoutil.Str(accountID)},
+	})
+	// Gone already, or pointing somewhere else — either way it is not
+	// this account's to remove.
+	if dynamoutil.ConditionFailed(err) {
+		return nil
+	}
+	return err
 }
 
 func (s *Store) remove(ctx context.Context, pk, sk string) error {
