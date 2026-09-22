@@ -1,8 +1,10 @@
 # Relay design
 
-Status: **being built.** The relay running today is described by
-`SYNC_DESIGN.md`, `PUSH_DESIGN.md`, `INVITE_FLOW.md` and
-`ACCOUNT_RECOVERY.md`; this document replaces them once built.
+Status: **being built.** The circles half is built and answers under
+`/v1`, replacing the routes `SYNC_DESIGN.md` and `INVITE_FLOW.md`
+describe. Accounts, push and blobs are still as `PUSH_DESIGN.md` and
+`ACCOUNT_RECOVERY.md` describe them; this document replaces those two as
+they land.
 
 The relay owns accounts, circles, membership, roles, devices and invites
 in plaintext. Content is end-to-end encrypted: photos, captions, comments,

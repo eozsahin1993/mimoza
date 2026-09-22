@@ -29,25 +29,25 @@ func TestCircles_JoinAndPost(t *testing.T) {
 	var invite struct {
 		Code string `json:"code"`
 	}
-	admin.Post(v2("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
+	admin.Post(api("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
 
 	var preview struct {
 		CircleID    string `json:"circleId"`
 		Name        string `json:"name"`
 		MemberCount int    `json:"memberCount"`
 	}
-	joiner.Get(v2("/invites/" + invite.Code)).Expect(http.StatusOK).Decode(&preview)
+	joiner.Get(api("/invites/" + invite.Code)).Expect(http.StatusOK).Decode(&preview)
 	harness.AssertEqual(t, preview.Name, "Family", "the preview names the circle")
 	harness.AssertEqual(t, preview.MemberCount, 1, "the preview counts its members")
 
 	// Not a member yet: the circle's entries are not readable.
-	joiner.Get(v2("/circles/" + circleID + "/entries?type=post")).Expect(http.StatusForbidden)
+	joiner.Get(api("/circles/" + circleID + "/entries?type=post")).Expect(http.StatusForbidden)
 
 	// The ask, carrying the key an approver seals to.
 	var request struct {
 		RequestID string `json:"requestId"`
 	}
-	joiner.Post(v2("/invites/"+invite.Code+"/requests"), harness.Body{
+	joiner.Post(api("/invites/"+invite.Code+"/requests"), harness.Body{
 		"publicKey": base64.StdEncoding.EncodeToString([]byte("joiner-public-key")),
 	}).Expect(http.StatusCreated).Decode(&request)
 
@@ -57,12 +57,12 @@ func TestCircles_JoinAndPost(t *testing.T) {
 			Status    string `json:"status"`
 		} `json:"requests"`
 	}
-	admin.Get(v2("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
+	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
 	harness.AssertEqual(t, len(pending.Requests), 1, "the admin sees one ask")
 	harness.AssertEqual(t, pending.Requests[0].Status, "pending", "and it is unanswered")
 
 	// Approval carries every content key version, sealed to that key.
-	admin.Post(v2("/circles/"+circleID+"/requests/"+request.RequestID+"/approve"), harness.Body{
+	admin.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/approve"), harness.Body{
 		"sealed": map[string]string{"1": base64.StdEncoding.EncodeToString([]byte("sealed-v1"))},
 	}).Expect(http.StatusNoContent)
 
@@ -83,7 +83,7 @@ func TestCircles_JoinAndPost(t *testing.T) {
 		} `json:"members"`
 		Keys map[string]string `json:"keys"`
 	}
-	joiner.Get(v2("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&roster)
+	joiner.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&roster)
 	harness.AssertEqual(t, len(roster.Members), 2, "both are on the roster")
 	harness.AssertEqual(t, len(roster.Keys), 1, "the joiner got the key that was sealed to them")
 }
@@ -97,13 +97,13 @@ func TestCircles_APostCarriesWhatACardNeeds(t *testing.T) {
 	circleID := createCircle(t, admin, "Family")
 	putPost(t, admin, circleID, "post-1", 1)
 
-	admin.Post(v2("/circles/"+circleID+"/entries/post-1/comments"), harness.Body{
+	admin.Post(api("/circles/"+circleID+"/entries/post-1/comments"), harness.Body{
 		"commentId":  "comment-1",
 		"keyVersion": 1,
 		"ciphertext": base64.StdEncoding.EncodeToString([]byte("nice one")),
 	}).Expect(http.StatusCreated)
 
-	admin.Put(v2("/circles/"+circleID+"/entries/post-1/reactions/me"), harness.Body{
+	admin.Put(api("/circles/"+circleID+"/entries/post-1/reactions/me"), harness.Body{
 		"tag":        "tag-heart",
 		"keyVersion": 1,
 		"ciphertext": base64.StdEncoding.EncodeToString([]byte("heart")),
@@ -128,7 +128,7 @@ func TestCircles_APostCarriesWhatACardNeeds(t *testing.T) {
 			Tag       string `json:"tag"`
 		} `json:"reactions"`
 	}
-	admin.Get(v2("/circles/" + circleID + "/entries/post-1/children")).Expect(http.StatusOK).Decode(&children)
+	admin.Get(api("/circles/" + circleID + "/entries/post-1/children")).Expect(http.StatusOK).Decode(&children)
 	harness.AssertEqual(t, len(children.Comments), 1, "the comment is there in full")
 	harness.AssertEqual(t, len(children.Reactions), 1, "and so is the reaction")
 }
@@ -143,7 +143,7 @@ func TestCircles_RemovingAMemberRotatesTheKey(t *testing.T) {
 	joinCircle(t, admin, member, circleID)
 
 	memberID := member.AccountID()
-	admin.Post(v2("/circles/"+circleID+"/members/"+memberID+"/remove"), harness.Body{
+	admin.Post(api("/circles/"+circleID+"/members/"+memberID+"/remove"), harness.Body{
 		"expectedVersion": 1,
 		"sealed": map[string]string{
 			admin.AccountID(): base64.StdEncoding.EncodeToString([]byte("sealed-v2")),
@@ -151,16 +151,16 @@ func TestCircles_RemovingAMemberRotatesTheKey(t *testing.T) {
 	}).Expect(http.StatusNoContent)
 
 	// Out: even reading is refused now.
-	member.Get(v2("/circles/" + circleID + "/entries?type=post")).Expect(http.StatusForbidden)
+	member.Get(api("/circles/" + circleID + "/entries?type=post")).Expect(http.StatusForbidden)
 
 	// And the key moved, so the admin's next post is under version 2.
 	var circle struct {
 		KeyVersion int64 `json:"keyVersion"`
 	}
-	admin.Get(v2("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&circle)
+	admin.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&circle)
 	harness.AssertEqual(t, circle.KeyVersion, int64(2), "the key rotated on removal")
 
-	admin.Post(v2("/circles/"+circleID+"/entries"), harness.Body{
+	admin.Post(api("/circles/"+circleID+"/entries"), harness.Body{
 		"entryId":    "post-after",
 		"keyVersion": 1,
 		"ciphertext": base64.StdEncoding.EncodeToString([]byte("stale")),
@@ -199,7 +199,7 @@ func TestCircles_TheWalkResumesWhereItLeftOff(t *testing.T) {
 
 // v2 is where the relay-owned circles live while the old routes still
 // answer under /v1.
-func v2(path string) string { return "/v2" + path }
+func api(path string) string { return "/v1" + path }
 
 type entryView struct {
 	EntryID        string           `json:"entryId"`
@@ -225,7 +225,7 @@ func createCircle(t *testing.T, device *harness.Device, name string) string {
 	var created struct {
 		CircleID string `json:"circleId"`
 	}
-	device.Post(v2("/circles"), harness.Body{
+	device.Post(api("/circles"), harness.Body{
 		"name":      name,
 		"sealedKey": base64.StdEncoding.EncodeToString([]byte("sealed-v1")),
 	}).Expect(http.StatusCreated).Decode(&created)
@@ -235,7 +235,7 @@ func createCircle(t *testing.T, device *harness.Device, name string) string {
 func putPost(t *testing.T, device *harness.Device, circleID, entryID string, keyVersion int64) entryView {
 	t.Helper()
 	var entry entryView
-	device.Post(v2("/circles/"+circleID+"/entries"), harness.Body{
+	device.Post(api("/circles/"+circleID+"/entries"), harness.Body{
 		"entryId":    entryID,
 		"keyVersion": keyVersion,
 		"ciphertext": base64.StdEncoding.EncodeToString([]byte("ciphertext for " + entryID)),
@@ -245,7 +245,7 @@ func putPost(t *testing.T, device *harness.Device, circleID, entryID string, key
 
 func walk(t *testing.T, device *harness.Device, circleID, cursor string) pageView {
 	t.Helper()
-	path := v2("/circles/" + circleID + "/entries?type=post")
+	path := api("/circles/" + circleID + "/entries?type=post")
 	if cursor != "" {
 		path += "&cursor=" + cursor
 	}
@@ -261,16 +261,16 @@ func joinCircle(t *testing.T, admin, joiner *harness.Device, circleID string) {
 	var invite struct {
 		Code string `json:"code"`
 	}
-	admin.Post(v2("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
+	admin.Post(api("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
 
 	var request struct {
 		RequestID string `json:"requestId"`
 	}
-	joiner.Post(v2("/invites/"+invite.Code+"/requests"), harness.Body{
+	joiner.Post(api("/invites/"+invite.Code+"/requests"), harness.Body{
 		"publicKey": base64.StdEncoding.EncodeToString([]byte("joiner-public-key")),
 	}).Expect(http.StatusCreated).Decode(&request)
 
-	admin.Post(v2("/circles/"+circleID+"/requests/"+request.RequestID+"/approve"), harness.Body{
+	admin.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/approve"), harness.Body{
 		"sealed": map[string]string{"1": base64.StdEncoding.EncodeToString([]byte("sealed-v1"))},
 	}).Expect(http.StatusNoContent)
 }
