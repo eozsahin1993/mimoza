@@ -11,11 +11,6 @@ import (
 	"mimoza-relay/internal/util/httputil"
 )
 
-type createRequest struct {
-	// PublicKey is what the approver seals the content keys to.
-	PublicKey string `json:"publicKey"`
-}
-
 type requestResponse struct {
 	RequestID string `json:"requestId"`
 	CircleID  string `json:"circleId"`
@@ -23,18 +18,6 @@ type requestResponse struct {
 	Status    string `json:"status"`
 	CreatedAt int64  `json:"createdAt"`
 }
-
-type listResponse struct {
-	Requests []requestResponse `json:"requests"`
-}
-
-type approveRequest struct {
-	// Sealed is every content key version, sealed to the requester's
-	// public key: version as a string, because JSON object keys are.
-	Sealed map[string]string `json:"sealed"`
-}
-
-type CreateHandler struct{ Service *Service }
 
 func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var body createRequest
@@ -57,8 +40,6 @@ func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusCreated, asResponse(request))
 }
 
-type ListHandler struct{ Service *Service }
-
 func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	requests, err := h.Service.List(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
 	if err != nil {
@@ -73,8 +54,6 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.WriteJSON(w, http.StatusOK, body)
 }
-
-type ApproveHandler struct{ Service *Service }
 
 func (h *ApproveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var body approveRequest
@@ -107,8 +86,6 @@ func (h *ApproveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
-type DenyHandler struct{ Service *Service }
 
 func (h *DenyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.Deny(r.Context(), r.PathValue("circleId"), r.PathValue("requestId"),

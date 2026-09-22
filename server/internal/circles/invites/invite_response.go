@@ -15,19 +15,6 @@ type inviteResponse struct {
 	ExpiresAt int64  `json:"expiresAt"`
 }
 
-type listResponse struct {
-	Invites []inviteResponse `json:"invites"`
-}
-
-type previewResponse struct {
-	CircleID    string `json:"circleId"`
-	Name        string `json:"name"`
-	MemberCount int    `json:"memberCount"`
-	InvitedBy   string `json:"invitedBy"`
-}
-
-type CreateHandler struct{ Service *Service }
-
 func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	invite, err := h.Service.Create(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
 	if err != nil {
@@ -37,8 +24,6 @@ func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.WriteJSON(w, http.StatusCreated, asResponse(invite))
 }
-
-type ListHandler struct{ Service *Service }
 
 func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	invites, err := h.Service.List(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
@@ -55,8 +40,6 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, body)
 }
 
-type RevokeHandler struct{ Service *Service }
-
 func (h *RevokeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.Revoke(r.Context(), r.PathValue("circleId"), r.PathValue("code"), auth.AccountID(r.Context()))
 	if err != nil {
@@ -66,8 +49,6 @@ func (h *RevokeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
-type PreviewHandler struct{ Service *Service }
 
 func (h *PreviewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	preview, err := h.Service.Preview(r.Context(), r.PathValue("code"))
