@@ -10,7 +10,7 @@ variable "deletion_protection" {
 }
 
 variable "point_in_time_recovery" {
-  description = "Continuous backups on the two tables holding data no one else can reconstruct — the sync log and accounts. Not snapshots: restoring builds a new table at a chosen second within the last 35 days, so it is disaster recovery, never row history. Off elsewhere; the ephemeral tables (sessions, invites, rate limit) are cheaper to lose than to back up."
+  description = "Continuous backups on the tables holding data no one else can reconstruct — circles, accounts, and until they are retired the sync log and the old accounts table. Not snapshots: restoring builds a new table at a chosen second within the last 35 days, so it is disaster recovery, never row history. Off elsewhere; the ephemeral tables (sessions, invites, rate limit) are cheaper to lose than to back up."
   type        = bool
   default     = false
 }

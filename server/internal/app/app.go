@@ -106,7 +106,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		Log:        logdynamodb.New(dynamo(), cfg.TableName),
 		Blob:       blob,
 		Auth:       authdynamodb.New(dynamo(), cfg.SessionsTableName),
-		Manifest:   manifestdynamodb.New(dynamo(), cfg.AccountsTableName),
+		Manifest:   manifestdynamodb.New(dynamo(), cfg.AccountsOldTableName),
 		Invite:     invitedynamodb.New(dynamo(), cfg.InviteTableName, cfg.InviteRetentionDays),
 		WriteLimit: limit("write", cfg.RateLimitWriteMaxRequests),
 		ReadLimit:  limit("read", cfg.RateLimitReadMaxRequests),
@@ -115,7 +115,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		AppleID:    appleID,
 		// Shares the accounts table rather than taking one of its own —
 		// see auth/dynamodb's AppleCredentialStore for the key spacing.
-		AppleCredentials: authdynamodb.NewAppleCredentialStore(dynamo(), cfg.AccountsTableName),
+		AppleCredentials: authdynamodb.NewAppleCredentialStore(dynamo(), cfg.AccountsOldTableName),
 		Push: api.PushDeps{
 			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName, cfg.InviteRetentionDays),
 			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),

@@ -59,13 +59,13 @@ import (
 // cmd/testrelay uses too — one definition, so a table this suite creates
 // can't differ in shape from the one the relay is served against.
 const (
-	tableName          = localstack.LogTable
-	bucketName         = localstack.BlobBucket
-	sessionsTableName  = localstack.SessionsTable
-	accountsTableName  = localstack.AccountsTable
-	inviteTableName    = localstack.InviteTable
-	rateLimitTableName = localstack.RateLimitTable
-	pushTableName      = localstack.PushTable
+	tableName            = localstack.LogTable
+	bucketName           = localstack.BlobBucket
+	sessionsTableName    = localstack.SessionsTable
+	accountsOldTableName = localstack.AccountsOldTable
+	inviteTableName      = localstack.InviteTable
+	rateLimitTableName   = localstack.RateLimitTable
+	pushTableName        = localstack.PushTable
 )
 
 var (
@@ -292,7 +292,7 @@ func NewAuthStore(t testing.TB) auth.Store {
 // NewManifestStore returns a real dynamodb-backed account.Store
 // against LocalStack, creating the accounts table once per test binary
 // run — a genuinely separate table from sessions (see
-// server/provision/modules/storage/accounts_table.tf).
+// server/provision/modules/storage/accounts_old_table.tf).
 func NewManifestStore(t testing.TB) account.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
@@ -300,13 +300,13 @@ func NewManifestStore(t testing.TB) account.Store {
 	})
 
 	accountsTableOnce.Do(func() {
-		accountsTableErr = localstack.CreateTable(context.Background(), client, accountsTableName, localstack.HashOnly)
+		accountsTableErr = localstack.CreateTable(context.Background(), client, accountsOldTableName, localstack.HashOnly)
 	})
 	if accountsTableErr != nil {
 		unreachable(t, "DynamoDB", accountsTableErr)
 	}
 
-	return manifestdynamodb.New(client, accountsTableName)
+	return manifestdynamodb.New(client, accountsOldTableName)
 }
 
 // NewInviteStore returns a real dynamodb-backed invite.Store

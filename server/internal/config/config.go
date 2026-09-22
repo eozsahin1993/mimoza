@@ -29,10 +29,17 @@ type Config struct {
 	// separate table from TableName; also separate from AccountsTableName
 	// (token-lookup vs account-lookup are different access patterns).
 	SessionsTableName string
-	// AccountsTableName is the standalone one-document-per-account table
-	// (today: the encrypted recovery manifest) — see
+	// AccountsTableName is one partition per account — profile, devices,
+	// linked sign-in providers — see
 	// server/provision/modules/storage/accounts_table.tf.
 	AccountsTableName string
+	// AccountsOldTableName is the pre-rewrite single-key accounts table
+	// (the encrypted recovery manifest and the Apple refresh token), kept
+	// under a new name until nothing reads it — see accounts_old_table.tf.
+	AccountsOldTableName string
+	// CirclesTableName is one partition per circle: membership, sealed
+	// keys, invites, posts, activity — see circles_table.tf.
+	CirclesTableName string
 	// InviteTableName is the standalone invite/join-request table: pk =
 	// hash(invite code), with one row for the invite itself and one row
 	// per pending join request under it — see
@@ -161,6 +168,8 @@ func Load() Config {
 		BucketName:                 prefix + "-blobs",
 		SessionsTableName:          prefix + "-sessions",
 		AccountsTableName:          prefix + "-accounts",
+		AccountsOldTableName:       prefix + "-accounts-old",
+		CirclesTableName:           prefix + "-circles",
 		InviteTableName:            prefix + "-invites",
 		RateLimitTableName:         prefix + "-rate-limit",
 		PushTableName:              prefix + "-push",

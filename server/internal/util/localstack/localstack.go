@@ -20,6 +20,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	circlesdynamodb "mimoza-relay/internal/circles/dynamodb"
 	"mimoza-relay/internal/config"
 	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 )
@@ -46,25 +47,32 @@ func Endpoint() string {
 
 // The shared resources — see Shared.
 const (
-	LogTable       = "test-sync-log"
-	BlobBucket     = "test-blobs"
-	SessionsTable  = "test-sessions"
-	AccountsTable  = "test-accounts"
-	InviteTable    = "test-invites"
-	RateLimitTable = "test-rate-limit"
-	PushTable      = "test-push"
+	LogTable      = "test-sync-log"
+	BlobBucket    = "test-blobs"
+	SessionsTable = "test-sessions"
+	// The old single-key shape keeps the name a long-running LocalStack
+	// already holds; giving that name to the two-key table would have
+	// CreateTable's already-exists path hand tests the wrong schema.
+	AccountsOldTable = "test-accounts"
+	AccountsTable    = "test-accounts-keyed"
+	CirclesTable     = "test-circles"
+	InviteTable      = "test-invites"
+	RateLimitTable   = "test-rate-limit"
+	PushTable        = "test-push"
 )
 
 // Names is one complete, independent set of resources — everything a
 // relay needs to run and nothing shared with another set.
 type Names struct {
-	LogTable       string
-	SessionsTable  string
-	AccountsTable  string
-	InviteTable    string
-	RateLimitTable string
-	PushTable      string
-	BlobBucket     string
+	LogTable         string
+	SessionsTable    string
+	AccountsTable    string
+	AccountsOldTable string
+	CirclesTable     string
+	InviteTable      string
+	RateLimitTable   string
+	PushTable        string
+	BlobBucket       string
 }
 
 // Shared is the fixed set. internal/util/testsupport uses it for the whole Go
@@ -72,13 +80,15 @@ type Names struct {
 // and every table is partitioned by one.
 func Shared() Names {
 	return Names{
-		LogTable:       LogTable,
-		SessionsTable:  SessionsTable,
-		AccountsTable:  AccountsTable,
-		InviteTable:    InviteTable,
-		RateLimitTable: RateLimitTable,
-		PushTable:      PushTable,
-		BlobBucket:     BlobBucket,
+		LogTable:         LogTable,
+		SessionsTable:    SessionsTable,
+		AccountsTable:    AccountsTable,
+		AccountsOldTable: AccountsOldTable,
+		CirclesTable:     CirclesTable,
+		InviteTable:      InviteTable,
+		RateLimitTable:   RateLimitTable,
+		PushTable:        PushTable,
+		BlobBucket:       BlobBucket,
 	}
 }
 
@@ -89,12 +99,14 @@ func Shared() Names {
 // Creating one costs about 200ms.
 func Unique(suffix string) Names {
 	return Names{
-		LogTable:       "bb-log-" + suffix,
-		SessionsTable:  "bb-sessions-" + suffix,
-		AccountsTable:  "bb-accounts-" + suffix,
-		InviteTable:    "bb-invites-" + suffix,
-		RateLimitTable: "bb-rate-limit-" + suffix,
-		PushTable:      "bb-push-" + suffix,
+		LogTable:         "bb-log-" + suffix,
+		SessionsTable:    "bb-sessions-" + suffix,
+		AccountsTable:    "bb-accounts-" + suffix,
+		AccountsOldTable: "bb-accounts-old-" + suffix,
+		CirclesTable:     "bb-circles-" + suffix,
+		InviteTable:      "bb-invites-" + suffix,
+		RateLimitTable:   "bb-rate-limit-" + suffix,
+		PushTable:        "bb-push-" + suffix,
 		// S3 is stricter than DynamoDB about names: lowercase, no
 		// underscores, 3-63 characters.
 		BlobBucket: "bb-blobs-" + suffix,
@@ -140,6 +152,8 @@ func RelayConfig(names Names) config.Config {
 		BucketName:                names.BlobBucket,
 		SessionsTableName:         names.SessionsTable,
 		AccountsTableName:         names.AccountsTable,
+		AccountsOldTableName:      names.AccountsOldTable,
+		CirclesTableName:          names.CirclesTable,
 		InviteTableName:           names.InviteTable,
 		RateLimitTableName:        names.RateLimitTable,
 		PushTableName:             names.PushTable,
@@ -174,8 +188,10 @@ func (n Names) sorted() []struct {
 		{n.LogTable, WithSortKey},
 		{n.InviteTable, WithSortKey},
 		{n.PushTable, WithSortKey},
+		{n.AccountsTable, WithSortKey},
+		{n.CirclesTable, WithSortKey},
 		{n.SessionsTable, HashOnly},
-		{n.AccountsTable, HashOnly},
+		{n.AccountsOldTable, HashOnly},
 		{n.RateLimitTable, HashOnly},
 	}
 }
@@ -199,6 +215,9 @@ func ProvisionSet(ctx context.Context, ddb *awsdynamodb.Client, s3 *awss3.Client
 	}
 	if err := EnsureAccountIDIndex(ctx, ddb, names.SessionsTable); err != nil {
 		return fmt.Errorf("add accountId index to %s: %w", names.SessionsTable, err)
+	}
+	if err := EnsureCircleIndexes(ctx, ddb, names.CirclesTable); err != nil {
+		return fmt.Errorf("add indexes to %s: %w", names.CirclesTable, err)
 	}
 	if err := CreateBucket(ctx, s3, names.BlobBucket); err != nil {
 		return fmt.Errorf("create %s: %w", names.BlobBucket, err)
@@ -258,20 +277,44 @@ func CreateTable(ctx context.Context, client *awsdynamodb.Client, name string, s
 // there yet — a separate, idempotent step since CreateTable's shape is
 // shared by every table here, most needing no GSI.
 func EnsureEntryIDIndex(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
-	return ensureKeysOnlyIndex(ctx, client, tableName, "entryId", logdynamodb.EntryIDIndexName)
+	return ensureIndex(ctx, client, tableName, index{name: logdynamodb.EntryIDIndexName, hash: "entryId", projection: ddbtypes.ProjectionTypeKeysOnly})
 }
 
 // EnsureAccountIDIndex adds the accountId GSI to the sessions table if it
 // isn't there yet — see auth/dynamodb.DeleteAllSessions.
 func EnsureAccountIDIndex(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
-	return ensureKeysOnlyIndex(ctx, client, tableName, "accountId", authdynamodb.AccountIDIndexName)
+	return ensureIndex(ctx, client, tableName, index{name: authdynamodb.AccountIDIndexName, hash: "accountId", projection: ddbtypes.ProjectionTypeKeysOnly})
 }
 
-// ensureKeysOnlyIndex adds a single-attribute, KEYS_ONLY GSI to tableName
-// if it isn't there yet — the shape every GSI in this codebase happens to
-// need so far. A separate, idempotent step since CreateTable's shape is
-// shared by every table here, most needing no GSI at all.
-func ensureKeysOnlyIndex(ctx context.Context, client *awsdynamodb.Client, tableName, attributeName, indexName string) error {
+// EnsureCircleIndexes adds the circles table's three GSIs, matching
+// circles_table.tf. One at a time: DynamoDB accepts a single index
+// creation per UpdateTable call.
+func EnsureCircleIndexes(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
+	for _, idx := range []index{
+		{name: circlesdynamodb.ByTypeReceivedIndex, hash: "pk", rangeKey: circlesdynamodb.ByTypeReceivedSK, projection: ddbtypes.ProjectionTypeAll},
+		{name: circlesdynamodb.ByAccountIndex, hash: circlesdynamodb.ByAccountPK, rangeKey: "sk", projection: ddbtypes.ProjectionTypeKeysOnly},
+		{name: circlesdynamodb.ByTypeUpdatedIndex, hash: "pk", rangeKey: circlesdynamodb.ByTypeUpdatedSK, projection: ddbtypes.ProjectionTypeAll},
+	} {
+		if err := ensureIndex(ctx, client, tableName, idx); err != nil {
+			return fmt.Errorf("%s: %w", idx.name, err)
+		}
+	}
+	return nil
+}
+
+// index is one GSI's shape. rangeKey is empty for a hash-only index.
+type index struct {
+	name       string
+	hash       string
+	rangeKey   string
+	projection ddbtypes.ProjectionType
+}
+
+// ensureIndex adds a GSI to tableName if it isn't there yet — a separate,
+// idempotent step since CreateTable's shape is shared by every table
+// here, most needing no GSI at all.
+func ensureIndex(ctx context.Context, client *awsdynamodb.Client, tableName string, idx index) error {
+	indexName := idx.name
 	describe, err := client.DescribeTable(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(tableName)})
 	if err != nil {
 		return err
@@ -282,17 +325,22 @@ func ensureKeysOnlyIndex(ctx context.Context, client *awsdynamodb.Client, tableN
 		}
 	}
 
+	keys := []ddbtypes.KeySchemaElement{{AttributeName: aws.String(idx.hash), KeyType: ddbtypes.KeyTypeHash}}
+	attrs := []ddbtypes.AttributeDefinition{{AttributeName: aws.String(idx.hash), AttributeType: ddbtypes.ScalarAttributeTypeS}}
+	if idx.rangeKey != "" {
+		keys = append(keys, ddbtypes.KeySchemaElement{AttributeName: aws.String(idx.rangeKey), KeyType: ddbtypes.KeyTypeRange})
+		attrs = append(attrs, ddbtypes.AttributeDefinition{AttributeName: aws.String(idx.rangeKey), AttributeType: ddbtypes.ScalarAttributeTypeS})
+	}
+
 	_, err = client.UpdateTable(ctx, &awsdynamodb.UpdateTableInput{
-		TableName: aws.String(tableName),
-		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String(attributeName), AttributeType: ddbtypes.ScalarAttributeTypeS},
-		},
+		TableName:            aws.String(tableName),
+		AttributeDefinitions: attrs,
 		GlobalSecondaryIndexUpdates: []ddbtypes.GlobalSecondaryIndexUpdate{
 			{
 				Create: &ddbtypes.CreateGlobalSecondaryIndexAction{
 					IndexName:  aws.String(indexName),
-					KeySchema:  []ddbtypes.KeySchemaElement{{AttributeName: aws.String(attributeName), KeyType: ddbtypes.KeyTypeHash}},
-					Projection: &ddbtypes.Projection{ProjectionType: ddbtypes.ProjectionTypeKeysOnly},
+					KeySchema:  keys,
+					Projection: &ddbtypes.Projection{ProjectionType: idx.projection},
 				},
 			},
 		},

@@ -22,13 +22,15 @@ variable "binary_path" {
 variable "storage" {
   description = "The storage module's outputs — ARNs for the relay's IAM policy. Names aren't passed: the relay derives them from RESOURCE_PREFIX."
   type = object({
-    table_arn            = string
-    bucket_arn           = string
-    invite_table_arn     = string
-    sessions_table_arn   = string
-    accounts_table_arn   = string
-    rate_limit_table_arn = string
-    push_table_arn       = string
+    table_arn              = string
+    bucket_arn             = string
+    invite_table_arn       = string
+    sessions_table_arn     = string
+    accounts_table_arn     = string
+    accounts_old_table_arn = string
+    circles_table_arn      = string
+    rate_limit_table_arn   = string
+    push_table_arn         = string
   })
 }
 
