@@ -1,8 +1,12 @@
 import {
+  AttachmentKinds,
+  AttachmentStatuses,
   applyCircle,
   applyRoster,
+  coverEntryId,
   getCircle,
   dropRequest,
+  insertAttachment,
   listCircles as listLocalCircles,
   listRequests,
   markCircleLeft,
@@ -79,6 +83,26 @@ export async function syncCircles(): Promise<number> {
 async function syncCircle(circle: Circle, now: number): Promise<void> {
   const before = await getCircle(circle.circleId);
   await applyCircle(circle, now);
+
+  // Unconditional, not folded into rosterMoved below: a cover change
+  // bumps neither rosterVersion nor keyVersion, so gating this on that
+  // flag would miss it. Requires coverKeyVersion, not just coverId — a
+  // circle whose cover was set before the relay carried a version would
+  // otherwise get a row that retries forever and never succeeds (see
+  // fetchOne in photo-queue.ts, which needs a real key version to fetch
+  // at all). onConflictDoNothing makes a repeat of the same cover free.
+  if (circle.coverId && circle.coverKeyVersion) {
+    await insertAttachment({
+      circleId: circle.circleId,
+      entryId: coverEntryId(circle.coverId),
+      kind: AttachmentKinds.CIRCLE_COVER,
+      keyVersion: circle.coverKeyVersion,
+      status: AttachmentStatuses.PENDING,
+      fetchAttempts: 0,
+      nextAttemptAt: null,
+      createdAt: now,
+    });
+  }
 
   const rosterMoved =
     !before ||

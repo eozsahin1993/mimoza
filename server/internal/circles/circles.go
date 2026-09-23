@@ -16,6 +16,10 @@ type Circle struct {
 	ID      string
 	Name    string
 	CoverID string
+	// CoverKeyVersion is which content key the cover is sealed under —
+	// unset (0) whenever CoverID is, and otherwise always one of the
+	// versions members hold, same requirement as an entry's own KeyVersion.
+	CoverKeyVersion int64
 	// KeyVersion is the content key entries must be encrypted under; it
 	// rises by one every time a member leaves the circle, removed or not.
 	KeyVersion int64

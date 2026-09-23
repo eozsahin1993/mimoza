@@ -29,29 +29,29 @@ func TestUpdateCircle_ChangesEitherFieldOnItsOwn(t *testing.T) {
 	// Cover alone. This is the one that used to fail: with no name in the
 	// request there is nothing a reserved-word placeholder is needed for,
 	// and DynamoDB rejects the empty map outright.
-	updated, err := store.UpdateCircle(ctx, circleID, "", "cover-1", founder)
+	updated, err := store.UpdateCircle(ctx, circleID, "", "cover-1", 1, founder)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.CoverID != "cover-1" {
-		t.Fatalf("coverId = %q, want cover-1", updated.CoverID)
+	if updated.CoverID != "cover-1" || updated.CoverKeyVersion != 1 {
+		t.Fatalf("coverId, coverKeyVersion = %q, %d, want cover-1, 1", updated.CoverID, updated.CoverKeyVersion)
 	}
 	if updated.Name != "Family" {
 		t.Errorf("the name must be left alone, got %q", updated.Name)
 	}
 
 	// Name alone, then both at once.
-	if updated, err = store.UpdateCircle(ctx, circleID, "Renamed", "", founder); err != nil {
+	if updated, err = store.UpdateCircle(ctx, circleID, "Renamed", "", 0, founder); err != nil {
 		t.Fatal(err)
 	}
-	if updated.Name != "Renamed" || updated.CoverID != "cover-1" {
+	if updated.Name != "Renamed" || updated.CoverID != "cover-1" || updated.CoverKeyVersion != 1 {
 		t.Fatalf("expected only the name to move, got %+v", updated)
 	}
 
-	if updated, err = store.UpdateCircle(ctx, circleID, "Both", "cover-2", founder); err != nil {
+	if updated, err = store.UpdateCircle(ctx, circleID, "Both", "cover-2", 1, founder); err != nil {
 		t.Fatal(err)
 	}
-	if updated.Name != "Both" || updated.CoverID != "cover-2" {
+	if updated.Name != "Both" || updated.CoverID != "cover-2" || updated.CoverKeyVersion != 1 {
 		t.Fatalf("expected both to move, got %+v", updated)
 	}
 }

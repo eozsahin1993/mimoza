@@ -12,15 +12,16 @@ import (
 // to decide whether anything about this circle needs fetching, and
 // nothing that would need fetching itself.
 type membershipResponse struct {
-	CircleID      string `json:"circleId"`
-	Name          string `json:"name"`
-	CoverID       string `json:"coverId,omitempty"`
-	Role          string `json:"role"`
-	NotifyLevel   string `json:"notifyLevel"`
-	KeyVersion    int64  `json:"keyVersion"`
-	RosterVersion int64  `json:"rosterVersion"`
-	LastEntryAt   int64  `json:"lastEntryAt,omitempty"`
-	NeedsRewrap   bool   `json:"needsRewrap,omitempty"`
+	CircleID        string `json:"circleId"`
+	Name            string `json:"name"`
+	CoverID         string `json:"coverId,omitempty"`
+	CoverKeyVersion int64  `json:"coverKeyVersion,omitempty"`
+	Role            string `json:"role"`
+	NotifyLevel     string `json:"notifyLevel"`
+	KeyVersion      int64  `json:"keyVersion"`
+	RosterVersion   int64  `json:"rosterVersion"`
+	LastEntryAt     int64  `json:"lastEntryAt,omitempty"`
+	NeedsRewrap     bool   `json:"needsRewrap,omitempty"`
 }
 
 // pendingResponse is an ask this account is waiting on. It carries a
@@ -92,14 +93,15 @@ func millis(at interface {
 // same path whether it just made the circle or is catching up on it.
 func asMembership(membership circles.Membership) membershipResponse {
 	return membershipResponse{
-		CircleID:      membership.Circle.ID,
-		Name:          membership.Circle.Name,
-		CoverID:       membership.Circle.CoverID,
-		Role:          membership.Role,
-		NotifyLevel:   membership.NotifyLevel,
-		KeyVersion:    membership.Circle.KeyVersion,
-		RosterVersion: membership.Circle.RosterVersion,
-		LastEntryAt:   millis(membership.Circle.LastEntryAt),
-		NeedsRewrap:   membership.NeedsRewrap,
+		CircleID:        membership.Circle.ID,
+		Name:            membership.Circle.Name,
+		CoverID:         membership.Circle.CoverID,
+		CoverKeyVersion: membership.Circle.CoverKeyVersion,
+		Role:            membership.Role,
+		NotifyLevel:     membership.NotifyLevel,
+		KeyVersion:      membership.Circle.KeyVersion,
+		RosterVersion:   membership.Circle.RosterVersion,
+		LastEntryAt:     millis(membership.Circle.LastEntryAt),
+		NeedsRewrap:     membership.NeedsRewrap,
 	}
 }

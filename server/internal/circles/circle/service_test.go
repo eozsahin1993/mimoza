@@ -17,7 +17,7 @@ type fakeStore struct {
 	createCircle    func(ctx context.Context, circle circles.Circle, founder circles.Member, sealed []byte) error
 	getCircle       func(ctx context.Context, circleID string) (circles.Circle, error)
 	getMember       func(ctx context.Context, circleID, accountID string) (circles.Member, error)
-	updateCircle    func(ctx context.Context, circleID, name, coverID, actorID string) (circles.Circle, error)
+	updateCircle    func(ctx context.Context, circleID, name, coverID string, coverKeyVersion int64, actorID string) (circles.Circle, error)
 	deleteCircle    func(ctx context.Context, circleID string) error
 	listMemberships func(ctx context.Context, accountID string) ([]circles.Membership, error)
 }
@@ -51,11 +51,11 @@ func (f *fakeStore) GetMember(ctx context.Context, circleID, accountID string) (
 	return f.getMember(ctx, circleID, accountID)
 }
 
-func (f *fakeStore) UpdateCircle(ctx context.Context, circleID, name, coverID, actorID string) (circles.Circle, error) {
+func (f *fakeStore) UpdateCircle(ctx context.Context, circleID, name, coverID string, coverKeyVersion int64, actorID string) (circles.Circle, error) {
 	if f.updateCircle == nil {
 		panic("UpdateCircle was not expected")
 	}
-	return f.updateCircle(ctx, circleID, name, coverID, actorID)
+	return f.updateCircle(ctx, circleID, name, coverID, coverKeyVersion, actorID)
 }
 
 func (f *fakeStore) DeleteCircle(ctx context.Context, circleID string) error {
@@ -122,7 +122,7 @@ func TestPatchAndDelete_RefuseAMemberWhoIsNotAnAdmin(t *testing.T) {
 
 	t.Run("patch", func(t *testing.T) {
 		service := &Service{Store: &fakeStore{getMember: member}}
-		if _, err := service.Patch(context.Background(), "circle-1", "account-2", "New name", ""); !errors.Is(err, circles.ErrNotAdmin) {
+		if _, err := service.Patch(context.Background(), "circle-1", "account-2", "New name", "", 0); !errors.Is(err, circles.ErrNotAdmin) {
 			t.Errorf("expected ErrNotAdmin, got %v", err)
 		}
 	})
@@ -143,26 +143,50 @@ func TestPatch_RefusesSomeoneWhoIsNotInTheCircle(t *testing.T) {
 		},
 	}}
 
-	if _, err := service.Patch(context.Background(), "circle-1", "stranger", "New name", ""); !errors.Is(err, circles.ErrNotMember) {
+	if _, err := service.Patch(context.Background(), "circle-1", "stranger", "New name", "", 0); !errors.Is(err, circles.ErrNotMember) {
 		t.Errorf("expected ErrNotMember, got %v", err)
 	}
 }
 
 func TestPatch_PassesBothFieldsThrough(t *testing.T) {
 	var gotName, gotCover string
+	var gotCoverVersion int64
 	service := &Service{Store: &fakeStore{
 		getMember: admin(circles.Member{}, nil),
-		updateCircle: func(_ context.Context, _, name, coverID, _ string) (circles.Circle, error) {
-			gotName, gotCover = name, coverID
-			return circles.Circle{Name: name, CoverID: coverID}, nil
+		getCircle: func(context.Context, string) (circles.Circle, error) {
+			return circles.Circle{KeyVersion: 3}, nil
+		},
+		updateCircle: func(_ context.Context, _, name, coverID string, coverKeyVersion int64, _ string) (circles.Circle, error) {
+			gotName, gotCover, gotCoverVersion = name, coverID, coverKeyVersion
+			return circles.Circle{Name: name, CoverID: coverID, CoverKeyVersion: coverKeyVersion}, nil
 		},
 	}}
 
-	if _, err := service.Patch(context.Background(), "circle-1", "admin-1", "New name", "cover-9"); err != nil {
+	if _, err := service.Patch(context.Background(), "circle-1", "admin-1", "New name", "cover-9", 3); err != nil {
 		t.Fatal(err)
 	}
-	if gotName != "New name" || gotCover != "cover-9" {
-		t.Errorf("store got (%q, %q), want (New name, cover-9)", gotName, gotCover)
+	if gotName != "New name" || gotCover != "cover-9" || gotCoverVersion != 3 {
+		t.Errorf("store got (%q, %q, %d), want (New name, cover-9, 3)", gotName, gotCover, gotCoverVersion)
+	}
+}
+
+// A cover sealed under a rotated-away key would be unreadable to
+// everyone but whoever set it, so it is refused rather than stored —
+// same rule as an entry's own KeyVersion in posts.Service.Put.
+func TestPatch_RefusesACoverKeyVersionThatHasBeenRotatedAway(t *testing.T) {
+	service := &Service{Store: &fakeStore{
+		getMember: admin(circles.Member{}, nil),
+		getCircle: func(context.Context, string) (circles.Circle, error) {
+			return circles.Circle{KeyVersion: 3}, nil
+		},
+		updateCircle: func(context.Context, string, string, string, int64, string) (circles.Circle, error) {
+			panic("UpdateCircle must not be called for a stale cover key version")
+		},
+	}}
+
+	_, err := service.Patch(context.Background(), "circle-1", "admin-1", "", "cover-9", 2)
+	if !errors.Is(err, circles.ErrStaleKeyVersion) {
+		t.Fatalf("expected ErrStaleKeyVersion, got %v", err)
 	}
 }
 

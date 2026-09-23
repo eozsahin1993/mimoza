@@ -14,14 +14,18 @@ type patchRequest struct {
 	// the name and vice versa.
 	Name    string `json:"name"`
 	CoverID string `json:"coverId"`
+	// CoverKeyVersion is which content key the cover was sealed under —
+	// required alongside CoverID, same as a member's avatarId+keyVersion.
+	CoverKeyVersion int64 `json:"coverKeyVersion"`
 }
 
 type circleResponse struct {
-	CircleID      string `json:"circleId"`
-	Name          string `json:"name"`
-	CoverID       string `json:"coverId,omitempty"`
-	KeyVersion    int64  `json:"keyVersion"`
-	RosterVersion int64  `json:"rosterVersion"`
+	CircleID        string `json:"circleId"`
+	Name            string `json:"name"`
+	CoverID         string `json:"coverId,omitempty"`
+	CoverKeyVersion int64  `json:"coverKeyVersion,omitempty"`
+	KeyVersion      int64  `json:"keyVersion"`
+	RosterVersion   int64  `json:"rosterVersion"`
 }
 
 type PatchHandler struct {
@@ -39,17 +43,18 @@ func (h *PatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	circle, err := h.Service.Patch(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()), body.Name, body.CoverID)
+	circle, err := h.Service.Patch(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()), body.Name, body.CoverID, body.CoverKeyVersion)
 	if err != nil {
 		status, message := circles.Status(err)
 		httputil.WriteError(w, status, message)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, circleResponse{
-		CircleID:      circle.ID,
-		Name:          circle.Name,
-		CoverID:       circle.CoverID,
-		KeyVersion:    circle.KeyVersion,
-		RosterVersion: circle.RosterVersion,
+		CircleID:        circle.ID,
+		Name:            circle.Name,
+		CoverID:         circle.CoverID,
+		CoverKeyVersion: circle.CoverKeyVersion,
+		KeyVersion:      circle.KeyVersion,
+		RosterVersion:   circle.RosterVersion,
 	})
 }

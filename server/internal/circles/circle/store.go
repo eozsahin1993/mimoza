@@ -101,7 +101,7 @@ func (s *Store) CreateCircle(ctx context.Context, circle circles.Circle, founder
 // Update sets the name, the cover, or both, and records whichever
 // changed. Empty means "leave it alone", so a cover change does not have
 // to resend the name.
-func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actorID string) (circles.Circle, error) {
+func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID string, coverKeyVersion int64, actorID string) (circles.Circle, error) {
 	if name == "" && coverID == "" {
 		return s.GetCircle(ctx, circleID)
 	}
@@ -122,6 +122,8 @@ func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actor
 	if coverID != "" {
 		sets = append(sets, dynamo.AttrCoverID+" = :cover")
 		values[":cover"] = dynamoutil.Str(coverID)
+		sets = append(sets, dynamo.AttrCoverVersion+" = :coverVersion")
+		values[":coverVersion"] = dynamoutil.Num(coverKeyVersion)
 	}
 
 	// lastEntryAt rides on this same update: a transaction cannot write

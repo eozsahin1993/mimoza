@@ -19,6 +19,8 @@ export type Circle = {
   circleId: string;
   name: string;
   coverId?: string;
+  /** Which content key the cover is sealed under — absent exactly when coverId is. */
+  coverKeyVersion?: number;
   role: string;
   notifyLevel: string;
   keyVersion: number;
@@ -99,11 +101,11 @@ export async function renameCircle(circleId: string, name: string): Promise<void
   if (!response.ok) throw new Error(await describeError(response, 'renaming the circle'));
 }
 
-export async function setCover(circleId: string, coverId: string): Promise<void> {
+export async function setCover(circleId: string, coverId: string, coverKeyVersion: number): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${circleId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ coverId }),
+    body: JSON.stringify({ coverId, coverKeyVersion }),
   });
   if (!response.ok) throw new Error(await describeError(response, 'changing the cover'));
 }

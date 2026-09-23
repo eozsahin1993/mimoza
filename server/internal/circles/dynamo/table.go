@@ -88,6 +88,7 @@ func (t *Table) Key(pk, sk string) map[string]types.AttributeValue {
 const (
 	AttrName          = "name"
 	AttrCoverID       = "coverId"
+	AttrCoverVersion  = "coverKeyVersion"
 	AttrKeyVersion    = "keyVersion"
 	AttrRosterVersion = "rosterVersion"
 	AttrLastEntryAt   = "lastEntryAt"

@@ -1,4 +1,8 @@
 import {
+  AttachmentKinds,
+  AttachmentStatuses,
+  coverEntryId,
+  getAttachment,
   getCircle,
   initDatabase,
   listCircles,
@@ -6,6 +10,7 @@ import {
   listLeftCircles,
   listMembers,
   listRequests,
+  markAttachmentFetched,
   saveProfile,
   upsertRequest,
 } from '@/data/db';
@@ -197,6 +202,48 @@ describe('a sync pass', () => {
 
     expect(await syncCircles()).toBe(1);
     expect(await listMembers(good)).toHaveLength(1);
+  });
+
+  test('a cover with a key version becomes a pending attachment other devices can fetch', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({
+      circles: [circleOf(id, { coverId: 'cover-1', coverKeyVersion: 3 })],
+      requests: [],
+    });
+
+    await syncCircles();
+
+    const attachment = await getAttachment(id, coverEntryId('cover-1'));
+    expect(attachment?.kind).toBe(AttachmentKinds.CIRCLE_COVER);
+    expect(attachment?.keyVersion).toBe(3);
+    expect(attachment?.status).toBe(AttachmentStatuses.PENDING);
+  });
+
+  // A cover set before the relay carried a version has nothing to fetch
+  // it with — queuing it would just retry forever and never succeed.
+  test('a cover with no key version is left alone rather than queued to fail forever', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { coverId: 'cover-1' })], requests: [] });
+
+    await syncCircles();
+
+    expect(await getAttachment(id, coverEntryId('cover-1'))).toBeNull();
+  });
+
+  test('a repeat sync of the same cover does not reset an already-fetched attachment back to pending', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({
+      circles: [circleOf(id, { coverId: 'cover-1', coverKeyVersion: 3 })],
+      requests: [],
+    });
+    await syncCircles();
+    await markAttachmentFetched(id, coverEntryId('cover-1'), new Uint8Array([1, 2, 3]));
+
+    await syncCircles();
+
+    const attachment = await getAttachment(id, coverEntryId('cover-1'));
+    expect(attachment?.status).toBe(AttachmentStatuses.FETCHED);
+    expect(attachment?.bytes).not.toBeNull();
   });
 
   test('a request the relay no longer lists has been answered', async () => {

@@ -20,7 +20,7 @@ type store interface {
 	ListMemberships(ctx context.Context, accountID string) ([]circles.Membership, error)
 	GetCircle(ctx context.Context, circleID string) (circles.Circle, error)
 	GetMember(ctx context.Context, circleID, accountID string) (circles.Member, error)
-	UpdateCircle(ctx context.Context, circleID, name, coverID, actorID string) (circles.Circle, error)
+	UpdateCircle(ctx context.Context, circleID, name, coverID string, coverKeyVersion int64, actorID string) (circles.Circle, error)
 	DeleteCircle(ctx context.Context, circleID string) error
 }
 
@@ -102,11 +102,20 @@ func (s *Service) requireAdmin(ctx context.Context, circleID, accountID string) 
 
 // Patch sets the name, the cover, or both. A new cover is a new id, so
 // its bytes sit at a key nothing has cached.
-func (s *Service) Patch(ctx context.Context, circleID, accountID, name, coverID string) (circles.Circle, error) {
+func (s *Service) Patch(ctx context.Context, circleID, accountID, name, coverID string, coverKeyVersion int64) (circles.Circle, error) {
 	if err := s.requireAdmin(ctx, circleID, accountID); err != nil {
 		return circles.Circle{}, err
 	}
-	return s.Store.UpdateCircle(ctx, circleID, name, coverID, accountID)
+	if coverID != "" {
+		circle, err := s.Store.GetCircle(ctx, circleID)
+		if err != nil {
+			return circles.Circle{}, err
+		}
+		if coverKeyVersion != circle.KeyVersion {
+			return circles.Circle{}, circles.ErrStaleKeyVersion
+		}
+	}
+	return s.Store.UpdateCircle(ctx, circleID, name, coverID, coverKeyVersion, accountID)
 }
 
 // Delete ends a circle for everyone in it.

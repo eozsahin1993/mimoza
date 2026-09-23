@@ -104,7 +104,7 @@ func TestBlobs_ACoverIsAnAdminsToPutThere(t *testing.T) {
 		Expect(http.StatusOK).Decode(&target)
 	harness.PostBlob(t, target.URL, target.Fields, []byte("encrypted cover"))
 
-	admin.Patch(api("/circles/"+circleID), harness.Body{"coverId": "cover-1"}).Expect(http.StatusOK)
+	admin.Patch(api("/circles/"+circleID), harness.Body{"coverId": "cover-1", "coverKeyVersion": 1}).Expect(http.StatusOK)
 
 	// Any member reads the cover, and a new one is a new id rather than
 	// an overwrite.

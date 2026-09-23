@@ -32,7 +32,7 @@ export async function setCoverPhoto(circleId: string, photo: Uint8Array): Promis
     await getUploadTarget(circleId, BlobPaths.cover(coverId)),
     encrypt(photo, current.key)
   );
-  await setCover(circleId, coverId);
+  await setCover(circleId, coverId, current.version);
 
   await upsertAttachment({
     circleId,

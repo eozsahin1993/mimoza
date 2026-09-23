@@ -64,7 +64,7 @@ describe('what the client sends is what the relay reads', () => {
       'internal/circles/circle/patch.go',
       'patchRequest',
     ],
-    ['setting a cover', () => setCover('c1', 'cover-1'), 'internal/circles/circle/patch.go', 'patchRequest'],
+    ['setting a cover', () => setCover('c1', 'cover-1', 1), 'internal/circles/circle/patch.go', 'patchRequest'],
     [
       'changing a membership',
       () => patchMembership('c1', 'a1', { role: 'admin', notifyLevel: 'all', avatarId: 'av1', keyVersion: 2 }),

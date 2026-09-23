@@ -201,14 +201,15 @@ func SortByReceivedAt(comments []circles.Comment) {
 
 func CircleFrom(circleID string, item map[string]types.AttributeValue) circles.Circle {
 	return circles.Circle{
-		ID:            circleID,
-		Name:          dynamoutil.StringAt(item, AttrName),
-		CoverID:       dynamoutil.StringAt(item, AttrCoverID),
-		KeyVersion:    dynamoutil.IntAt(item, AttrKeyVersion),
-		RosterVersion: dynamoutil.IntAt(item, AttrRosterVersion),
-		LastEntryAt:   dynamoutil.TimeAt(item, AttrLastEntryAt),
-		CreatedBy:     dynamoutil.StringAt(item, AttrCreatedBy),
-		CreatedAt:     dynamoutil.TimeAt(item, AttrCreatedAt),
+		ID:              circleID,
+		Name:            dynamoutil.StringAt(item, AttrName),
+		CoverID:         dynamoutil.StringAt(item, AttrCoverID),
+		CoverKeyVersion: dynamoutil.IntAt(item, AttrCoverVersion),
+		KeyVersion:      dynamoutil.IntAt(item, AttrKeyVersion),
+		RosterVersion:   dynamoutil.IntAt(item, AttrRosterVersion),
+		LastEntryAt:     dynamoutil.TimeAt(item, AttrLastEntryAt),
+		CreatedBy:       dynamoutil.StringAt(item, AttrCreatedBy),
+		CreatedAt:       dynamoutil.TimeAt(item, AttrCreatedAt),
 	}
 }
 
