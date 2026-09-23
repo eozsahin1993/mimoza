@@ -197,8 +197,6 @@ func TestCircles_TheWalkResumesWhereItLeftOff(t *testing.T) {
 
 // --- helpers ------------------------------------------------------------
 
-// v2 is where the relay-owned circles live while the old routes still
-// answer under /v1.
 func api(path string) string { return "/v1" + path }
 
 type entryView struct {
@@ -213,6 +211,7 @@ type entryView struct {
 	} `json:"recentComments"`
 	MyTag      string `json:"myTag"`
 	ICommented bool   `json:"iCommented"`
+	UpdatedAt  int64  `json:"updatedAt"`
 }
 
 type pageView struct {

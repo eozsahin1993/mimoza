@@ -2,6 +2,7 @@ package requests
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -112,22 +113,32 @@ func (s *Store) ListRequestsForAccount(ctx context.Context, accountID string) ([
 	var requests []circles.Request
 	now := s.Now()
 	for start := 0; start < len(keys); start += 100 {
-		out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
-			RequestItems: map[string]types.KeysAndAttributes{
-				s.Name: {Keys: keys[start:min(start+100, len(keys))]},
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		for _, item := range out.Responses[s.Name] {
-			request := requestFrom(item)
-			// An expired ask is one nobody can answer any more, so it is
-			// not something to still be waiting on.
-			if !request.ExpiresAt.IsZero() && request.ExpiresAt.Before(now) {
-				continue
+		batch := keys[start:min(start+100, len(keys))]
+		for len(batch) > 0 {
+			out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+				RequestItems: map[string]types.KeysAndAttributes{s.Name: {Keys: batch}},
+			})
+			if err != nil {
+				return nil, err
 			}
-			requests = append(requests, request)
+			for _, item := range out.Responses[s.Name] {
+				request := requestFrom(item)
+				// An expired ask is one nobody can answer any more, so
+				// it is not something to still be waiting on.
+				if !request.ExpiresAt.IsZero() && request.ExpiresAt.Before(now) {
+					continue
+				}
+				requests = append(requests, request)
+			}
+
+			// Throttling comes back as keys left unread, not as an
+			// error: dropping them would tell a waiting device it has no
+			// outstanding ask.
+			unprocessed := out.UnprocessedKeys[s.Name].Keys
+			if len(unprocessed) >= len(batch) {
+				return nil, fmt.Errorf("circles: batch read stalled with %d keys left", len(unprocessed))
+			}
+			batch = unprocessed
 		}
 	}
 	return requests, nil

@@ -86,14 +86,19 @@ func (s *Store) DeletePost(ctx context.Context, circleID, postID string) (circle
 		Key:       s.Key(dynamo.CirclePK(circleID), dynamo.EntryKey(postID)),
 		UpdateExpression: aws.String("SET " + dynamo.AttrDeletedAt + " = :now, " + dynamo.AttrUpdatedAt + " = :now, " +
 			dynamo.ByTypeUpdatedKey + " = :key REMOVE " + dynamo.AttrCiphertext),
-		ConditionExpression: aws.String("attribute_exists(sk)"),
+		// Not already deleted: without this a repeat restamps deletedAt
+		// and the forward index key, which pushes a post nobody can read
+		// back to the head of every device's walk.
+		ConditionExpression: aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":now": dynamoutil.Millis(now),
 			":key": dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
 		},
 	})
 	if dynamoutil.ConditionFailed(err) {
-		return circles.Entry{}, circles.ErrEntryNotFound
+		// Either it was never there, or it is already gone — and a
+		// repeated deletion is the outcome the caller asked for.
+		return s.GetPost(ctx, circleID, postID, "")
 	}
 	if err != nil {
 		return circles.Entry{}, err

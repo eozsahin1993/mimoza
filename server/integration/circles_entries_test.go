@@ -11,6 +11,26 @@ import (
 
 // Removing a post is the author's, or an admin's. Nobody else can take
 // down what someone else put up.
+// A device retries from its outbox, so a deletion arrives more than
+// once. The repeat has to change nothing: a restamped deletion would
+// ride the forward walk again and arrive as news.
+func TestCircles_DeletingAPostTwiceChangesNothing(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	circleID := createCircle(t, admin, "Family")
+	putPost(t, admin, circleID, "post-1", 1)
+
+	var first, second entryView
+	admin.Delete(api("/circles/" + circleID + "/entries/post-1")).Expect(http.StatusOK).Decode(&first)
+	harness.AssertTrue(t, first.DeletedAt > 0, "the post is stamped deleted")
+
+	admin.Delete(api("/circles/" + circleID + "/entries/post-1")).Expect(http.StatusOK).Decode(&second)
+	harness.AssertEqual(t, second.DeletedAt, first.DeletedAt, "and the stamp does not move")
+	harness.AssertEqual(t, second.UpdatedAt, first.UpdatedAt, "nor does the walk key behind it")
+
+	admin.Delete(api("/circles/" + circleID + "/entries/never-posted")).Expect(http.StatusNotFound)
+}
+
 func TestCircles_DeletingAPostIsTheAuthorsOrAnAdmins(t *testing.T) {
 	relay := harness.Start(t)
 	admin := relay.SignIn()

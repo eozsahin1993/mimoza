@@ -44,8 +44,12 @@ func (t *Table) GetMember(ctx context.Context, circleID, accountID string) (circ
 	return MemberFrom(out.Item), nil
 }
 
+// ListMembers reads consistently: a kick seals the new key to whoever
+// this returns, so a member admitted moments ago being missing would
+// leave them holding no copy of it, with nothing flagged to repair.
 func (t *Table) ListMembers(ctx context.Context, circleID string) ([]circles.Member, error) {
 	paginator := dynamodb.NewQueryPaginator(t.Client, &dynamodb.QueryInput{
+		ConsistentRead:         aws.Bool(true),
 		TableName:              aws.String(t.Name),
 		KeyConditionExpression: aws.String("pk = :pk AND begins_with(sk, :prefix)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
