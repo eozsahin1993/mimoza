@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"mimoza-relay/internal/accounts"
+	"mimoza-relay/internal/circles"
 )
 
 type fakeStore struct {
@@ -159,5 +160,55 @@ func TestAFailedProfileWriteIsNotAnsweredWithTheOldOne(t *testing.T) {
 	}
 	if got.Name != "" {
 		t.Errorf("expected an empty profile on failure, got %+v", got)
+	}
+}
+
+type fakeNotifier struct{ events []circles.Notification }
+
+func (f *fakeNotifier) Notify(_ context.Context, event circles.Notification) {
+	f.events = append(f.events, event)
+}
+
+// A device with no private key waits for another member to reseal. The
+// reset wakes them silently, or it waits on someone opening the app.
+func TestAResetWakesTheOtherMembers(t *testing.T) {
+	notifier := &fakeNotifier{}
+	service := &Service{
+		Store:   &fakeStore{},
+		Circles: &fakeCircles{waiting: []string{"circle-1", "circle-2"}},
+		Notify:  notifier,
+	}
+
+	if _, err := service.SetPublicKey(context.Background(), "account-1", []byte("new"), true); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(notifier.events) != 2 {
+		t.Fatalf("expected one wake per circle, got %d", len(notifier.events))
+	}
+	for _, event := range notifier.events {
+		if event.Kind != circles.NotifyRoster {
+			t.Errorf("kind = %q, want a silent roster nudge", event.Kind)
+		}
+		if event.ActorID != "account-1" {
+			t.Errorf("the account that reset must not wake itself: %+v", event)
+		}
+	}
+}
+
+// Publishing a first key wakes nobody: nothing is waiting on a reseal.
+func TestPublishingAKeyWakesNobody(t *testing.T) {
+	notifier := &fakeNotifier{}
+	service := &Service{
+		Store:   &fakeStore{},
+		Circles: &fakeCircles{waiting: []string{"circle-1"}},
+		Notify:  notifier,
+	}
+
+	if _, err := service.SetPublicKey(context.Background(), "account-1", []byte("first"), false); err != nil {
+		t.Fatal(err)
+	}
+	if len(notifier.events) != 0 {
+		t.Errorf("expected nothing woken, got %+v", notifier.events)
 	}
 }

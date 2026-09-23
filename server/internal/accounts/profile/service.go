@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"mimoza-relay/internal/accounts"
+	"mimoza-relay/internal/circles"
 )
 
 type store interface {
@@ -25,6 +26,9 @@ type Service struct {
 	// replaced key would leave every circle unreadable with nothing
 	// asking anyone to fix it.
 	Circles rewrapper
+	// Notify wakes the other members so one of them reseals. Without it
+	// a recovering device waits for someone to open the app.
+	Notify circles.Notifier
 }
 
 func (s *Service) Get(ctx context.Context, accountID string) (accounts.Profile, error) {
@@ -49,5 +53,18 @@ func (s *Service) SetPublicKey(ctx context.Context, accountID string, publicKey 
 	if !reset || s.Circles == nil {
 		return nil, nil
 	}
-	return s.Circles.MarkMembershipsNeedRewrap(ctx, accountID)
+	waiting, err := s.Circles.MarkMembershipsNeedRewrap(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	// Silent, and to everyone but the account that reset: their own
+	// device already knows it is waiting.
+	if s.Notify != nil {
+		for _, circleID := range waiting {
+			s.Notify.Notify(ctx, circles.Notification{
+				Kind: circles.NotifyRoster, CircleID: circleID, ActorID: accountID,
+			})
+		}
+	}
+	return waiting, nil
 }

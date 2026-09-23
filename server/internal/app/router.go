@@ -135,6 +135,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	profile.Register(accountMux, &profile.Service{
 		Store:   profile.NewStore(deps.Accounts),
 		Circles: members.NewStore(deps.Circles),
+		Notify:  notifier,
 	}, readLimit, writeLimit)
 	devices.Register(accountMux, &devices.Service{Store: devices.NewStore(deps.Accounts)}, writeLimit)
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
