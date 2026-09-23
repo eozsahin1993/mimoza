@@ -142,11 +142,14 @@ func (s *Store) stripContent(ctx context.Context, circleID, accountID string) ([
 			}
 
 		case strings.Contains(sk, dynamo.ReactSeg):
-			if !strings.HasSuffix(sk, dynamo.ReactSeg+accountID) {
+			// One row per emoji, so a member can appear several times on
+			// the same post.
+			owner, tag, _ := strings.Cut(sk[strings.Index(sk, dynamo.ReactSeg)+len(dynamo.ReactSeg):], "#")
+			if owner != accountID {
 				continue
 			}
 			postID := strings.TrimPrefix(sk[:strings.Index(sk, dynamo.ReactSeg)], dynamo.ChildSK)
-			if err := s.dropReaction(ctx, circleID, postID, accountID, dynamoutil.StringAt(item, dynamo.AttrTag)); err != nil {
+			if err := s.dropReaction(ctx, circleID, postID, accountID, tag); err != nil {
 				return blobKeys, err
 			}
 		}
@@ -213,7 +216,7 @@ func (s *Store) stripComment(ctx context.Context, circleID, postID, childKey, ac
 	return err
 }
 
-// dropReaction removes the slot and its count.
+// dropReaction removes one reaction row and its count.
 func (s *Store) dropReaction(ctx context.Context, circleID, postID, accountID, tag string) error {
 	now := s.Now()
 	err := dynamo.WithRetry(func() error {
@@ -221,7 +224,7 @@ func (s *Store) dropReaction(ctx context.Context, circleID, postID, accountID, t
 			TransactItems: []types.TransactWriteItem{
 				{Delete: &types.Delete{
 					TableName:           aws.String(s.Name),
-					Key:                 s.Key(dynamo.CirclePK(circleID), dynamo.ReactionKey(postID, accountID)),
+					Key:                 s.Key(dynamo.CirclePK(circleID), dynamo.ReactionKey(postID, accountID, tag)),
 					ConditionExpression: aws.String("attribute_exists(sk)"),
 				}},
 				{Update: &types.Update{

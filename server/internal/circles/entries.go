@@ -40,12 +40,12 @@ type Entry struct {
 	CommentCount   int64
 	ReactionCounts map[string]int64
 	RecentComments []Comment
-	// MyTag is the reading member's own reaction tag, or empty, and
+	// IReacted is whether the reading member has reacted at all, and
 	// ICommented whether they have commented. Both are read straight off
 	// the post — it carries one entry per member who reacted or
 	// commented, and a read projects only the caller's own — so the wall
 	// needs no second query to show what you did.
-	MyTag      string
+	IReacted   bool
 	ICommented bool
 	UpdatedAt  time.Time
 	DeletedAt  time.Time
@@ -69,7 +69,7 @@ type Comment struct {
 	DeletedAt       time.Time
 }
 
-// Reaction is one member's reaction to one post — a slot, not an event,
+// Reaction is one of a member's reactions to one post — a row per emoji,
 // so changing it overwrites and the counts stay exact. Tag is
 // HMAC(HKDF(contentKey), emoji): the relay counts by it and never learns
 // which emoji it stands for.

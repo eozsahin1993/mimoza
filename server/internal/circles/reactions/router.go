@@ -1,6 +1,6 @@
-// Package reactions is the slice for a member's own reaction to a post.
-// One slot per member per post, addressed as "mine": setting it replaces
-// whatever was there, and clearing it takes it back.
+// Package reactions is the slice for a member's reactions to a post.
+// A member may hold several at once, so a reaction is a row per emoji:
+// adding one is idempotent, and taking one back names its tag.
 package reactions
 
 import "net/http"
@@ -11,7 +11,7 @@ func Register(mux *http.ServeMux, service *Service, write func(http.Handler) htt
 		handler http.Handler
 	}{
 		{"PUT /circles/{circleId}/entries/{postId}/reactions/me", &SetHandler{Service: service}},
-		{"DELETE /circles/{circleId}/entries/{postId}/reactions/me", &ClearHandler{Service: service}},
+		{"DELETE /circles/{circleId}/entries/{postId}/reactions/{tag}", &ClearHandler{Service: service}},
 	}
 	for _, route := range routes {
 		handler := route.handler

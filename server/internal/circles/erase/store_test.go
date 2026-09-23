@@ -50,7 +50,7 @@ func TestAccount_LeavesNothingOfTheAccountInACircle(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reactions.NewStore(table).SetReaction(ctx, circleID, circles.Reaction{
+	if _, err := reactions.NewStore(table).Add(ctx, circleID, circles.Reaction{
 		AccountID: leaver, PostID: "post-founder", Tag: "heart", KeyVersion: 1, Ciphertext: []byte("h"),
 	}); err != nil {
 		t.Fatal(err)

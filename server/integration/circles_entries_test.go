@@ -134,20 +134,32 @@ func TestCircles_AReactionIsASlotNotAnEvent(t *testing.T) {
 
 	react(admin, "tag-heart")
 	post := react(admin, "tag-heart")
-	harness.AssertEqual(t, post.ReactionCounts["tag-heart"], int64(1), "the same tag twice counts once")
+	harness.AssertEqual(t, post.ReactionCounts["tag-heart"], int64(1), "the same emoji twice counts once")
 
+	// A second emoji stands beside the first rather than replacing it.
 	post = react(admin, "tag-laugh")
-	harness.AssertEqual(t, post.ReactionCounts["tag-laugh"], int64(1), "changing moves the count")
-	harness.AssertEqual(t, post.ReactionCounts["tag-heart"], int64(0), "off the old tag")
+	harness.AssertEqual(t, post.ReactionCounts["tag-laugh"], int64(1), "the second emoji counts too")
+	harness.AssertEqual(t, post.ReactionCounts["tag-heart"], int64(1), "and the first is still there")
 
 	post = react(other, "tag-laugh")
 	harness.AssertEqual(t, post.ReactionCounts["tag-laugh"], int64(2), "each member counts separately")
 
-	var cleared entryView
-	admin.Delete(api("/circles/" + circleID + "/entries/post-1/reactions/me")).
-		Expect(http.StatusOK).Decode(&cleared)
+	// Taking one back names it, since "mine" no longer says which. Each
+	// answer decodes into a fresh value: iReacted is omitted when false,
+	// so a reused one would keep the previous true.
+	unreact := func(tag string) entryView {
+		t.Helper()
+		var cleared entryView
+		admin.Delete(api("/circles/" + circleID + "/entries/post-1/reactions/" + tag)).
+			Expect(http.StatusOK).Decode(&cleared)
+		return cleared
+	}
+
+	cleared := unreact("tag-laugh")
 	harness.AssertEqual(t, cleared.ReactionCounts["tag-laugh"], int64(1), "clearing takes only the caller's")
-	harness.AssertEqual(t, cleared.MyTag, "", "and they no longer have one")
+	harness.AssertTrue(t, cleared.IReacted, "their other reaction keeps the flag set")
+
+	harness.AssertTrue(t, !unreact("tag-heart").IReacted, "the last one takes the flag with it")
 }
 
 // History pages backward in the order things were written, and the count

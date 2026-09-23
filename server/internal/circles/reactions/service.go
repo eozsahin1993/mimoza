@@ -9,8 +9,8 @@ import (
 type store interface {
 	GetCircle(ctx context.Context, circleID string) (circles.Circle, error)
 	GetMember(ctx context.Context, circleID, accountID string) (circles.Member, error)
-	SetReaction(ctx context.Context, circleID string, reaction circles.Reaction) (circles.Entry, error)
-	ClearReaction(ctx context.Context, circleID, postID, accountID string) (circles.Entry, error)
+	Add(ctx context.Context, circleID string, reaction circles.Reaction) (circles.Entry, error)
+	Remove(ctx context.Context, circleID, postID, accountID, tag string) (circles.Entry, error)
 }
 
 type Service struct {
@@ -19,9 +19,9 @@ type Service struct {
 	Notify circles.Notifier
 }
 
-// Set replaces this member's reaction. The tag is what the relay counts
-// by; it never learns which emoji it stands for.
-func (s *Service) Set(ctx context.Context, circleID, accountID string, reaction circles.Reaction) (circles.Entry, error) {
+// Add records one of this member's reactions. The tag is what the relay
+// counts by; it never learns which emoji it stands for.
+func (s *Service) Add(ctx context.Context, circleID, accountID string, reaction circles.Reaction) (circles.Entry, error) {
 	if _, err := s.Store.GetMember(ctx, circleID, accountID); err != nil {
 		return circles.Entry{}, err
 	}
@@ -34,7 +34,7 @@ func (s *Service) Set(ctx context.Context, circleID, accountID string, reaction 
 	}
 
 	reaction.AccountID = accountID
-	post, err := s.Store.SetReaction(ctx, circleID, reaction)
+	post, err := s.Store.Add(ctx, circleID, reaction)
 	if err != nil {
 		return circles.Entry{}, err
 	}
@@ -47,9 +47,11 @@ func (s *Service) Set(ctx context.Context, circleID, accountID string, reaction 
 	return post, nil
 }
 
-func (s *Service) Clear(ctx context.Context, circleID, postID, accountID string) (circles.Entry, error) {
+// Remove takes one reaction back, named by its tag: a member may hold
+// several, so "mine" no longer says which.
+func (s *Service) Remove(ctx context.Context, circleID, postID, accountID, tag string) (circles.Entry, error) {
 	if _, err := s.Store.GetMember(ctx, circleID, accountID); err != nil {
 		return circles.Entry{}, err
 	}
-	return s.Store.ClearReaction(ctx, circleID, postID, accountID)
+	return s.Store.Remove(ctx, circleID, postID, accountID, tag)
 }

@@ -14,10 +14,10 @@ import (
 	"mimoza-relay/internal/util/testsupport"
 )
 
-// A reaction is a slot, not an event: changing one adjusts both tags,
-// and repeating one changes nothing. The counts on the post are what the
-// wall renders, so they have to be exact however they are reached.
-func TestSetReaction_MovesTheCountsBetweenTags(t *testing.T) {
+// A member may hold several reactions at once, and repeating one changes
+// nothing. The counts on the post are what the wall renders, so they have
+// to be exact however they are reached.
+func TestReactions_AMemberMayHoldSeveral(t *testing.T) {
 	ctx := context.Background()
 	table := testsupport.NewCircleTable(t)
 	postStore, reactionStore := posts.NewStore(table), reactions.NewStore(table)
@@ -31,54 +31,69 @@ func TestSetReaction_MovesTheCountsBetweenTags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	after, err := reactionStore.SetReaction(ctx, circleID, circles.Reaction{
-		AccountID: member, PostID: post.ID, Tag: "heart", KeyVersion: 1, Ciphertext: []byte("h"),
-	})
-	if err != nil {
-		t.Fatal(err)
+	react := func(tag string) circles.Entry {
+		t.Helper()
+		after, err := reactionStore.Add(ctx, circleID, circles.Reaction{
+			AccountID: member, PostID: post.ID, Tag: tag, KeyVersion: 1, Ciphertext: []byte(tag),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return after
 	}
+
+	after := react("heart")
 	if after.ReactionCounts["heart"] != 1 {
 		t.Fatalf("heart = %d, want 1", after.ReactionCounts["heart"])
 	}
-	if after.MyTag != "heart" {
-		t.Errorf("myTag = %q, want heart", after.MyTag)
+	if !after.IReacted {
+		t.Error("expected the caller to be marked as having reacted")
 	}
 
-	// The same tag again is a no-op, not a second count.
-	if after, err = reactionStore.SetReaction(ctx, circleID, circles.Reaction{
-		AccountID: member, PostID: post.ID, Tag: "heart", KeyVersion: 1, Ciphertext: []byte("h"),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if after.ReactionCounts["heart"] != 1 {
+	// The same emoji again is the same row, not a second count.
+	if after = react("heart"); after.ReactionCounts["heart"] != 1 {
 		t.Errorf("reacting twice with the same tag = %d, want 1", after.ReactionCounts["heart"])
 	}
 
-	// Changing tags moves the count rather than adding one.
-	if after, err = reactionStore.SetReaction(ctx, circleID, circles.Reaction{
-		AccountID: member, PostID: post.ID, Tag: "laugh", KeyVersion: 1, Ciphertext: []byte("l"),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if after.ReactionCounts["laugh"] != 1 || after.ReactionCounts["heart"] != 0 {
-		t.Errorf("after changing tag: laugh=%d heart=%d, want 1 and 0",
-			after.ReactionCounts["laugh"], after.ReactionCounts["heart"])
+	// A second emoji stands beside the first rather than replacing it.
+	after = react("laugh")
+	if after.ReactionCounts["heart"] != 1 || after.ReactionCounts["laugh"] != 1 {
+		t.Fatalf("heart=%d laugh=%d, want 1 and 1",
+			after.ReactionCounts["heart"], after.ReactionCounts["laugh"])
 	}
 
-	if after, err = reactionStore.ClearReaction(ctx, circleID, post.ID, member); err != nil {
+	// Taking one back leaves the other, and the flag stays set.
+	after, err = reactionStore.Remove(ctx, circleID, post.ID, member, "heart")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if after.ReactionCounts["laugh"] != 0 {
-		t.Errorf("after clearing: laugh=%d, want 0", after.ReactionCounts["laugh"])
+	if _, held := after.ReactionCounts["heart"]; held {
+		t.Errorf("heart should be gone from the counts, got %v", after.ReactionCounts)
 	}
-	if after.MyTag != "" {
-		t.Errorf("myTag = %q after clearing, want empty", after.MyTag)
+	if after.ReactionCounts["laugh"] != 1 {
+		t.Errorf("laugh = %d, want 1", after.ReactionCounts["laugh"])
+	}
+	if !after.IReacted {
+		t.Error("one reaction remains, so the flag stays set")
+	}
+
+	// Taking the last one back clears it.
+	if after, err = reactionStore.Remove(ctx, circleID, post.ID, member, "laugh"); err != nil {
+		t.Fatal(err)
+	}
+	if after.IReacted {
+		t.Error("expected the flag to come off with the last reaction")
+	}
+
+	// Taking back something that was never there changes nothing.
+	if _, err := reactionStore.Remove(ctx, circleID, post.ID, member, "heart"); err != nil {
+		t.Fatalf("removing a reaction that is not there: %v", err)
 	}
 }
 
-// Every member has their own slot, so their counts add up rather than
+// Every member's reactions count separately, so they add up rather than
 // overwrite each other.
-func TestSetReaction_CountsEveryMemberSeparately(t *testing.T) {
+func TestReactions_CountEveryMemberSeparately(t *testing.T) {
 	ctx := context.Background()
 	table := testsupport.NewCircleTable(t)
 	postStore, reactionStore := posts.NewStore(table), reactions.NewStore(table)
@@ -95,7 +110,7 @@ func TestSetReaction_CountsEveryMemberSeparately(t *testing.T) {
 	var last circles.Entry
 	for i := range 3 {
 		accountID := fmt.Sprintf("%s-%d", first, i)
-		last, err = reactionStore.SetReaction(ctx, circleID, circles.Reaction{
+		last, err = reactionStore.Add(ctx, circleID, circles.Reaction{
 			AccountID: accountID, PostID: post.ID, Tag: "heart", KeyVersion: 1, Ciphertext: []byte("h"),
 		})
 		if err != nil {

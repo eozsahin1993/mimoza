@@ -128,7 +128,7 @@ func EntryFrom(item map[string]types.AttributeValue) circles.Entry {
 	entry.CommentCount = dynamoutil.IntAt(item, AttrCommentCount)
 	entry.ReactionCounts = CountsFrom(item)
 	entry.RecentComments = RecentFrom(item, entry.ID)
-	entry.MyTag = TagOf(item)
+	entry.IReacted = ReactedBy(item)
 	entry.ICommented = HasCommented(item)
 	entry.UpdatedAt = dynamoutil.TimeAt(item, AttrUpdatedAt)
 	entry.DeletedAt = dynamoutil.TimeAt(item, AttrDeletedAt)
@@ -147,8 +147,9 @@ func CountsFrom(item map[string]types.AttributeValue) map[string]int64 {
 			continue
 		}
 		parsed, err := strconv.ParseInt(n.Value, 10, 64)
-		// A tag that has been added and removed back to zero stays in the
-		// map; clients hide it rather than the relay rewriting the map.
+		// ADD never removes a key, so a tag reacted with and then taken
+		// back sits at zero forever. Dropping it here is what keeps that
+		// off the wire.
 		if err != nil || parsed == 0 {
 			continue
 		}
@@ -280,21 +281,13 @@ func ExpiryFrom(item map[string]types.AttributeValue) time.Time {
 	return time.Unix(seconds, 0)
 }
 
-// TagOf and HasCommented read the one entry a projected read asks for:
+// ReactedBy and HasCommented read the one entry a projected read asks for:
 // the caller's own. A read that projected the whole map would answer for
 // whoever DynamoDB returned first, so both are only meaningful on a read
 // that asked for a single account.
-func TagOf(item map[string]types.AttributeValue) string {
+func ReactedBy(item map[string]types.AttributeValue) bool {
 	raw, ok := item[AttrReactors].(*types.AttributeValueMemberM)
-	if !ok || len(raw.Value) != 1 {
-		return ""
-	}
-	for _, tag := range raw.Value {
-		if value, ok := tag.(*types.AttributeValueMemberS); ok {
-			return value.Value
-		}
-	}
-	return ""
+	return ok && len(raw.Value) == 1
 }
 
 func HasCommented(item map[string]types.AttributeValue) bool {

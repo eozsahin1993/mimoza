@@ -71,10 +71,10 @@ through the `lookup` row.
 | `circle#<id>` | `key#<accountId>` | keys `{ "<v>": sealedKey }`, updatedAt |
 | `circle#<id>` | `invite#<code>` | createdBy, createdAt, expiresAt |
 | `circle#<id>` | `request#<requestId>` | accountId, publicKey, status `pending\|approved\|denied`, createdAt, expiresAt. Indexed by account like a membership, since the asker has no membership to read: the query that answers "which circles am I in" filters on the `member#` prefix, so an ask can never be mistaken for one |
-| `circle#<id>` | `entry#<postId>` | type `post`, authorId, keyVersion, ciphertext, hasBlob, visibility, commentCount, reactionCounts `{ tag: n }`, reactors `{ accountId: tag }`, commenters `{ accountId: true }`, recentComments, receivedAt, updatedAt, deletedAt, typeReceivedKey, typeUpdatedKey |
+| `circle#<id>` | `entry#<postId>` | type `post`, authorId, keyVersion, ciphertext, hasBlob, visibility, commentCount, reactionCounts `{ tag: n }`, reactors `{ accountId: true }`, commenters `{ accountId: true }`, recentComments, receivedAt, updatedAt, deletedAt, typeReceivedKey, typeUpdatedKey |
 | `circle#<id>` | `entry#<activityId>` | type `activity`, event, authorId (who did it), subjectId, subjectName, receivedAt, typeReceivedKey |
 | `circle#<id>` | `child#<postId>#comment#<commentId>` | authorId, parentCommentId, keyVersion, ciphertext, receivedAt, deletedAt |
-| `circle#<id>` | `child#<postId>#reaction#<accountId>` | tag, keyVersion, ciphertext, receivedAt |
+| `circle#<id>` | `child#<postId>#reaction#<accountId>#<tag>` | tag, keyVersion, ciphertext, receivedAt. One row per emoji: a member may hold several at once, and reacting twice with the same emoji is the same row |
 | `invite#<code>` | `meta` | circleId, createdBy, createdAt, expiresAt |
 
 - The circles column holds no names. A roster and a list of pending
@@ -86,7 +86,8 @@ through the `lookup` row.
   profile, not sent with the ask, so there is one place for it to live.
   An account that has published none cannot ask to join.
 - `recentComments` is the newest N comments, `{commentId, authorId, keyVersion, ciphertext, receivedAt}`, N a relay constant.
-- `reactors` and `commenters` are what a card says about **you**: your reaction's tag, and whether you have commented. Bounded by the member cap, and a read projects only the caller's own entry, so a page of 200 posts carries 200 tags rather than every reactor in the circle. They also mean neither answer costs a second read.
+- `reactors` and `commenters` are what a card says about **you**: whether you have reacted at all, and whether you have commented. Both are flags rather than detail, because the wall shows a filled state and not which emoji — that comes from the children fetch when a post is opened. A read projects only the caller's own entry, so a page of 200 posts carries 200 booleans rather than every reactor in the circle, and neither answer costs a second read. The flag comes off only with a member's last reaction.
+- `reactionCounts` is kept rather than derived from `reactors`, because it is bounded by the emoji palette while `reactors` grows with the roster: inlining the latter would trade a constant for something that scales with the member cap and eats the 1 MB page limit. `ADD` never removes a key, so a tag taken back sits at zero in the item forever; reads drop those on the way out.
 - `memberCount` exists so the member cap is a condition on the write rather than a count read beforehand, which two admins approving at once would both pass.
 - `needsRewrap` means the member replaced their keypair and their `key#` item is unreadable until another member re-seals it.
 - Activity events: `created`, `joined`, `left`, `removed`, `account_deleted`, `promoted`, `demoted`, `renamed`, `cover_changed`. The relay writes each one in the same transaction as the change it records.
@@ -142,7 +143,7 @@ outlives it.
 | create circle | one transaction: `meta`, founder `member#` (admin), founder `key#` with v1, `activity{created}` |
 | post | conditional put of `entry#<postId>`; duplicate id returns the existing entry |
 | comment | one transaction: conditional put of the child, `ADD commentCount 1`, and set `recentComments` (see below) |
-| react / unreact | read own slot; one transaction: put or delete the slot conditioned on what was read, `ADD` −1/+1 on the old and new tag |
+| react / unreact | read this member's rows on the post; one transaction: put or delete the one for that tag, `ADD` +1/−1 on it, and set or clear the `reactors` flag — clearing only when it was their last |
 | delete post | strip ciphertext, set `deletedAt` and `updatedAt`, delete the blob |
 | approve join | one transaction: `member#`, the joiner's `key#` with every version, `rosterVersion + 1`, request approved, `activity{joined}` |
 | kick | one transaction: delete `member#` and the leaver's `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read, `activity{removed}` |
@@ -211,7 +212,7 @@ GET /circles/{id}/blobs/avatar/{accountId}/{avatarId}
 ```
 
 A post entry in a page carries its counts, `recentComments`, and what the
-caller themselves did — `myTag` and `iCommented`, projected from the two
+caller themselves did — `iReacted` and `iCommented`, projected from the two
 maps above — so the feed renders from posts alone. Comments and reactions
 beyond that are fetched when a post is opened.
 

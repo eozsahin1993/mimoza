@@ -61,8 +61,15 @@ func CommentKey(postID, commentID string) string {
 	return ChildSK + postID + CommentSeg + commentID
 }
 
-func ReactionKey(postID, accountID string) string {
-	return ChildSK + postID + ReactSeg + accountID
+// ReactionKey is one row per member per emoji: a member may react more
+// than once, and reacting twice with the same emoji is the same row.
+func ReactionKey(postID, accountID, tag string) string {
+	return ReactionPrefix(postID, accountID) + tag
+}
+
+// ReactionPrefix is everything one member has reacted with on one post.
+func ReactionPrefix(postID, accountID string) string {
+	return ChildSK + postID + ReactSeg + accountID + "#"
 }
 
 // ChildPrefix is every comment and reaction on one post — what the post

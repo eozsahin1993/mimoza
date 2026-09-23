@@ -121,10 +121,44 @@ func (t *Table) GetPost(ctx context.Context, circleID, postID, readerID string) 
 	return EntryFrom(out.Item), nil
 }
 
-func (t *Table) GetReaction(ctx context.Context, circleID, postID, accountID string) (*circles.Reaction, error) {
+// ReactionsBy is everything one member has reacted with on one post,
+// which is what a write reads first to know whether it is adding,
+// repeating, or taking back the last one.
+func (t *Table) ReactionsBy(ctx context.Context, circleID, postID, accountID string) ([]circles.Reaction, error) {
+	paginator := dynamodb.NewQueryPaginator(t.Client, &dynamodb.QueryInput{
+		TableName:              aws.String(t.Name),
+		ConsistentRead:         aws.Bool(true),
+		KeyConditionExpression: aws.String("pk = :pk AND begins_with(sk, :prefix)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pk":     dynamoutil.Str(CirclePK(circleID)),
+			":prefix": dynamoutil.Str(ReactionPrefix(postID, accountID)),
+		},
+	})
+
+	var reactions []circles.Reaction
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range page.Items {
+			reactions = append(reactions, circles.Reaction{
+				AccountID:  accountID,
+				PostID:     postID,
+				Tag:        dynamoutil.StringAt(item, AttrTag),
+				KeyVersion: dynamoutil.IntAt(item, AttrKeyVersion),
+				Ciphertext: dynamoutil.BytesAt(item, AttrCiphertext),
+				ReceivedAt: dynamoutil.TimeAt(item, AttrReceivedAt),
+			})
+		}
+	}
+	return reactions, nil
+}
+
+func (t *Table) GetReaction(ctx context.Context, circleID, postID, accountID, tag string) (*circles.Reaction, error) {
 	out, err := t.Client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName:      aws.String(t.Name),
-		Key:            t.Key(CirclePK(circleID), ReactionKey(postID, accountID)),
+		Key:            t.Key(CirclePK(circleID), ReactionKey(postID, accountID, tag)),
 		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil || out.Item == nil {
@@ -174,10 +208,12 @@ func (t *Table) ListChildren(ctx context.Context, circleID, postID string) ([]ci
 					DeletedAt:       dynamoutil.TimeAt(item, AttrDeletedAt),
 				})
 			case strings.Contains(sk, ReactSeg):
+				// account#tag, and neither half can contain a hash.
+				accountID, tag, _ := strings.Cut(sk[strings.Index(sk, ReactSeg)+len(ReactSeg):], "#")
 				reactions = append(reactions, circles.Reaction{
-					AccountID:  sk[strings.Index(sk, ReactSeg)+len(ReactSeg):],
+					AccountID:  accountID,
 					PostID:     postID,
-					Tag:        dynamoutil.StringAt(item, AttrTag),
+					Tag:        tag,
 					KeyVersion: dynamoutil.IntAt(item, AttrKeyVersion),
 					Ciphertext: dynamoutil.BytesAt(item, AttrCiphertext),
 					ReceivedAt: dynamoutil.TimeAt(item, AttrReceivedAt),

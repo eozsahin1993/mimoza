@@ -115,7 +115,7 @@ func TestCircles_APostCarriesWhatACardNeeds(t *testing.T) {
 	harness.AssertEqual(t, card.CommentCount, int64(1), "the card counts the comment")
 	harness.AssertEqual(t, len(card.RecentComments), 1, "and carries the last one")
 	harness.AssertEqual(t, card.ReactionCounts["tag-heart"], int64(1), "and counts the reaction by tag")
-	harness.AssertEqual(t, card.MyTag, "tag-heart", "and says what the caller reacted with")
+	harness.AssertTrue(t, card.IReacted, "and says the caller has reacted")
 	harness.AssertTrue(t, card.ICommented, "and that the caller has commented")
 
 	// The details screen reads the children themselves.
@@ -209,9 +209,9 @@ type entryView struct {
 	RecentComments []struct {
 		CommentID string `json:"commentId"`
 	} `json:"recentComments"`
-	MyTag      string `json:"myTag"`
-	ICommented bool   `json:"iCommented"`
-	UpdatedAt  int64  `json:"updatedAt"`
+	IReacted   bool  `json:"iReacted"`
+	ICommented bool  `json:"iCommented"`
+	UpdatedAt  int64 `json:"updatedAt"`
 }
 
 type pageView struct {

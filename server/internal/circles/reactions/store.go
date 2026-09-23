@@ -2,7 +2,6 @@ package reactions
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -22,103 +21,88 @@ type Store struct {
 
 func NewStore(table *dynamo.Table) *Store { return &Store{Table: table} }
 
-// React sets this member's reaction, adjusting the post's per-tag counts
-// by the difference. A reaction is a slot rather than an event, so
-// changing one cannot double-count and a retry is harmless.
-func (s *Store) SetReaction(ctx context.Context, circleID string, reaction circles.Reaction) (circles.Entry, error) {
-	return s.set(ctx, circleID, reaction.PostID, reaction.AccountID, &reaction)
+// Add records one reaction. A member may hold several at once, so this
+// is a row per emoji rather than a slot: reacting twice with the same
+// emoji is the same row and changes nothing.
+func (s *Store) Add(ctx context.Context, circleID string, reaction circles.Reaction) (circles.Entry, error) {
+	return s.write(ctx, circleID, reaction.PostID, reaction.AccountID, reaction.Tag, &reaction)
 }
 
-// withCondition attaches a condition to whichever half of a transact
-// item is set.
-func withCondition(item types.TransactWriteItem, expression string, names map[string]string, values map[string]types.AttributeValue) types.TransactWriteItem {
-	switch {
-	case item.Put != nil:
-		item.Put.ConditionExpression = aws.String(expression)
-		item.Put.ExpressionAttributeNames = names
-		item.Put.ExpressionAttributeValues = values
-	case item.Delete != nil:
-		item.Delete.ConditionExpression = aws.String(expression)
-		item.Delete.ExpressionAttributeNames = names
-		item.Delete.ExpressionAttributeValues = values
-	}
-	return item
+// Remove takes one reaction back, named by its tag since "mine" no
+// longer identifies a single row.
+func (s *Store) Remove(ctx context.Context, circleID, postID, accountID, tag string) (circles.Entry, error) {
+	return s.write(ctx, circleID, postID, accountID, tag, nil)
 }
 
-func (s *Store) ClearReaction(ctx context.Context, circleID, postID, accountID string) (circles.Entry, error) {
-	return s.set(ctx, circleID, postID, accountID, nil)
-}
-func (s *Store) set(ctx context.Context, circleID, postID, accountID string, next *circles.Reaction) (circles.Entry, error) {
-	// The slot condition failing means this member's reaction moved
-	// between the read and the write — another device of theirs. That is
-	// a stale read, so it is worth rerunning; the post condition failing
-	// is not, and is mapped below.
-	err := dynamo.WithRetryOn(staleSlot, func() error {
-		previous, err := s.GetReaction(ctx, circleID, postID, accountID)
+func (s *Store) write(ctx context.Context, circleID, postID, accountID, tag string, next *circles.Reaction) (circles.Entry, error) {
+	err := dynamo.WithRetry(func() error {
+		held, err := s.ReactionsBy(ctx, circleID, postID, accountID)
 		if err != nil {
 			return err
 		}
-		if next != nil && previous != nil && previous.Tag == next.Tag {
-			return nil // The same reaction again.
+		has := false
+		for _, reaction := range held {
+			if reaction.Tag == tag {
+				has = true
+			}
 		}
-		if next == nil && previous == nil {
-			return nil // Nothing to take back.
+		if (next != nil) == has {
+			return nil // Already reacted with this, or nothing to take back.
 		}
 
 		now := s.Now()
-		counts := []string{}
-		names := map[string]string{"#reactor": accountID}
+		// Only the names the expression actually uses: DynamoDB rejects
+		// an unused one outright.
+		names := map[string]string{"#tag": tag}
 		values := map[string]types.AttributeValue{
-			":now": dynamoutil.Millis(now),
-			":key": dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
-		}
-		if previous != nil {
-			counts = append(counts, dynamo.AttrReactionCounts+".#old :minusOne")
-			names["#old"] = previous.Tag
-			values[":minusOne"] = dynamoutil.Num(-1)
-		}
-		if next != nil {
-			counts = append(counts, dynamo.AttrReactionCounts+".#new :one")
-			names["#new"] = next.Tag
-			values[":one"] = dynamoutil.Num(1)
-			values[":tag"] = dynamoutil.Str(next.Tag)
+			":now":   dynamoutil.Millis(now),
+			":key":   dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
+			":delta": dynamoutil.Num(1),
 		}
 
-		slot := types.TransactWriteItem{Delete: &types.Delete{
-			TableName: aws.String(s.Name),
-			Key:       s.Key(dynamo.CirclePK(circleID), dynamo.ReactionKey(postID, accountID)),
-		}}
-		if next != nil {
-			slot = types.TransactWriteItem{Put: &types.Put{
+		var row types.TransactWriteItem
+		reactors := ", " + dynamo.AttrReactors + ".#reactor = :reacted"
+		if next == nil {
+			values[":delta"] = dynamoutil.Num(-1)
+			row = types.TransactWriteItem{Delete: &types.Delete{
+				TableName:           aws.String(s.Name),
+				Key:                 s.Key(dynamo.CirclePK(circleID), dynamo.ReactionKey(postID, accountID, tag)),
+				ConditionExpression: aws.String("attribute_exists(sk)"),
+			}}
+			// The flag says "has reacted at all", so it only comes off
+			// with the last one. Another device of theirs adding one in
+			// between would leave it off; their next reaction sets it
+			// again, and nothing but a filled icon depends on it.
+			reactors = ""
+			if len(held) == 1 {
+				reactors = " REMOVE " + dynamo.AttrReactors + ".#reactor"
+				names["#reactor"] = accountID
+			}
+		} else {
+			names["#reactor"] = accountID
+			values[":reacted"] = dynamoutil.Bool(true)
+			row = types.TransactWriteItem{Put: &types.Put{
 				TableName: aws.String(s.Name),
 				Item: map[string]types.AttributeValue{
 					dynamoutil.PKAttr:     dynamoutil.Str(dynamo.CirclePK(circleID)),
-					dynamoutil.SKAttr:     dynamoutil.Str(dynamo.ReactionKey(postID, accountID)),
-					dynamo.AttrTag:        dynamoutil.Str(next.Tag),
+					dynamoutil.SKAttr:     dynamoutil.Str(dynamo.ReactionKey(postID, accountID, tag)),
+					dynamo.AttrTag:        dynamoutil.Str(tag),
 					dynamo.AttrKeyVersion: dynamoutil.Num(next.KeyVersion),
 					dynamo.AttrCiphertext: dynamoutil.Binary(next.Ciphertext),
 					dynamo.AttrReceivedAt: dynamoutil.Millis(now),
 				},
+				ConditionExpression: aws.String("attribute_not_exists(sk)"),
 			}}
-		}
-		// The slot is written against what was just read, so two devices
-		// of the same account cannot both adjust the counts from a stale
-		// view of it.
-		if previous == nil {
-			slot = withCondition(slot, "attribute_not_exists(sk)", nil, nil)
-		} else {
-			slot = withCondition(slot, dynamo.AttrTag+" = :expected", nil,
-				map[string]types.AttributeValue{":expected": dynamoutil.Str(previous.Tag)})
 		}
 
 		_, err = s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 			TransactItems: []types.TransactWriteItem{
-				slot,
+				row,
 				{Update: &types.Update{
 					TableName: aws.String(s.Name),
 					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.EntryKey(postID)),
-					UpdateExpression: aws.String("ADD " + strings.Join(counts, ", ") +
-						" SET " + dynamo.AttrUpdatedAt + " = :now, " + dynamo.ByTypeUpdatedKey + " = :key" + reactorSet(next)),
+					UpdateExpression: aws.String("ADD " + dynamo.AttrReactionCounts + ".#tag :delta" +
+						" SET " + dynamo.AttrUpdatedAt + " = :now, " + dynamo.ByTypeUpdatedKey + " = :key" + reactors),
 					ConditionExpression:       aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
 					ExpressionAttributeNames:  names,
 					ExpressionAttributeValues: values,
@@ -128,37 +112,15 @@ func (s *Store) set(ctx context.Context, circleID, postID, accountID string, nex
 		})
 		return err
 	})
-	if dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed {
+	switch {
+	case dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed:
 		return circles.Entry{}, circles.ErrEntryNotFound
-	}
-	if err != nil {
+	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:
+		// Another device of theirs got there first; the outcome is the
+		// one the caller asked for either way.
+	case err != nil:
 		return circles.Entry{}, err
 	}
 
-	post, err := s.GetPost(ctx, circleID, postID, "")
-	if err != nil {
-		return circles.Entry{}, err
-	}
-	if next != nil {
-		post.MyTag = next.Tag
-	}
-	return post, nil
-}
-
-// reactorSet records this member's tag on the post, or takes it off.
-// Written as its own path in the same update as the counts, so the two
-// can never disagree: another member's write touches a different path,
-// and a repeat of this one is the same value again.
-func reactorSet(next *circles.Reaction) string {
-	if next == nil {
-		return " REMOVE " + dynamo.AttrReactors + ".#reactor"
-	}
-	return ", " + dynamo.AttrReactors + ".#reactor = :tag"
-}
-
-// staleSlot reports whether the only thing that failed is the reaction
-// slot's own condition, at index 0 of the transaction.
-func staleSlot(err error) bool {
-	return dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed &&
-		dynamoutil.CancelledFor(err, 1) != dynamoutil.ConditionalCheckFailed
+	return s.GetPost(ctx, circleID, postID, accountID)
 }

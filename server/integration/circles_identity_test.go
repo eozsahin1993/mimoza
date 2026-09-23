@@ -58,14 +58,14 @@ func TestCircles_TheSessionIsTheIdentity(t *testing.T) {
 		harness.AssertTrue(t, containsEntry(theirs, "post-claimed"), "the post is in the walk")
 		for _, entry := range theirs.Entries {
 			if entry.EntryID == "post-claimed" {
-				harness.AssertEqual(t, entry.MyTag, "tag-heart", "the reactor sees their own tag")
+				harness.AssertTrue(t, entry.IReacted, "the reactor sees their own filled state")
 			}
 		}
 
 		others := walk(t, admin, circleID, "")
 		for _, entry := range others.Entries {
 			if entry.EntryID == "post-claimed" {
-				harness.AssertEqual(t, entry.MyTag, "", "someone who has not reacted sees none")
+				harness.AssertTrue(t, !entry.IReacted, "someone who has not reacted sees none")
 				harness.AssertEqual(t, entry.ReactionCounts["tag-heart"], int64(1), "but sees the count")
 			}
 		}

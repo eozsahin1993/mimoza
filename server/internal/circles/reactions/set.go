@@ -43,7 +43,7 @@ func (h *SetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := h.Service.Set(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()), circles.Reaction{
+	post, err := h.Service.Add(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()), circles.Reaction{
 		PostID:     r.PathValue("postId"),
 		Tag:        body.Tag,
 		KeyVersion: body.KeyVersion,

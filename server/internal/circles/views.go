@@ -29,12 +29,13 @@ type EntryView struct {
 	CommentCount   int64            `json:"commentCount,omitempty"`
 	ReactionCounts map[string]int64 `json:"reactionCounts,omitempty"`
 	RecentComments []CommentView    `json:"recentComments,omitempty"`
-	// MyTag is the caller's own reaction, and ICommented whether they
-	// have commented: what a card shows about you, without a second call.
-	MyTag      string `json:"myTag,omitempty"`
-	ICommented bool   `json:"iCommented,omitempty"`
-	UpdatedAt  int64  `json:"updatedAt,omitempty"`
-	DeletedAt  int64  `json:"deletedAt,omitempty"`
+	// IReacted and ICommented are what a card shows about you, without a
+	// second call. Which emoji you picked comes from the children fetch
+	// when the post is opened, since the wall only shows a filled state.
+	IReacted   bool  `json:"iReacted,omitempty"`
+	ICommented bool  `json:"iCommented,omitempty"`
+	UpdatedAt  int64 `json:"updatedAt,omitempty"`
+	DeletedAt  int64 `json:"deletedAt,omitempty"`
 
 	Event       string `json:"event,omitempty"`
 	SubjectID   string `json:"subjectId,omitempty"`
@@ -84,7 +85,7 @@ func FromEntry(entry Entry) EntryView {
 	for _, comment := range entry.RecentComments {
 		out.RecentComments = append(out.RecentComments, FromComment(comment))
 	}
-	out.MyTag = entry.MyTag
+	out.IReacted = entry.IReacted
 	out.ICommented = entry.ICommented
 	return out
 }
