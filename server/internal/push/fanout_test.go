@@ -233,3 +233,37 @@ func TestNotify_ReportsWhatItDelivered(t *testing.T) {
 		}
 	}
 }
+
+// Letting someone back in is an admin's job. A silent nudge goes to
+// everyone beside this, but the card that asks a human goes to the few
+// people who can act on it.
+func TestNotify_ARewrapCardAsksTheAdmins(t *testing.T) {
+	roster := []circles.Member{
+		{AccountID: "admin", Role: circles.RoleAdmin, NotifyLevel: circles.NotifyAll},
+		member("bystander", circles.NotifyAll),
+		member("locked-out", circles.NotifyAll),
+	}
+	devices := phone("admin")
+	devices["bystander"] = phone("bystander")["bystander"]
+	notifier, delivered := notifierFor(roster, devices)
+
+	notifier.Notify(context.Background(), Event{
+		Kind: KindRewrapNeeded, CircleID: "circle-1", ActorID: "locked-out",
+	})
+
+	if len(*delivered) != 1 || (*delivered)[0].token != "token-admin" {
+		t.Fatalf("expected only the admin, got %+v", *delivered)
+	}
+	message := (*delivered)[0].message
+	if message.Silent {
+		t.Error("the whole point is that it is not silent")
+	}
+	if message.BodyKey != keyRewrapNeeded {
+		t.Errorf("bodyKey = %q", message.BodyKey)
+	}
+	// It names who is locked out, or an admin cannot tell what they are
+	// being asked to do.
+	if len(message.Args) == 0 || message.Args[0] == "" {
+		t.Errorf("args = %v, want the locked-out member named", message.Args)
+	}
+}

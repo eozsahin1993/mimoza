@@ -33,6 +33,11 @@ const (
 	NotifyJoinRequest = "join_request"
 	NotifyApproved    = "approved"
 	NotifyRewrapped   = "rewrapped"
+	// NotifyRewrapNeeded asks a circle's admins to let someone back in.
+	// A card rather than a nudge: the silent push that goes out beside
+	// it is throttled by both platforms and dropped after a force quit,
+	// so waiting on it can mean waiting days.
+	NotifyRewrapNeeded = "rewrap_needed"
 	// NotifyRoster is silent: a nudge to re-sync, not a card.
 	NotifyRoster = "roster"
 )

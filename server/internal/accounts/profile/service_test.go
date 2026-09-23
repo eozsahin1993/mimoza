@@ -183,16 +183,17 @@ func TestAResetWakesTheOtherMembers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(notifier.events) != 2 {
-		t.Fatalf("expected one wake per circle, got %d", len(notifier.events))
-	}
+	// Two per circle: the silent nudge that fixes it with nobody
+	// involved, and the card that asks an admin when no device wakes.
+	kinds := map[string]int{}
 	for _, event := range notifier.events {
-		if event.Kind != circles.NotifyRoster {
-			t.Errorf("kind = %q, want a silent roster nudge", event.Kind)
-		}
+		kinds[event.Kind]++
 		if event.ActorID != "account-1" {
 			t.Errorf("the account that reset must not wake itself: %+v", event)
 		}
+	}
+	if kinds[circles.NotifyRoster] != 2 || kinds[circles.NotifyRewrapNeeded] != 2 {
+		t.Fatalf("expected a nudge and a card per circle, got %v", kinds)
 	}
 }
 

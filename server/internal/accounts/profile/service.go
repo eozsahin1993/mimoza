@@ -57,12 +57,17 @@ func (s *Service) SetPublicKey(ctx context.Context, accountID string, publicKey 
 	if err != nil {
 		return nil, err
 	}
-	// Silent, and to everyone but the account that reset: their own
-	// device already knows it is waiting.
+	// Two pushes per circle. The silent one fixes it with nobody
+	// involved, when a device happens to be awake. The card is what
+	// covers the case where none are, since a background wake is
+	// throttled by both platforms and dropped after a force quit.
 	if s.Notify != nil {
 		for _, circleID := range waiting {
 			s.Notify.Notify(ctx, circles.Notification{
 				Kind: circles.NotifyRoster, CircleID: circleID, ActorID: accountID,
+			})
+			s.Notify.Notify(ctx, circles.Notification{
+				Kind: circles.NotifyRewrapNeeded, CircleID: circleID, ActorID: accountID,
 			})
 		}
 	}

@@ -36,13 +36,14 @@ type Sender func(ctx context.Context, token, platform string, message Message) e
 type Kind = string
 
 const (
-	KindPost        = circles.NotifyPost
-	KindComment     = circles.NotifyComment
-	KindReaction    = circles.NotifyReaction
-	KindJoinRequest = circles.NotifyJoinRequest
-	KindApproved    = circles.NotifyApproved
-	KindRewrapped   = circles.NotifyRewrapped
-	KindRoster      = circles.NotifyRoster
+	KindPost         = circles.NotifyPost
+	KindComment      = circles.NotifyComment
+	KindReaction     = circles.NotifyReaction
+	KindJoinRequest  = circles.NotifyJoinRequest
+	KindApproved     = circles.NotifyApproved
+	KindRewrapped    = circles.NotifyRewrapped
+	KindRewrapNeeded = circles.NotifyRewrapNeeded
+	KindRoster       = circles.NotifyRoster
 )
 
 // Event is what a write handler reports once its write has landed. It is

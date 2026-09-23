@@ -2,8 +2,6 @@ package requests
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"time"
 
@@ -84,7 +82,7 @@ func (s *Service) Create(ctx context.Context, code, accountID string) (circles.R
 	request := circles.Request{
 		// One request per account per circle: asking twice replaces the
 		// first ask rather than queueing a second for an admin to answer.
-		ID:        requestID(accountID),
+		ID:        circles.RequestID(accountID),
 		CircleID:  invite.CircleID,
 		AccountID: accountID,
 		PublicKey: profile.PublicKey,
@@ -215,7 +213,3 @@ func (s *Service) requireAdmin(ctx context.Context, circleID, accountID string) 
 // what makes asking twice replace the first ask instead of queueing a
 // second for an admin to answer. A hash, so two accounts cannot land on
 // the same id and overwrite each other's ask.
-func requestID(accountID string) string {
-	sum := sha256.Sum256([]byte(accountID))
-	return hex.EncodeToString(sum[:16])
-}

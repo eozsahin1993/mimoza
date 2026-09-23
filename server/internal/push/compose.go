@@ -13,6 +13,7 @@ const (
 	keyJoinRequest     = "push.join_request"
 	keyApproved        = "push.approved"
 	keyRewrapped       = "push.rewrapped"
+	keyRewrapNeeded    = "push.rewrap_needed"
 	keyCircleTitle     = "push.title_circle"
 	keyAccountTitleKey = "push.title_account"
 )
@@ -53,6 +54,8 @@ func compose(event Event, actor, circle, recipient string) Message {
 		message.BodyKey = keyJoinRequest
 	case KindApproved:
 		message.BodyKey = keyApproved
+	case KindRewrapNeeded:
+		message.BodyKey = keyRewrapNeeded
 	case KindRewrapped:
 		message.TitleKey = keyAccountTitleKey
 		message.BodyKey = keyRewrapped

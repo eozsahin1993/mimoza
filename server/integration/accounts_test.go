@@ -175,6 +175,76 @@ func TestAccounts_DeletingAnAccountEndsIt(t *testing.T) {
 	device.Get(api("/circles")).Expect(http.StatusUnauthorized)
 }
 
+// Deleting an account reaches into every circle it was in. Before this
+// the memberships, the sealed keys and everything the account wrote
+// stayed behind, and it still counted against the member cap.
+func TestAccounts_DeletingAnAccountEmptiesItsCircles(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	member := relay.SignIn()
+	member.Put(api("/account/profile"), harness.Body{"name": "Ali"}).Expect(http.StatusOK)
+
+	circleID := createCircle(t, admin, "Family")
+	joinCircle(t, admin, member, circleID)
+	putPost(t, member, circleID, "post-1", 1)
+	putPost(t, admin, circleID, "post-2", 1)
+
+	member.Delete(api("/account")).Expect(http.StatusOK)
+
+	// Gone from the roster, so the circle has room again.
+	var roster struct {
+		Members []struct {
+			AccountID string `json:"accountId"`
+		} `json:"members"`
+	}
+	admin.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&roster)
+	harness.AssertEqual(t, len(roster.Members), 1, "only the admin is left")
+
+	// Their post is stripped, the admin's is untouched, and the wall
+	// says an account was deleted, with the name it had.
+	page := walk(t, admin, circleID, "")
+	for _, entry := range page.Entries {
+		if entry.EntryID == "post-1" {
+			harness.AssertTrue(t, entry.DeletedAt > 0, "their post is stamped deleted")
+			harness.AssertEqual(t, entry.Ciphertext, "", "and its content is gone")
+		}
+		if entry.EntryID == "post-2" {
+			harness.AssertTrue(t, entry.Ciphertext != "", "the admin's post is untouched")
+		}
+	}
+
+	var activity struct {
+		Entries []struct {
+			Event       string `json:"event"`
+			SubjectName string `json:"subjectName"`
+		} `json:"entries"`
+	}
+	admin.Get(api("/circles/" + circleID + "/entries?type=activity")).Expect(http.StatusOK).Decode(&activity)
+	var said bool
+	for _, entry := range activity.Entries {
+		if entry.Event == "account_deleted" && entry.SubjectName == "Ali" {
+			said = true
+		}
+	}
+	harness.AssertTrue(t, said, "the wall says who left")
+}
+
+// A circle nobody is left in is a circle nobody could read, so it goes
+// with its last member.
+func TestAccounts_DeletingTheLastMemberTakesTheCircle(t *testing.T) {
+	relay := harness.Start(t)
+	device := relay.SignIn()
+	circleID := createCircle(t, device, "Just me")
+	putPost(t, device, circleID, "post-1", 1)
+
+	device.Delete(api("/account")).Expect(http.StatusOK)
+
+	// A new account cannot see it, and neither can anyone: the rows are
+	// gone.
+	other := relay.SignIn()
+	other.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusForbidden)
+}
+
 // circleRow is one row of the list a sync starts from.
 type circleRow struct {
 	CircleID      string `json:"circleId"`

@@ -18,6 +18,7 @@ import (
 	"mimoza-relay/internal/circles/circle"
 	"mimoza-relay/internal/circles/comments"
 	"mimoza-relay/internal/circles/dynamo"
+	"mimoza-relay/internal/circles/erase"
 	circleinvites "mimoza-relay/internal/circles/invites"
 	"mimoza-relay/internal/circles/members"
 	"mimoza-relay/internal/circles/posts"
@@ -141,7 +142,12 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 
-	deleteAccountService := &deletion.Service{AuthStore: deps.Auth, Store: deletion.NewStore(deps.Accounts)}
+	deleteAccountService := &deletion.Service{
+		AuthStore: deps.Auth,
+		Store:     deletion.NewStore(deps.Accounts),
+		Circles:   erase.NewStore(deps.Circles),
+		Blobs:     deps.Blobs,
+	}
 	if deps.AppleID != nil {
 		deleteAccountService.RevokeApple = deps.AppleID.Revoke
 	}

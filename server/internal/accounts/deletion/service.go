@@ -8,13 +8,29 @@ import (
 	"mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/auth/appleid"
+	"mimoza-relay/internal/circles/erase"
 )
 
 type store interface {
 	// Providers is read before the account goes: the Apple grant to
 	// revoke is on one of these rows.
 	Providers(ctx context.Context, accountID string) ([]accounts.Provider, error)
+	// GetProfile is read for the name each circle stamps on its
+	// account_deleted row.
+	GetProfile(ctx context.Context, accountID string) (accounts.Profile, error)
 	Delete(ctx context.Context, accountID, keep string) error
+}
+
+// circles is the other column's half: building circle rows is its
+// business, not this one's.
+type circles interface {
+	Account(ctx context.Context, accountID, name string) (erase.Erased, error)
+}
+
+// bucket is what is deleted once the rows are gone.
+type blobs interface {
+	Delete(ctx context.Context, key string) error
+	DeletePrefix(ctx context.Context, prefix string) error
 }
 
 type Service struct {
@@ -22,6 +38,10 @@ type Service struct {
 	// Store holds the profile, devices and provider rows deletion
 	// removes, and the Apple grant it revokes on the way.
 	Store store
+	// Circles and Blobs are nil in tests that only care about the
+	// account's own rows.
+	Circles circles
+	Blobs   blobs
 	// RevokeApple is nil unless this environment has a Sign in with Apple
 	// key configured — see appleid.NewClient. Deletion works either way.
 	RevokeApple func(ctx context.Context, refreshToken string) error
@@ -33,10 +53,50 @@ type Service struct {
 // one row that stays, so the revoke can be retried.
 func (s *Service) Delete(ctx context.Context, accountID string) error {
 	keep := s.revokeAppleGrant(ctx, accountID)
+
+	// Circles first, while the profile still has a name to stamp.
+	if err := s.eraseCircles(ctx, accountID); err != nil {
+		return err
+	}
 	if err := s.Store.Delete(ctx, accountID, keep); err != nil {
 		return err
 	}
 	return s.AuthStore.DeleteAllSessions(ctx, accountID)
+}
+
+// eraseCircles empties the circles, then the bucket. A failed blob
+// delete is logged, not returned: the rows are gone, so the bytes are
+// unreachable and a retry would not find them either.
+func (s *Service) eraseCircles(ctx context.Context, accountID string) error {
+	if s.Circles == nil {
+		return nil
+	}
+
+	name := ""
+	if profile, err := s.Store.GetProfile(ctx, accountID); err == nil {
+		name = profile.Name
+	}
+
+	erased, err := s.Circles.Account(ctx, accountID, name)
+	if err != nil {
+		return err
+	}
+	if s.Blobs == nil {
+		return nil
+	}
+	for _, key := range erased.BlobKeys {
+		if err := s.Blobs.Delete(ctx, key); err != nil {
+			slog.ErrorContext(ctx, "deleted an account but not one of its photos",
+				"reason", "blob_not_deleted", "error", err, "key", key)
+		}
+	}
+	for _, prefix := range erased.Prefixes {
+		if err := s.Blobs.DeletePrefix(ctx, prefix); err != nil {
+			slog.ErrorContext(ctx, "deleted a circle but not its photos",
+				"reason", "blobs_not_deleted", "error", err, "prefix", prefix)
+		}
+	}
+	return nil
 }
 
 // revokeAppleGrant spends the refresh token banked at sign-in, so the app

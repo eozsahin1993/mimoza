@@ -8,6 +8,7 @@ import (
 	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/circles/erase"
 )
 
 type fakeAuthStore struct{ sessionsDeletedFor []string }
@@ -44,6 +45,10 @@ func (s *fakeAccounts) Providers(_ context.Context, accountID string) ([]account
 		return nil, nil
 	}
 	return []accounts.Provider{{Name: auth.AppleProvider, Subject: "sub", RefreshToken: token}}, nil
+}
+
+func (s *fakeAccounts) GetProfile(_ context.Context, accountID string) (accounts.Profile, error) {
+	return accounts.Profile{AccountID: accountID, Name: "Sarah"}, nil
 }
 
 func (s *fakeAccounts) Delete(_ context.Context, accountID, keep string) error {
@@ -168,5 +173,84 @@ func TestDeleteWithoutRevocationConfigured(t *testing.T) {
 	}
 	if len(sessions.sessionsDeletedFor) != 1 {
 		t.Fatalf("expected an ordinary deletion")
+	}
+}
+
+// fakeCircles is the other column's half: it reports what it erased so
+// the bytes can go too.
+type fakeCircles struct {
+	name   string
+	erased erase.Erased
+	err    error
+}
+
+func (f *fakeCircles) Account(_ context.Context, _, name string) (erase.Erased, error) {
+	f.name = name
+	return f.erased, f.err
+}
+
+type fakeBlobs struct {
+	deleted []string
+	swept   []string
+}
+
+func (f *fakeBlobs) Delete(_ context.Context, key string) error {
+	f.deleted = append(f.deleted, key)
+	return nil
+}
+
+func (f *fakeBlobs) DeletePrefix(_ context.Context, prefix string) error {
+	f.swept = append(f.swept, prefix)
+	return nil
+}
+
+// Deleting an account has to reach the circles too, and the bytes those
+// rows pointed at. Without this the account left its posts, photos and
+// memberships behind in every circle it was in.
+func TestDeleteErasesTheCirclesAndTheirBytes(t *testing.T) {
+	circles := &fakeCircles{erased: erase.Erased{
+		BlobKeys: []string{"circle-1/post-1"},
+		Prefixes: []string{"circle-2/"},
+	}}
+	blobs := &fakeBlobs{}
+	service, sessions := newService(&fakeAccounts{tokens: map[string]string{}}, nil)
+	service.Circles, service.Blobs = circles, blobs
+
+	if err := service.Delete(context.Background(), "account-1"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The name is read while the profile is still there, because the
+	// wall has to say who left.
+	if circles.name != "Sarah" {
+		t.Errorf("name = %q, want the profile's", circles.name)
+	}
+	if len(blobs.deleted) != 1 || blobs.deleted[0] != "circle-1/post-1" {
+		t.Errorf("deleted %v", blobs.deleted)
+	}
+	if len(blobs.swept) != 1 || blobs.swept[0] != "circle-2/" {
+		t.Errorf("swept %v", blobs.swept)
+	}
+	if len(sessions.sessionsDeletedFor) != 1 {
+		t.Error("expected the sessions to go last")
+	}
+}
+
+// If the circles cannot be erased, the account stays: deleting it first
+// would leave content nobody can attribute and no membership to find it
+// by, with nothing left that could retry.
+func TestDeleteStopsWhenTheCirclesCannotBeErased(t *testing.T) {
+	credentials := &fakeAccounts{tokens: map[string]string{}}
+	service, sessions := newService(credentials, nil)
+	service.Circles = &fakeCircles{err: errors.New("dynamo is down")}
+
+	if err := service.Delete(context.Background(), "account-1"); err == nil {
+		t.Fatal("expected the failure to reach the caller")
+	}
+	if len(credentials.deleted) != 0 {
+		t.Error("the account must survive a failed erasure")
+	}
+	if len(sessions.sessionsDeletedFor) != 0 {
+		t.Error("and so must its sessions")
 	}
 }

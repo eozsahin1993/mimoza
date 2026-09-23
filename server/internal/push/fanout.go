@@ -104,6 +104,14 @@ func (n *Notifier) recipients(ctx context.Context, event Event) ([]string, strin
 		if member.AccountID == event.ActorID {
 			continue
 		}
+		// Letting someone back in is an admin's job, and telling fifty
+		// people about one person's new phone is noise.
+		if event.Kind == KindRewrapNeeded {
+			if member.IsAdmin() {
+				recipients = append(recipients, member.AccountID)
+			}
+			continue
+		}
 		// The author of the photo hears about a comment or a reaction on
 		// it whatever else they have silenced, short of silencing
 		// everything.
