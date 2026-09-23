@@ -51,9 +51,18 @@ func TestStore_ACircleCannotBeLeftWithoutAnAdmin(t *testing.T) {
 	})
 
 	t.Run("nor leave", func(t *testing.T) {
-		err := memberStore.LeaveCircle(ctx, circleID, admin, "")
+		err := memberStore.LeaveCircle(ctx, circleID, admin, "", 1, map[string][]byte{other: []byte("sealed-v2")})
 		if !errors.Is(err, circles.ErrWouldEmptyAdmins) {
 			t.Fatalf("expected ErrWouldEmptyAdmins, got %v", err)
+		}
+	})
+
+	t.Run("a stale version fails as itself, not as the admin guard", func(t *testing.T) {
+		// other is not yet an admin, so this would also strand the circle —
+		// the wrong version has to be what comes back regardless.
+		err := memberStore.LeaveCircle(ctx, circleID, admin, "", 99, map[string][]byte{other: []byte("sealed-v2")})
+		if !errors.Is(err, circles.ErrVersionMoved) {
+			t.Fatalf("expected ErrVersionMoved, got %v", err)
 		}
 	})
 
@@ -61,16 +70,61 @@ func TestStore_ACircleCannotBeLeftWithoutAnAdmin(t *testing.T) {
 		if err := memberStore.SetRole(ctx, circleID, other, circles.RoleAdmin, admin, ""); err != nil {
 			t.Fatal(err)
 		}
-		if err := memberStore.LeaveCircle(ctx, circleID, admin, ""); err != nil {
+		if err := memberStore.LeaveCircle(ctx, circleID, admin, "", 1, map[string][]byte{other: []byte("sealed-v2")}); err != nil {
 			t.Fatalf("leaving with another admin in place: %v", err)
+		}
+
+		circle, err := memberStore.GetCircle(ctx, circleID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if circle.KeyVersion != 2 {
+			t.Fatalf("expected the key to have rotated to version 2, got %d", circle.KeyVersion)
+		}
+		sealed, err := memberStore.GetSealedKeys(ctx, circleID, other)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(sealed[2]) != "sealed-v2" {
+			t.Fatalf("expected other's sealed keys to carry version 2, got %+v", sealed)
 		}
 	})
 
 	t.Run("and the last member out strands nobody", func(t *testing.T) {
-		if err := memberStore.LeaveCircle(ctx, circleID, other, ""); err != nil {
+		if err := memberStore.LeaveCircle(ctx, circleID, other, "", 2, map[string][]byte{}); err != nil {
 			t.Fatalf("the last member leaving: %v", err)
 		}
 	})
+}
+
+// The new key must cover every member staying behind — a leave that
+// forgets one would lock them out of everything posted after it.
+func TestStore_LeaveRefusesAnIncompleteKeySet(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	circleStore, memberStore := circle.NewStore(table), members.NewStore(table)
+
+	circleID := testsupport.UniqueCircleID(t)
+	admin := testsupport.UniqueAccountID(t)
+	other := admin + "-second"
+
+	err := circleStore.CreateCircle(ctx, circles.Circle{
+		ID: circleID, Name: "test", KeyVersion: 1, RosterVersion: 1, CreatedBy: admin, CreatedAt: time.Now(),
+	}, circles.Member{AccountID: admin, Role: circles.RoleAdmin, NotifyLevel: circles.NotifyAll}, []byte("sealed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	addMember(t, table, circleID, other)
+	third := other + "-third"
+	addMember(t, table, circleID, third)
+
+	err = memberStore.LeaveCircle(ctx, circleID, admin, "", 1, map[string][]byte{other: []byte("sealed-v2")})
+	if !errors.Is(err, circles.ErrIncompleteKeys) {
+		t.Fatalf("expected ErrIncompleteKeys, got %v", err)
+	}
+	if _, err := memberStore.GetMember(ctx, circleID, admin); err != nil {
+		t.Fatalf("the leave must not have landed: %v", err)
+	}
 }
 
 // addMember admits someone the way the relay does, through a request and

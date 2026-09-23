@@ -18,7 +18,7 @@ type store interface {
 	SetNotifyLevel(ctx context.Context, circleID, accountID, level string) error
 	SetAvatar(ctx context.Context, circleID, accountID, avatarID string, keyVersion int64) error
 	RemoveMember(ctx context.Context, circleID, accountID, actorID, subjectName string, expectedVersion int64, sealed map[string][]byte) error
-	LeaveCircle(ctx context.Context, circleID, accountID, subjectName string) error
+	LeaveCircle(ctx context.Context, circleID, accountID, subjectName string, expectedVersion int64, sealed map[string][]byte) error
 	ReplaceSealedKeys(ctx context.Context, circleID, accountID string, sealed circles.SealedKeys) error
 }
 
@@ -202,7 +202,7 @@ func (s *Service) Remove(ctx context.Context, circleID, subjectID, actorID strin
 		return err
 	}
 	if subjectID == actorID {
-		// Removing yourself is leaving, which does not rotate.
+		// Removing yourself is leaving — call that instead.
 		return circles.ErrNotTheAuthor
 	}
 	// The picture they put here goes with them: it was sealed to this
@@ -220,8 +220,10 @@ func (s *Service) Remove(ctx context.Context, circleID, subjectID, actorID strin
 }
 
 // Leave is never refused for long: the last admin has to hand the role
-// on first, but nobody is held in a circle.
-func (s *Service) Leave(ctx context.Context, circleID, accountID string) error {
+// on first, but nobody is held in a circle. Rotates the content key the
+// same way Remove does — the caller supplies the new key sealed to
+// everyone who stays.
+func (s *Service) Leave(ctx context.Context, circleID, accountID string, expectedVersion int64, sealed map[string][]byte) error {
 	if err := s.wouldStrandCircle(ctx, circleID, accountID); err != nil {
 		return err
 	}
@@ -229,7 +231,7 @@ func (s *Service) Leave(ctx context.Context, circleID, accountID string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.Store.LeaveCircle(ctx, circleID, accountID, s.nameOf(ctx, accountID)); err != nil {
+	if err := s.Store.LeaveCircle(ctx, circleID, accountID, s.nameOf(ctx, accountID), expectedVersion, sealed); err != nil {
 		return err
 	}
 	s.retireAvatar(ctx, circleID, accountID, departing.AvatarID, "")

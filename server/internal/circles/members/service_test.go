@@ -80,7 +80,7 @@ func (f *fakeStore) RemoveMember(_ context.Context, _, accountID, _, subjectName
 	return f.removeErr
 }
 
-func (f *fakeStore) LeaveCircle(_ context.Context, _, accountID, subjectName string) error {
+func (f *fakeStore) LeaveCircle(_ context.Context, _, accountID, subjectName string, _ int64, _ map[string][]byte) error {
 	f.left = accountID
 	f.stampedName = subjectName
 	return f.leaveErr
@@ -157,7 +157,7 @@ func TestLeave_RefusesTheLastAdminWhileOthersRemain(t *testing.T) {
 	store := roster(adminMember("admin-1"), plainMember("member-2"))
 	service := serviceFor(store, nil)
 
-	if err := service.Leave(context.Background(), "circle-1", "admin-1"); !errors.Is(err, circles.ErrWouldEmptyAdmins) {
+	if err := service.Leave(context.Background(), "circle-1", "admin-1", 1, nil); !errors.Is(err, circles.ErrWouldEmptyAdmins) {
 		t.Fatalf("expected ErrWouldEmptyAdmins, got %v", err)
 	}
 	if store.left != "" {
@@ -171,7 +171,7 @@ func TestLeave_AllowsTheLastAdminWhenNobodyElseIsLeft(t *testing.T) {
 	store := roster(adminMember("admin-1"))
 	service := serviceFor(store, nil)
 
-	if err := service.Leave(context.Background(), "circle-1", "admin-1"); err != nil {
+	if err := service.Leave(context.Background(), "circle-1", "admin-1", 1, nil); err != nil {
 		t.Fatal(err)
 	}
 	if store.left != "admin-1" {
@@ -183,7 +183,7 @@ func TestLeave_AllowsAnAdminWhenAnotherRemains(t *testing.T) {
 	store := roster(adminMember("admin-1"), adminMember("admin-2"))
 	service := serviceFor(store, nil)
 
-	if err := service.Leave(context.Background(), "circle-1", "admin-1"); err != nil {
+	if err := service.Leave(context.Background(), "circle-1", "admin-1", 1, nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -224,8 +224,8 @@ func TestSetNotifyLevel_IsOnlyYourOwn(t *testing.T) {
 	}
 }
 
-// Removing yourself is leaving, which does not rotate the key — sending
-// it down the removal path would churn everyone else's keys for nothing.
+// Removing yourself is Leave's endpoint, not this one — both rotate, but
+// only Leave carries the last-admin guard self-removal needs.
 func TestRemove_RefusesRemovingYourself(t *testing.T) {
 	store := roster(adminMember("admin-1"), plainMember("member-2"))
 	service := serviceFor(store, nil)
@@ -354,7 +354,7 @@ func TestDepartures_StampTheNameOnTheActivity(t *testing.T) {
 		store := roster(adminMember("admin-1"), adminMember("member-2"))
 		service := serviceFor(store, named(names))
 
-		if err := service.Leave(context.Background(), "circle-1", "member-2"); err != nil {
+		if err := service.Leave(context.Background(), "circle-1", "member-2", 1, nil); err != nil {
 			t.Fatal(err)
 		}
 		if store.stampedName != "Ali" {

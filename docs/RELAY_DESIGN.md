@@ -146,7 +146,7 @@ outlives it.
 | delete post | strip ciphertext, set `deletedAt` and `updatedAt`, delete the blob |
 | approve join | one transaction: `member#`, the joiner's `key#` with every version, `rosterVersion + 1`, request approved, `activity{joined}` |
 | kick | one transaction: delete `member#` and the leaver's `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read, `activity{removed}` |
-| leave | delete own `member#` and `key#`, `meta{rosterVersion + 1, memberCount − 1}`, `activity{left}`. No rotation: a leaver must not be able to churn everyone's keys |
+| leave | same shape as kick, self-directed: delete own `member#` and `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read and, for an admin, on another admin remaining, `activity{left}` |
 | role change, rename, cover | row update with an admin check, `rosterVersion + 1` where membership changes, matching activity. A request that sets both a name and a cover records both |
 | notification level | the member's own row, no activity — nobody else needs to know — but `rosterVersion + 1`, so that account's other devices refetch |
 | visibility, delete post, delete comment | see Reads: each stamps `updatedAt` and the forward index key, so the change reaches every device through the walk |

@@ -119,7 +119,12 @@ func TestCircles_ActivityKeepsTheNameOfWhoeverLeft(t *testing.T) {
 
 	circleID := createCircle(t, admin, "Family")
 	joinCircle(t, admin, member, circleID)
-	member.Post(api("/circles/"+circleID+"/leave"), nil).Expect(http.StatusNoContent)
+	member.Post(api("/circles/"+circleID+"/leave"), harness.Body{
+		"expectedVersion": 1,
+		"sealed": map[string]string{
+			admin.AccountID(): base64.StdEncoding.EncodeToString([]byte("v2-admin")),
+		},
+	}).Expect(http.StatusNoContent)
 
 	var page struct {
 		Entries []struct {
@@ -157,7 +162,13 @@ func TestCircles_TheLastAdminCannotLeaveOrStepDown(t *testing.T) {
 	circleID := createCircle(t, admin, "Family")
 	joinCircle(t, admin, member, circleID)
 
-	admin.Post(api("/circles/"+circleID+"/leave"), nil).Expect(http.StatusConflict)
+	leaveBody := harness.Body{
+		"expectedVersion": 1,
+		"sealed": map[string]string{
+			member.AccountID(): base64.StdEncoding.EncodeToString([]byte("v2-member")),
+		},
+	}
+	admin.Post(api("/circles/"+circleID+"/leave"), leaveBody).Expect(http.StatusConflict)
 	admin.Patch(api("/circles/"+circleID+"/members/"+admin.AccountID()), harness.Body{
 		"role": "member",
 	}).Expect(http.StatusConflict)
@@ -166,7 +177,7 @@ func TestCircles_TheLastAdminCannotLeaveOrStepDown(t *testing.T) {
 	admin.Patch(api("/circles/"+circleID+"/members/"+member.AccountID()), harness.Body{
 		"role": "admin",
 	}).Expect(http.StatusNoContent)
-	admin.Post(api("/circles/"+circleID+"/leave"), nil).Expect(http.StatusNoContent)
+	admin.Post(api("/circles/"+circleID+"/leave"), leaveBody).Expect(http.StatusNoContent)
 
 	// Gone: the circle is no longer theirs to read.
 	admin.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusForbidden)

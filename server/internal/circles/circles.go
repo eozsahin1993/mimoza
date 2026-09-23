@@ -17,7 +17,7 @@ type Circle struct {
 	Name    string
 	CoverID string
 	// KeyVersion is the content key entries must be encrypted under; it
-	// rises by one every time a member is removed.
+	// rises by one every time a member leaves the circle, removed or not.
 	KeyVersion int64
 	// RosterVersion rises on every membership, role or key change, so a
 	// device can tell from the circle list alone whether to refetch the

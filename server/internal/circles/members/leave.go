@@ -13,7 +13,13 @@ type LeaveHandler struct {
 }
 
 func (h *LeaveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	err := h.Service.Leave(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
+	expectedVersion, sealed, badRequest := decodeRotation(r)
+	if badRequest != "" {
+		httputil.WriteError(w, http.StatusBadRequest, badRequest)
+		return
+	}
+
+	err := h.Service.Leave(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()), expectedVersion, sealed)
 	if err != nil {
 		status, message := circles.Status(err)
 		httputil.WriteError(w, status, message)

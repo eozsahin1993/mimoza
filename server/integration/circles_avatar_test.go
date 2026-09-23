@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"encoding/base64"
 	"net/http"
 	"testing"
 
@@ -119,7 +120,12 @@ func TestCircleAvatars_LeavingTakesThePicture(t *testing.T) {
 		Expect(http.StatusOK).Decode(&download)
 	harness.AssertEqual(t, fetchStatus(t, download.URL), http.StatusOK, "the picture is there while they are")
 
-	member.Post(api("/circles/"+circleID+"/leave"), nil).Expect(http.StatusNoContent)
+	member.Post(api("/circles/"+circleID+"/leave"), harness.Body{
+		"expectedVersion": 1,
+		"sealed": map[string]string{
+			admin.AccountID(): base64.StdEncoding.EncodeToString([]byte("v2-admin")),
+		},
+	}).Expect(http.StatusNoContent)
 
 	harness.AssertEqual(t, fetchStatus(t, download.URL), http.StatusNotFound, "and gone once they leave")
 }

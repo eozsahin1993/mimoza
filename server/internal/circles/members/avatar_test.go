@@ -131,7 +131,7 @@ func TestDepartures_TakeThePictureWithThem(t *testing.T) {
 		bucket := &fakeBucket{}
 		service := withBucket(store, bucket)
 
-		if err := service.Leave(context.Background(), "circle-1", "member-1"); err != nil {
+		if err := service.Leave(context.Background(), "circle-1", "member-1", 1, nil); err != nil {
 			t.Fatal(err)
 		}
 		if len(bucket.deleted) != 1 || bucket.deleted[0] != "circle-1/avatar/member-1/hash-1" {

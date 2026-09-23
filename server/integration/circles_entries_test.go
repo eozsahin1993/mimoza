@@ -200,7 +200,12 @@ func TestCircles_TheActivityStreamRecordsWhatHappened(t *testing.T) {
 	admin.Patch(api("/circles/"+circleID+"/members/"+member.AccountID()), harness.Body{
 		"role": "admin",
 	}).Expect(http.StatusNoContent)
-	member.Post(api("/circles/"+circleID+"/leave"), nil).Expect(http.StatusNoContent)
+	member.Post(api("/circles/"+circleID+"/leave"), harness.Body{
+		"expectedVersion": 1,
+		"sealed": map[string]string{
+			admin.AccountID(): base64.StdEncoding.EncodeToString([]byte("v2-admin")),
+		},
+	}).Expect(http.StatusNoContent)
 
 	var stream struct {
 		Entries []struct {
