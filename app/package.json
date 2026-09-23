@@ -62,7 +62,6 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
-    "@bacons/apple-targets": "^5.0.0",
     "@expo/fingerprint": "^0.20.11",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.4.0",
@@ -97,7 +96,7 @@
     "lint": "expo lint",
     "test": "fnm exec --using=22.23.2 -- jest",
     "db:generate": "drizzle-kit generate",
-    "i18n:ios": "node scripts/generate-push-strings.js"
+    "i18n:push": "node scripts/generate-push-strings.js"
   },
   "private": true,
   "jest": {

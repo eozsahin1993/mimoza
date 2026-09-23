@@ -11,7 +11,6 @@ import { Snackbar } from '@/ui/components/snackbar';
 import { Colors } from '@/ui/theme/tokens';
 import { initDatabase } from '@/data/db';
 import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
-import { startPushHandling } from '@/features/push-notifications/services/task';
 import { startPushTapRouting } from '@/features/push-notifications/services/tap';
 import { AppSettingsProvider, useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useMessages } from '@/core/hooks/use-messages';
@@ -103,11 +102,7 @@ export default function RootLayout() {
     initDatabase()
       .then(() => setDbReady(true))
       .catch((error) => console.error('Failed to initialize database', error));
-    // Two independent best-efforts, not a chain: registering the background
-    // task fails on a build without the remote-notification entitlement, and
-    // that must not also stop this device registering to *receive* pushes.
-    // Neither should hold up the first screen either, so nothing is awaited.
-    startPushHandling().catch((error) => console.error('Failed to register the push task', error));
+    // Best-effort: must not hold up the first screen, so nothing is awaited.
     enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
     startPushTapRouting();
     getAppSettings()

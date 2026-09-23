@@ -1,0 +1,30 @@
+{
+  "ios": {
+    "Localizable.strings": {
+      "push.approved": "%1$@ accepted your request",
+      "push.commented_other": "%1$@ commented",
+      "push.commented_yours": "%1$@ commented on your photo",
+      "push.join_request": "%1$@ wants to join",
+      "push.posted": "%1$@ added a photo",
+      "push.reacted_other": "%1$@ reacted to a photo",
+      "push.reacted_yours": "%1$@ reacted to your photo",
+      "push.rewrap_needed": "%1$@ needs access to %2$@",
+      "push.rewrapped": "%1$@ let you back into %2$@",
+      "push.title_account": "%2$@",
+      "push.title_circle": "%2$@"
+    }
+  },
+  "android": {
+    "push_approved": "%1$s accepted your request",
+    "push_commented_other": "%1$s commented",
+    "push_commented_yours": "%1$s commented on your photo",
+    "push_join_request": "%1$s wants to join",
+    "push_posted": "%1$s added a photo",
+    "push_reacted_other": "%1$s reacted to a photo",
+    "push_reacted_yours": "%1$s reacted to your photo",
+    "push_rewrap_needed": "%1$s needs access to %2$s",
+    "push_rewrapped": "%1$s let you back into %2$s",
+    "push_title_account": "%2$s",
+    "push_title_circle": "%2$s"
+  }
+}

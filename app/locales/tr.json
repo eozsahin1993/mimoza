@@ -1,6 +1,32 @@
 {
   "ios": {
     "NSCameraUsageDescription": "Mimoza, cihaz aktarım kodunu taramak için kameranı kullanır.",
-    "NSPhotoLibraryUsageDescription": "Mimoza, çevrelerinde paylaşacağın fotoğrafları seçebilmen için fotoğraflarına erişir."
+    "NSPhotoLibraryUsageDescription": "Mimoza, çevrelerinde paylaşacağın fotoğrafları seçebilmen için fotoğraflarına erişir.",
+    "Localizable.strings": {
+      "push.approved": "%1$@ isteğini kabul etti",
+      "push.commented_other": "%1$@ yorum yaptı",
+      "push.commented_yours": "%1$@ fotoğrafına yorum yaptı",
+      "push.join_request": "%1$@ katılmak istiyor",
+      "push.posted": "%1$@ bir fotoğraf ekledi",
+      "push.reacted_other": "%1$@ bir fotoğrafa tepki verdi",
+      "push.reacted_yours": "%1$@ fotoğrafına tepki verdi",
+      "push.rewrap_needed": "%1$@ %2$@ için erişime ihtiyaç duyuyor",
+      "push.rewrapped": "%1$@ %2$@ erişimini geri verdi",
+      "push.title_account": "%2$@",
+      "push.title_circle": "%2$@"
+    }
+  },
+  "android": {
+    "push_approved": "%1$s isteğini kabul etti",
+    "push_commented_other": "%1$s yorum yaptı",
+    "push_commented_yours": "%1$s fotoğrafına yorum yaptı",
+    "push_join_request": "%1$s katılmak istiyor",
+    "push_posted": "%1$s bir fotoğraf ekledi",
+    "push_reacted_other": "%1$s bir fotoğrafa tepki verdi",
+    "push_reacted_yours": "%1$s fotoğrafına tepki verdi",
+    "push_rewrap_needed": "%1$s %2$s için erişime ihtiyaç duyuyor",
+    "push_rewrapped": "%1$s %2$s erişimini geri verdi",
+    "push_title_account": "%2$s",
+    "push_title_circle": "%2$s"
   }
 }

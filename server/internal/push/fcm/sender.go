@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"mimoza-relay/internal/push"
@@ -50,9 +51,9 @@ func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Mess
 	}
 	if !message.Silent {
 		payload["android"].(map[string]any)["notification"] = map[string]any{
-			"title_loc_key":  message.TitleKey,
+			"title_loc_key":  androidResourceName(message.TitleKey),
 			"title_loc_args": message.Args,
-			"body_loc_key":   message.BodyKey,
+			"body_loc_key":   androidResourceName(message.BodyKey),
 			"body_loc_args":  message.Args,
 		}
 	}
@@ -83,4 +84,14 @@ func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Mess
 		return fmt.Errorf("send push: %s", resp.Status)
 	}
 	return nil
+}
+
+// androidResourceName is a loc key as Android's own resource compiler
+// will accept it: aapt2 rejects a "." in a string resource's name, so
+// the dotted keys compose.go names (push.posted, matching iOS's own
+// Localizable.strings convention) have to lose the dots for the name
+// Android looks up body_loc_key/title_loc_key against — but only here;
+// iOS keeps them as sent.
+func androidResourceName(key string) string {
+	return strings.ReplaceAll(key, ".", "_")
 }
