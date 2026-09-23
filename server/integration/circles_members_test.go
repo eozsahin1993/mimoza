@@ -38,8 +38,7 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 	relay := harness.Start(t)
 	admin := relay.SignIn()
 	member := relay.SignIn()
-	adminAvatar := "avatars/" + admin.AccountID() + "/hash-1"
-	admin.Put(api("/account/profile"), harness.Body{"name": "Sarah", "avatarKey": adminAvatar}).Expect(http.StatusOK)
+	admin.Put(api("/account/profile"), harness.Body{"name": "Sarah", "avatarId": "hash-1"}).Expect(http.StatusOK)
 	member.Put(api("/account/profile"), harness.Body{"name": "Ali"}).Expect(http.StatusOK)
 
 	circleID := createCircle(t, admin, "Family")
@@ -49,7 +48,7 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 		Members []struct {
 			AccountID string `json:"accountId"`
 			Name      string `json:"name"`
-			AvatarKey string `json:"avatarKey"`
+			AvatarID  string `json:"avatarId"`
 			PublicKey string `json:"publicKey"`
 			Role      string `json:"role"`
 		} `json:"members"`
@@ -67,7 +66,7 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 
 	for _, entry := range roster.Members {
 		if entry.AccountID == admin.AccountID() {
-			harness.AssertEqual(t, entry.AvatarKey, adminAvatar, "the avatar comes with the name")
+			harness.AssertEqual(t, entry.AvatarID, "hash-1", "the avatar comes with the name")
 			harness.AssertEqual(t, entry.Role, "admin", "and the membership survives the join")
 		}
 	}
@@ -88,8 +87,7 @@ func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
 	relay := harness.Start(t)
 	admin := relay.SignIn()
 	joiner := relay.SignIn()
-	joinerAvatar := "avatars/" + joiner.AccountID() + "/hash-1"
-	joiner.Put(api("/account/profile"), harness.Body{"name": "Ali", "avatarKey": joinerAvatar}).Expect(http.StatusOK)
+	joiner.Put(api("/account/profile"), harness.Body{"name": "Ali", "avatarId": "hash-1"}).Expect(http.StatusOK)
 
 	circleID := createCircle(t, admin, "Family")
 	var invite struct {
@@ -102,13 +100,13 @@ func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
 		Requests []struct {
 			AccountID string `json:"accountId"`
 			Name      string `json:"name"`
-			AvatarKey string `json:"avatarKey"`
+			AvatarID  string `json:"avatarId"`
 		} `json:"requests"`
 	}
 	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
 	harness.AssertEqual(t, len(pending.Requests), 1, "one ask")
 	harness.AssertEqual(t, pending.Requests[0].Name, "Ali", "named")
-	harness.AssertEqual(t, pending.Requests[0].AvatarKey, joinerAvatar, "with a face")
+	harness.AssertEqual(t, pending.Requests[0].AvatarID, "hash-1", "with a face")
 	harness.AssertEqual(t, pending.Requests[0].AccountID, joiner.AccountID(), "and the account behind it")
 }
 

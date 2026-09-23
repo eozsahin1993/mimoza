@@ -11,7 +11,7 @@ import (
 
 type store interface {
 	GetProfile(ctx context.Context, accountID string) (accounts.Profile, error)
-	SetProfile(ctx context.Context, accountID, name, avatarKey string) error
+	SetProfile(ctx context.Context, accountID, name, avatarID string) error
 	SetPublicKey(ctx context.Context, accountID string, publicKey []byte) error
 }
 
@@ -45,31 +45,27 @@ func (s *Service) Get(ctx context.Context, accountID string) (accounts.Profile, 
 
 // Set writes the name and the avatar together: they are one act on a
 // screen.
-func (s *Service) Set(ctx context.Context, accountID, name, avatarKey string) (accounts.Profile, error) {
-	if avatarKey != "" && !avatar.Owns(accountID, avatarKey) {
-		return accounts.Profile{}, accounts.ErrNotYourAvatar
-	}
-
+func (s *Service) Set(ctx context.Context, accountID, name, avatarID string) (accounts.Profile, error) {
 	previous, err := s.Store.GetProfile(ctx, accountID)
 	if err != nil {
 		return accounts.Profile{}, err
 	}
-	if err := s.Store.SetProfile(ctx, accountID, name, avatarKey); err != nil {
+	if err := s.Store.SetProfile(ctx, accountID, name, avatarID); err != nil {
 		return accounts.Profile{}, err
 	}
-	s.retire(ctx, previous.AvatarKey, avatarKey)
+	s.retire(ctx, accountID, previous.AvatarID, avatarID)
 	return s.Store.GetProfile(ctx, accountID)
 }
 
 // retire runs after the write, so a failure leaves bytes nothing points
 // at rather than a profile pointing at bytes that are gone.
-func (s *Service) retire(ctx context.Context, previous, current string) {
+func (s *Service) retire(ctx context.Context, accountID, previous, current string) {
 	if s.Blobs == nil || previous == "" || previous == current {
 		return
 	}
-	if err := s.Blobs.Delete(ctx, previous); err != nil {
+	if err := s.Blobs.Delete(ctx, avatar.Key(accountID, previous)); err != nil {
 		slog.ErrorContext(ctx, "replaced an avatar but did not delete the old one",
-			"reason", "avatar_not_deleted", "error", err, "key", previous)
+			"reason", "avatar_not_deleted", "error", err, "avatarId", previous)
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 )
 
 func TestPresignForRequestHost(t *testing.T) {
-	store := testsupport.NewBlobStore(t)
+	store := testsupport.NewBlobBucket(t)
 	localStackHost := mustParse(t, localstack.Endpoint()).Host
 
 	tests := []struct {
@@ -31,14 +31,14 @@ func TestPresignForRequestHost(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var gotHost string
 			inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				download, err := store.GetDownloadURL(r.Context(), "sync-1", "entry-1")
+				download, err := store.DownloadURL(r.Context(), "circle-1/post-1")
 				if err != nil {
-					t.Fatalf("GetDownloadURL: %v", err)
+					t.Fatalf("DownloadURL: %v", err)
 				}
 				gotHost = mustParse(t, download).Host
 			})
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/circles/sync-1/blobs/entry-1", nil)
+			req := httptest.NewRequest(http.MethodGet, "/v1/circles/circle-1/blobs/post-1", nil)
 			req.Host = tt.requestHost
 			presignForRequestHost(tt.endpoint, inner).ServeHTTP(httptest.NewRecorder(), req)
 

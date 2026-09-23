@@ -39,8 +39,8 @@ type Service struct {
 // column.
 type RosterMember struct {
 	circles.Member
-	Name      string
-	AvatarKey string
+	Name     string
+	AvatarID string
 	// PublicKey is what this member's copy of a content key is sealed
 	// to. It is on the roster because resealing after a kick or a reset
 	// happens on another member's device, which needs every key here.
@@ -86,7 +86,7 @@ func (s *Service) Roster(ctx context.Context, circleID, accountID string) (circl
 		members = append(members, RosterMember{
 			Member:    member,
 			Name:      identity.Name,
-			AvatarKey: identity.AvatarKey,
+			AvatarID:  identity.AvatarID,
 			PublicKey: identity.PublicKey,
 		})
 	}

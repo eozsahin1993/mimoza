@@ -13,7 +13,7 @@ import (
 type memberResponse struct {
 	AccountID string `json:"accountId"`
 	Name      string `json:"name,omitempty"`
-	AvatarKey string `json:"avatarKey,omitempty"`
+	AvatarID  string `json:"avatarId,omitempty"`
 	// PublicKey is what a member seals this member's content keys to.
 	PublicKey   string `json:"publicKey,omitempty"`
 	Role        string `json:"role"`
@@ -51,7 +51,7 @@ func (h *RosterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		body.Members = append(body.Members, memberResponse{
 			AccountID:   member.AccountID,
 			Name:        member.Name,
-			AvatarKey:   member.AvatarKey,
+			AvatarID:    member.AvatarID,
 			PublicKey:   base64.StdEncoding.EncodeToString(member.PublicKey),
 			Role:        member.Role,
 			NotifyLevel: member.NotifyLevel,

@@ -54,7 +54,7 @@ reaction tag      HMAC-SHA256(HKDF(K_v, "reaction-tag"), emoji), hex
 
 | pk | sk | attributes |
 |---|---|---|
-| `account#<id>` | `profile` | name, avatarKey, pubkey, pubkeyUpdatedAt, createdAt |
+| `account#<id>` | `profile` | name, avatarId, pubkey, pubkeyUpdatedAt, createdAt |
 | `account#<id>` | `device#<deviceId>` | pushToken, platform, locale, updatedAt |
 | `account#<id>` | `provider#<provider>:<sub>` | linkedAt, refreshToken (Apple only, for revoking on deletion) |
 | `provider#<provider>:<sub>` | `lookup` | accountId |
@@ -112,11 +112,18 @@ those exact bytes are already there. Ids that become keys are checked
 for shape before they get near one (`internal/util/ids`).
 
 An avatar belongs to an account, not a circle, so it is unencrypted and
-is the one blob readable by any signed-in caller who holds its key. The
-key is unguessable and travels only on a roster or a pending request, so
-holding one already implies having been allowed to see it. A profile may
-only name a key under its own account, and replacing a picture deletes
-the one it replaced.
+is the one blob any signed-in caller may read. What is stored and shared
+is the id, never a URL or a key: an avatar id means nothing without the
+account it hangs off, exactly as a cover id means nothing without its
+circle. Both are unguessable and travel only where the reader was
+already allowed to look. Replacing a picture deletes the one it
+replaced.
+
+Nothing keeps a URL. A device holds ids, compares them to what it has
+cached, and asks for a signed URL only for bytes it is missing — which
+is also why ids rather than URLs are what the relay hands out: a URL
+expires within the hour, while an id is what says whether a picture has
+changed at all.
 
 A blob is uploaded before the entry that references it, so a crash in
 between leaves an orphaned object rather than a post pointing at bytes
@@ -187,7 +194,7 @@ GET /account
     what says whose it is, and it is the only one they may read
 
 GET /circles/{id}/roster
-  → rosterVersion, members [accountId, name, avatarKey, pubkey, role,
+  → rosterVersion, members [accountId, name, avatarId, pubkey, role,
     joinedAt, needsRewrap], the caller's sealed keys
 
 GET /circles/{id}/entries?type=post|activity&cursor=<opaque>&limit=200

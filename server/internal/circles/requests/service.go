@@ -34,8 +34,8 @@ type profiles interface {
 // admin actually answers.
 type Pending struct {
 	circles.Request
-	Name      string
-	AvatarKey string
+	Name     string
+	AvatarID string
 }
 
 type Service struct {
@@ -119,9 +119,9 @@ func (s *Service) List(ctx context.Context, circleID, accountID string) ([]Pendi
 	for _, request := range requests {
 		identity := identities[request.AccountID]
 		pending = append(pending, Pending{
-			Request:   request,
-			Name:      identity.Name,
-			AvatarKey: identity.AvatarKey,
+			Request:  request,
+			Name:     identity.Name,
+			AvatarID: identity.AvatarID,
 		})
 	}
 	return pending, nil

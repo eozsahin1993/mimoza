@@ -16,7 +16,10 @@ import "time"
 type Profile struct {
 	AccountID string
 	Name      string
-	AvatarKey string
+	// AvatarID names the picture, not where it is: the key is built from
+	// the account it hangs off, so an id can only ever mean this account's
+	// own picture.
+	AvatarID string
 	// PublicKey is X25519, for sealing. Replacing it is how a device with
 	// no keychain gets back in, and it makes every sealed key stale until
 	// another member reseals them.

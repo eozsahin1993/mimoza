@@ -2,7 +2,6 @@ package avatar
 
 import (
 	"context"
-	"strings"
 
 	"mimoza-relay/internal/blobs"
 )
@@ -15,22 +14,14 @@ type bucket interface {
 }
 
 // Key carries the client's content hash, so a changed picture is a
-// changed URL and the edge may cache forever. Keys travel whole rather
-// than being rebuilt from an account id: knowing who someone is must not
-// tell you where their picture is.
+// changed URL and the edge may cache forever. An id is meaningless
+// without the account it hangs off, which is why only the id is stored.
 func Key(accountID, avatarID string) string {
 	return Prefix(accountID) + avatarID
 }
 
 // Prefix is everything one account's pictures live under.
 func Prefix(accountID string) string { return "avatars/" + accountID + "/" }
-
-// Owns guards the profile write: without it an account could point at
-// someone else's picture and wear their face.
-func Owns(accountID, key string) bool {
-	id, found := strings.CutPrefix(key, Prefix(accountID))
-	return found && id != "" && !strings.Contains(id, "/")
-}
 
 // MaxSize caps one picture, far below what a photo is allowed.
 const MaxSize = 512 * 1024

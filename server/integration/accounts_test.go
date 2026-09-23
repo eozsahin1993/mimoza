@@ -19,27 +19,19 @@ func TestAccounts_ProfileBelongsToTheSession(t *testing.T) {
 	var profile struct {
 		AccountID string `json:"accountId"`
 		Name      string `json:"name"`
-		AvatarKey string `json:"avatarKey"`
+		AvatarID  string `json:"avatarId"`
 		PublicKey string `json:"publicKey"`
 	}
 	device.Get(api("/account")).Expect(http.StatusOK).Decode(&profile)
 	harness.AssertEqual(t, profile.AccountID, device.AccountID(), "the profile is the caller's own")
 	harness.AssertEqual(t, profile.Name, "", "and starts without a name")
 
-	mine := "avatars/" + device.AccountID() + "/hash-1"
 	device.Put(api("/account/profile"), harness.Body{
-		"name":      "Sarah",
-		"avatarKey": mine,
+		"name":     "Sarah",
+		"avatarId": "hash-1",
 	}).Expect(http.StatusOK).Decode(&profile)
 	harness.AssertEqual(t, profile.Name, "Sarah", "the name took")
-	harness.AssertEqual(t, profile.AvatarKey, mine, "and the avatar with it")
-
-	// A picture stored under another account is not this account's to
-	// wear.
-	device.Put(api("/account/profile"), harness.Body{
-		"name":      "Sarah",
-		"avatarKey": "avatars/" + other.AccountID() + "/hash-1",
-	}).Expect(http.StatusForbidden)
+	harness.AssertEqual(t, profile.AvatarID, "hash-1", "and the avatar with it")
 
 	// Another account sees its own, not this one's.
 	var theirs struct {

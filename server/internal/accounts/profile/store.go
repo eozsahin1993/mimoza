@@ -25,15 +25,15 @@ var _ store = (*Store)(nil)
 
 // SetProfile writes the name and avatar together: they are one act on a
 // screen, and an avatar with nobody's name on it is no use.
-func (s *Store) SetProfile(ctx context.Context, accountID, name, avatarKey string) error {
+func (s *Store) SetProfile(ctx context.Context, accountID, name, avatarID string) error {
 	_, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:        aws.String(s.Name),
 		Key:              s.Key(dynamo.AccountPK(accountID), dynamo.ProfileSK),
-		UpdateExpression: aws.String("SET #name = :name, " + dynamo.AttrAvatarKey + " = :avatar"),
+		UpdateExpression: aws.String("SET #name = :name, " + dynamo.AttrAvatarID + " = :avatar"),
 		// name is a reserved word in an update expression.
 		ExpressionAttributeNames:  map[string]string{"#name": dynamo.AttrName},
 		ConditionExpression:       aws.String("attribute_exists(pk)"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{":name": dynamoutil.Str(name), ":avatar": dynamoutil.Str(avatarKey)},
+		ExpressionAttributeValues: map[string]types.AttributeValue{":name": dynamoutil.Str(name), ":avatar": dynamoutil.Str(avatarID)},
 	})
 	if dynamoutil.ConditionFailed(err) {
 		return accounts.ErrNotFound

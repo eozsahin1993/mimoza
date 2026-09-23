@@ -37,7 +37,7 @@ func profileFrom(accountID string, item map[string]types.AttributeValue) account
 	return accounts.Profile{
 		AccountID:      accountID,
 		Name:           dynamoutil.StringAt(item, AttrName),
-		AvatarKey:      dynamoutil.StringAt(item, AttrAvatarKey),
+		AvatarID:       dynamoutil.StringAt(item, AttrAvatarID),
 		PublicKey:      dynamoutil.BytesAt(item, AttrPublicKey),
 		PublicKeySetAt: dynamoutil.TimeAt(item, AttrPublicKeyAt),
 		CreatedAt:      dynamoutil.TimeAt(item, AttrCreatedAt),

@@ -20,10 +20,9 @@ func TestAvatars_APictureBelongsToAnAccountAndIsSeenByMembers(t *testing.T) {
 	target := avatarTarget(t, member, "hash-1")
 	harness.PostBlob(t, target.URL, target.Fields, []byte("a picture"))
 
-	avatarKey := "avatars/" + member.AccountID() + "/hash-1"
 	member.Put(api("/account/profile"), harness.Body{
-		"name":      "Ali",
-		"avatarKey": avatarKey,
+		"name":     "Ali",
+		"avatarId": "hash-1",
 	}).Expect(http.StatusOK)
 
 	// Another member learns the key from the roster, which is the only
@@ -31,7 +30,7 @@ func TestAvatars_APictureBelongsToAnAccountAndIsSeenByMembers(t *testing.T) {
 	var roster struct {
 		Members []struct {
 			AccountID string `json:"accountId"`
-			AvatarKey string `json:"avatarKey"`
+			AvatarID  string `json:"avatarId"`
 		} `json:"members"`
 	}
 	admin.Get(api("/circles/" + circleID + "/roster")).Expect(http.StatusOK).Decode(&roster)
@@ -39,21 +38,22 @@ func TestAvatars_APictureBelongsToAnAccountAndIsSeenByMembers(t *testing.T) {
 	var found string
 	for _, entry := range roster.Members {
 		if entry.AccountID == member.AccountID() {
-			found = entry.AvatarKey
+			found = entry.AvatarID
 		}
 	}
-	harness.AssertEqual(t, found, avatarKey, "the roster carries the key")
+	harness.AssertEqual(t, found, "hash-1", "the roster carries the id")
 
+	// The id plus the account it hangs off is where the picture is.
 	var download struct {
 		URL string `json:"url"`
 	}
-	admin.Get(api("/" + found)).Expect(http.StatusOK).Decode(&download)
+	admin.Get(api("/avatars/" + member.AccountID() + "/" + found)).Expect(http.StatusOK).Decode(&download)
 	harness.AssertEqual(t, string(fetch(t, download.URL)), "a picture", "and the bytes come back")
 
 	// The same key twice is bytes that are already there.
 	member.Post(api("/account/avatar/hash-1/upload-target"), nil).Expect(http.StatusConflict)
 
-	relay.Anon().Get(api("/" + found)).Expect(http.StatusUnauthorized)
+	relay.Anon().Get(api("/avatars/" + member.AccountID() + "/" + found)).Expect(http.StatusUnauthorized)
 }
 
 // Replacing a picture retires the one it replaced: nothing points at the
@@ -66,8 +66,8 @@ func TestAvatars_ANewPictureRetiresTheOldOne(t *testing.T) {
 		target := avatarTarget(t, device, id)
 		harness.PostBlob(t, target.URL, target.Fields, []byte("picture "+id))
 		device.Put(api("/account/profile"), harness.Body{
-			"name":      "Ali",
-			"avatarKey": "avatars/" + device.AccountID() + "/" + id,
+			"name":     "Ali",
+			"avatarId": id,
 		}).Expect(http.StatusOK)
 	}
 
@@ -85,6 +85,7 @@ func TestAvatars_AnIdMustLookLikeAnId(t *testing.T) {
 
 	device.Post(api("/account/avatar/..%2Fescape/upload-target"), nil).Expect(http.StatusBadRequest)
 	device.Post(api("/account/avatar/.hidden/upload-target"), nil).Expect(http.StatusBadRequest)
+	device.Put(api("/account/profile"), harness.Body{"name": "Ali", "avatarId": "../escape"}).Expect(http.StatusBadRequest)
 }
 
 func avatarTarget(t *testing.T, device *harness.Device, avatarID string) struct {

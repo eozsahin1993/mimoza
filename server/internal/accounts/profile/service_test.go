@@ -32,11 +32,11 @@ func (f *fakeStore) GetProfile(context.Context, string) (accounts.Profile, error
 	return f.profile, nil
 }
 
-func (f *fakeStore) SetProfile(_ context.Context, accountID, name, avatarKey string) error {
+func (f *fakeStore) SetProfile(_ context.Context, accountID, name, avatarID string) error {
 	if f.setErr != nil {
 		return f.setErr
 	}
-	f.profile = accounts.Profile{AccountID: accountID, Name: name, AvatarKey: avatarKey}
+	f.profile = accounts.Profile{AccountID: accountID, Name: name, AvatarID: avatarID}
 	return nil
 }
 
@@ -65,11 +65,11 @@ func TestSetAnswersWithTheStoredProfile(t *testing.T) {
 	store := &fakeStore{}
 	service := &Service{Store: store}
 
-	got, err := service.Set(context.Background(), "account-1", "Sarah", "avatars/account-1/sarah")
+	got, err := service.Set(context.Background(), "account-1", "Sarah", "hash-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Name != "Sarah" || got.AvatarKey != "avatars/account-1/sarah" || got.AccountID != "account-1" {
+	if got.Name != "Sarah" || got.AvatarID != "hash-1" || got.AccountID != "account-1" {
 		t.Fatalf("expected the stored profile back, got %+v", got)
 	}
 }
@@ -175,29 +175,14 @@ func TestAFailedProfileWriteIsNotAnsweredWithTheOldOne(t *testing.T) {
 	}
 }
 
-// A profile may only name a picture its own account uploaded. Without
-// this an account could point at someone else's and wear their face.
-func TestSetRefusesAnAvatarBelongingToAnotherAccount(t *testing.T) {
-	store := &fakeStore{}
-	service := &Service{Store: store}
-
-	_, err := service.Set(context.Background(), "account-1", "Sarah", "avatars/account-2/hash")
-	if !errors.Is(err, accounts.ErrNotYourAvatar) {
-		t.Fatalf("expected ErrNotYourAvatar, got %v", err)
-	}
-	if store.profile.Name != "" {
-		t.Error("nothing should have been written")
-	}
-}
-
 // The picture a new one replaces has nothing left pointing at it, so it
 // is deleted rather than left in the bucket forever.
 func TestSetRetiresThePictureItReplaced(t *testing.T) {
 	bucket := &fakeBucket{}
-	store := &fakeStore{profile: accounts.Profile{AccountID: "account-1", AvatarKey: "avatars/account-1/old"}}
+	store := &fakeStore{profile: accounts.Profile{AccountID: "account-1", AvatarID: "old"}}
 	service := &Service{Store: store, Blobs: bucket}
 
-	if _, err := service.Set(context.Background(), "account-1", "Sarah", "avatars/account-1/new"); err != nil {
+	if _, err := service.Set(context.Background(), "account-1", "Sarah", "new"); err != nil {
 		t.Fatal(err)
 	}
 	if len(bucket.deleted) != 1 || bucket.deleted[0] != "avatars/account-1/old" {
@@ -209,17 +194,17 @@ func TestSetRetiresThePictureItReplaced(t *testing.T) {
 // must not delete what the profile still points at.
 func TestSetKeepsTheCurrentPicture(t *testing.T) {
 	for name, incoming := range map[string]string{
-		"the same key again": "avatars/account-1/same",
-		"no key at all":      "",
+		"the same id again": "same",
+		"no key at all":     "",
 	} {
 		bucket := &fakeBucket{}
-		store := &fakeStore{profile: accounts.Profile{AccountID: "account-1", AvatarKey: "avatars/account-1/same"}}
+		store := &fakeStore{profile: accounts.Profile{AccountID: "account-1", AvatarID: "same"}}
 		service := &Service{Store: store, Blobs: bucket}
 
 		if _, err := service.Set(context.Background(), "account-1", "Sarah", incoming); err != nil {
 			t.Fatal(err)
 		}
-		if name == "the same key again" && len(bucket.deleted) != 0 {
+		if name == "the same id again" && len(bucket.deleted) != 0 {
 			t.Errorf("%s: deleted %v, want nothing", name, bucket.deleted)
 		}
 	}

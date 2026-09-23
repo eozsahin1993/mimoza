@@ -40,21 +40,21 @@ func TestStore_AProfileIsWrittenAndReadBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fresh.Name != "" || len(fresh.PublicKey) != 0 {
+	if fresh.Name != "" || fresh.AvatarID != "" || len(fresh.PublicKey) != 0 {
 		t.Fatalf("expected an empty profile, got %+v", fresh)
 	}
 	if fresh.CreatedAt.IsZero() {
 		t.Error("expected a creation stamp")
 	}
 
-	if err := store.SetProfile(ctx, accountID, "Sarah", "avatars/sarah"); err != nil {
+	if err := store.SetProfile(ctx, accountID, "Sarah", "hash-1"); err != nil {
 		t.Fatal(err)
 	}
 	got, err := store.GetProfile(ctx, accountID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Name != "Sarah" || got.AvatarKey != "avatars/sarah" {
+	if got.Name != "Sarah" || got.AvatarID != "hash-1" {
 		t.Fatalf("expected the written profile back, got %+v", got)
 	}
 	if !got.CreatedAt.Equal(fresh.CreatedAt) {
