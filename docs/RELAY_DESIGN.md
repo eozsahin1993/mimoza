@@ -285,7 +285,25 @@ release rather than a relay deploy.
 - Without it: the device makes a new keypair and sends it with `reset`. The relay marks every membership `needsRewrap` and pushes the other members silently. The first member device to sync seals every version it holds to the new pubkey; the relay stores it and clears the flag.
 
 A relay that swapped in its own pubkey could have a member seal keys to
-it. Accepted: the relay already controls delivery and deletion.
+it. Accepted: the relay already controls delivery and deletion. The same
+holds for whoever controls the Google or Apple account, since a session
+is all that is needed to publish a key. Neither can read what is already
+stored; both are granted the circle by the next member who reseals.
+
+**There is no key escrow, and deliberately so.** The private key is never
+recovered, only replaced, and what comes back is entitlement rather than
+a secret: other members reseal the content keys to the new public key.
+Any relay-held backup, whether wrapped with a passphrase or anything
+else, would make the product only as strong as that secret, which is the
+one thing this design refuses. Losing the key is instead made rare by the
+platform keychains, which are end-to-end encrypted against Apple and
+Google: iCloud Keychain on iOS, Block Store on Android.
+
+Two cases have no answer and are accepted. Someone whose platform backup
+is switched off cannot be warned in advance, because neither platform
+reports it, and will wait for a member to reseal. And a circle whose
+every member loses their key, which in practice means a circle of one, is
+unreadable for good, since nothing anywhere still holds its content key.
 
 ## Account deletion
 
