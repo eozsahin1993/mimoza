@@ -1,4 +1,3 @@
-import { bytesToHex } from '@noble/curves/utils.js';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +33,6 @@ import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { takePendingInviteCode } from '@/features/invite/services/pending-invite';
-import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { bytesToDataUri } from '@/core/photo/image';
 import { formatAgo } from '@/core/utils/time';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';

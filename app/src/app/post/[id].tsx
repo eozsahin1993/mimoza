@@ -1,5 +1,4 @@
 import type { TFunction } from 'i18next';
-import { bytesToHex } from '@noble/curves/utils.js';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -38,8 +37,6 @@ import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { showError, showMessage } from '@/core/services/messages';
-import { bytesToDataUri } from '@/core/photo/image';
-import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { onPhotoFetched } from '@/core/photo/photo-events';
 import { formatDay, formatRelative, formatTimestamp } from '@/core/utils/time';

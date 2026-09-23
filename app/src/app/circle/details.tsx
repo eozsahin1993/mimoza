@@ -1,6 +1,5 @@
-import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
@@ -12,12 +11,11 @@ import { InviteSheet } from '@/features/invite/components/invite-sheet';
 import { OptionSheet } from '@/ui/components/option-sheet';
 import { PromptSheet } from '@/ui/components/prompt-sheet';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
-import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Fonts, Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
-import { getProfile, type Member } from '@/data/db';
+import { type Member } from '@/data/db';
 import { MemberRoles, type MemberRole } from '@/features/circle/usecases/change-member-role';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
@@ -34,7 +32,7 @@ import {
 } from '@/features/push-notifications/usecases/push-preferences';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showDone, showError } from '@/core/services/messages';
-import { bytesToDataUri, pickAndCompressImage } from '@/core/photo/image';
+import { pickAndCompressImage } from '@/core/photo/image';
 import { formatMonth } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
 
