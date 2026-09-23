@@ -1,21 +1,10 @@
-import { bytesToHex } from '@noble/curves/utils.js';
-
-import { writePhotoFile } from '@/core/photo/photo-cache';
-import { timedSync } from '@/core/utils/timing';
-
+import { AttachmentKinds, AttachmentStatuses, getProfile, queuePost } from '@/data/db';
 import { generateUUID, hashBytes } from '@/core/crypto/primitives';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
-import {
-  AttachmentKinds,
-  AttachmentStatuses,
-  insertPostAndEnqueue,
-  OutboxStatuses,
-  type NewAttachment,
-  type NewOutboxEntry,
-  type Post,
-} from '@/data/db';
-import { drainOutbox } from '@/features/circle/usecases/sync-circle';
+import { writePhotoFile } from '@/core/photo/photo-cache';
+import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { drainOutbox } from '@/core/sync/drain-outbox';
+import { Visibility } from '@/features/post/services/post-relay';
+import { timedSync } from '@/core/utils/timing';
 
 export type CreatePostInput = {
   circleId: string;
@@ -26,81 +15,66 @@ export type CreatePostInput = {
 };
 
 /**
- * Creates a post and queues it for sync in one local, offline-safe step
- * that always succeeds without network access — the outbox row's
- * encryptedMeta is built and signed right here, once (see the comment on
- * `encryptedMeta` in schema.ts for why the drain step must never
- * re-derive it later). Triggers a drain afterward, but doesn't wait on
- * or fail because of it: a stuck or failed push must never make posting
- * itself feel broken, since the whole point of the outbox is that they're
- * independent. The drain is also naturally retried the next time
- * anything calls it (app resume, another post, pull-to-refresh, ...), so
- * a failure here isn't a lost opportunity, just a deferred one.
+ * Posts a photo. Local and offline-safe: the row, the bytes and the
+ * queued write all land here, and the drain that follows is fire and
+ * forget — a stuck push must never make posting feel broken.
  *
- * `photoHash` rides inside the *signed* payload alongside the caption —
- * not a separate mechanism, just one more field something is already
- * signing. It's what lets every reader verify the downloaded photo bytes
- * actually match what this device posted, which the log entry's own
- * signature can't cover on its own (the entry and the blob are uploaded
- * separately) — see services/relay.ts's `getUploadTarget` doc comment for
- * why a shared write token alone can't stand in for this: it proves "a
- * current member," never "this specific author."
+ * The caption is sealed at drain time, not here, so a key rotation in
+ * between is not a problem. `photoHash` travels inside the ciphertext so
+ * a reader can check the bytes it downloads are the ones that were
+ * posted; the blob and its post are uploaded separately and nothing else
+ * ties them together.
  */
-export async function createPost(input: CreatePostInput): Promise<void> {
-  const identity = await getCircleIdentity(input.circleId);
-  if (!identity) throw new Error('No circle identity on this device.');
+export async function createPost(input: CreatePostInput): Promise<string> {
+  const profile = await getProfile();
+  if (!profile) throw new Error('No profile on this device.');
   const current = await getCurrentContentKey(input.circleId);
   if (!current) throw new Error('No content key on this device.');
 
   const postId = generateUUID();
   const createdAt = Date.now();
   const photoHash = timedSync(`post.hash(${Math.round(input.photo.length / 1024)}KB)`, () => hashBytes(input.photo));
-  const encryptedMeta = buildAndEncryptLogEntry(
-    EntryTypes.POST,
-    { postId, caption: input.caption, photoHash, createdAt, keyVersion: current.version, inAlbum: input.inAlbum },
-    identity,
-    current.key
+
+  queuePost(
+    {
+      id: postId,
+      circleId: input.circleId,
+      authorId: profile.accountId,
+      caption: input.caption,
+      createdAt,
+      receivedAt: createdAt,
+      inAlbum: input.inAlbum,
+      updatedAt: createdAt,
+    },
+    {
+      circleId: input.circleId,
+      entryId: postId,
+      kind: AttachmentKinds.POST_PHOTO,
+      bytes: input.photo,
+      hash: photoHash,
+      keyVersion: current.version,
+      // Made here, so there is nothing to download.
+      status: AttachmentStatuses.FETCHED,
+      fetchAttempts: 0,
+      nextAttemptAt: null,
+      createdAt,
+    },
+    {
+      circleId: input.circleId,
+      op: 'post',
+      postId,
+      entryId: postId,
+      plaintext: JSON.stringify({
+        caption: input.caption,
+        createdAt,
+        photoHash,
+        visibility: input.inAlbum ? Visibility.ALBUM : Visibility.FEED,
+      }),
+      createdAt,
+    }
   );
-
-  const post: Post = {
-    id: postId,
-    circleId: input.circleId,
-    caption: input.caption,
-    authorPublicKey: bytesToHex(identity.publicKey),
-    createdAt,
-    lastViewedAt: null,
-    inAlbum: input.inAlbum,
-  };
-
-  const attachment: NewAttachment = {
-    circleId: input.circleId,
-    // A post photo's blob address is the postId — the same id
-    // `drainOutbox` uploads it under (see services/relay.ts's
-    // getUploadTarget).
-    entryId: postId,
-    kind: AttachmentKinds.POST_PHOTO,
-    bytes: input.photo,
-    hash: photoHash,
-    keyVersion: current.version,
-    // Created here, so there is nothing to download.
-    status: AttachmentStatuses.FETCHED,
-    fetchAttempts: 0,
-    nextAttemptAt: null,
-    createdAt,
-  };
-
-  const outboxEntry: NewOutboxEntry = {
-    circleId: input.circleId,
-    entryType: EntryTypes.POST,
-    entryId: postId,
-    status: OutboxStatuses.pending,
-    epoch: null,
-    blobEntryId: null,
-    encryptedMeta,
-  };
-
-  await insertPostAndEnqueue(post, attachment, outboxEntry);
   writePhotoFile(input.circleId, postId, input.photo);
 
   drainOutbox(input.circleId).catch((err) => console.error('Failed to drain outbox', err));
+  return postId;
 }

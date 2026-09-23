@@ -3,7 +3,6 @@ import {
   getFetchableAttachments,
   markAttachmentFailed,
   markAttachmentFetched,
-  updateCirclePicture,
   type FetchableAttachment,
 } from '@/data/db';
 import { decrypt, hashBytes } from '@/core/crypto/primitives';
@@ -41,31 +40,31 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
   const { circleId, entryId, hash, keyVersion, fetchAttempts } = attachment;
   try {
     const keyMap = await getCircleKeyMap(circleId);
-    const key = keyMap?.[keyVersion];
+    const key = keyVersion === null ? undefined : keyMap?.[keyVersion];
     if (!key) throw new Error(`no content key for version ${keyVersion}`);
 
-    const encrypted = await timed(`photo.fetch(${entryId.slice(0, 8)})`, () => getBlob(attachment.syncId, entryId));
+    const encrypted = await timed(`photo.fetch(${entryId.slice(0, 8)})`, () => getBlob(circleId, entryId));
     // A blob that isn't there yet is an ordinary race, not corruption:
     // the uploader appends its entry after uploading, but a reader can
     // still arrive between a failed upload and its retry.
     if (!encrypted) throw new Error('blob not found');
 
     const bytes = timedSync(`photo.decrypt(${encrypted.length} bytes)`, () => decrypt(encrypted, key));
-    // The hash rode inside the entry's *signed* payload, so this is what
-    // ties the bytes to the author — the entry's signature can't cover a
-    // blob uploaded separately (see create-post.ts).
-    if (hash && hashBytes(bytes) !== hash) throw new Error('photo hash does not match the signed entry');
+    // The hash rode inside the ciphertext, which is what ties these
+    // bytes to the author: the blob is uploaded separately and nothing
+    // else connects the two.
+    if (hash && hashBytes(bytes) !== hash) throw new Error('photo hash does not match the entry');
 
     await markAttachmentFetched(circleId, entryId, bytes);
     // Written now, off the render path, so a feed load is only ever a
     // path string — see services/photo-cache.ts.
     if (attachment.kind === AttachmentKinds.CIRCLE_COVER) {
-      // A cover also lands on the circle row, which is what the circle
-      // list and header read; nothing there consults attachments. Not a
-      // post, so nothing to patch — the circle list re-reads on its own
-      // focus, same as before this event existed.
-      await updateCirclePicture(circleId, bytes, hash);
-      writeCoverFile(circleId, bytes, hash);
+      // Keyed by the cover's own id, which is the last path segment and
+      // is already content-addressed — a new cover is a new key.
+      writeCoverFile(circleId, bytes, entryId.split('/').pop() ?? entryId);
+    } else if (attachment.kind === AttachmentKinds.MEMBER_AVATAR) {
+      // Bytes only: a picture is small and its screens read it straight
+      // out of SQLite rather than through the file cache.
     } else {
       // Whatever screen is showing this post's placeholder patches just
       // this row rather than reloading — a backlog of many photos landing

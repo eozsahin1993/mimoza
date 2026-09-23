@@ -16,10 +16,21 @@ export const AttachmentStatuses = {
 export const AttachmentKinds = {
   POST_PHOTO: 'post_photo',
   CIRCLE_COVER: 'circle_cover',
+  MEMBER_AVATAR: 'member_avatar',
 } as const;
 
-/** The fixed entryId a circle's cover photo always lives at — mirrors the relay's own `coverPhotoEntryID`. */
-export const COVER_ENTRY_ID = 'cover';
+/**
+ * Where a blob lives, as the rest of the relay's key after the circle.
+ * Every one is written once and never overwritten, so a changed cover or
+ * picture is a new key rather than a replacement.
+ */
+export function coverEntryId(coverId: string): string {
+  return `cover/${coverId}`;
+}
+
+export function avatarEntryId(accountId: string, avatarId: string): string {
+  return `avatar/${accountId}/${avatarId}`;
+}
 
 export function normalizeAttachment(attachment: Attachment): Attachment {
   return { ...attachment, bytes: normalizeBlob(attachment.bytes) };
@@ -72,7 +83,7 @@ export async function getAttachment(circleId: string, entryId: string): Promise<
 }
 
 /** An attachment awaiting download, plus the syncId its blob lives under. */
-export type FetchableAttachment = Attachment & { syncId: string };
+export type FetchableAttachment = Attachment;
 
 /**
  * The download queue's only read: attachments that still need bytes and
@@ -102,15 +113,9 @@ export async function getFetchableAttachments(now: number, limit: number): Promi
     )
     .orderBy(desc(attachments.createdAt))
     .limit(limit);
-  if (rows.length === 0) return [];
-
-  const circleRows = await db
-    .select({ id: circles.id, syncId: circles.syncId })
-    .from(circles)
-    .where(inArray(circles.id, [...new Set(rows.map((row) => row.circleId))]));
-  const syncIdByCircle = new Map(circleRows.map((row) => [row.id, row.syncId]));
-
-  return rows.map((row) => ({ ...normalizeAttachment(row), syncId: syncIdByCircle.get(row.circleId) ?? '' }));
+  // The circle id is the address now: a blob's key is the circle and
+  // the rest, so nothing has to be looked up to fetch one.
+  return rows.map((row) => normalizeAttachment(row));
 }
 
 /** Records a successful download: bytes land, backoff state resets. */

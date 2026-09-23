@@ -1,63 +1,70 @@
-jest.mock('@/core/services/log-relay');
 jest.mock('@/core/services/blob-relay');
-jest.mock('@/features/account/usecases/account-manifest');
+jest.mock('@/core/services/keystore/circle-keys', () => ({
+  getCircleKeyMap: jest.fn(async () => ({ 1: new Uint8Array(32).fill(1) })),
+}));
 
 import {
   AttachmentKinds,
   AttachmentStatuses,
+  applyMembership,
+  applyPost,
   getAttachment,
   getFetchableAttachments,
   initDatabase,
-  insertPost,
+  insertAttachment,
 } from '@/data/db';
-import { createCircle } from '@/features/circle/usecases/create-circle';
 import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
-import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
-import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
-import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { getBlob } from '@/core/services/blob-relay';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';
+
+const NOW = 1_700_000_000_000;
+const KEY = new Uint8Array(32).fill(1);
+
+let next = 0;
+async function makeCircle(): Promise<string> {
+  next += 1;
+  const circleId = `circle-${next}`;
+  await applyMembership(
+    { circleId, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
+    NOW
+  );
+  return circleId;
+}
 
 beforeAll(async () => {
   await saveAuthToken('session-token');
   await initDatabase();
-  await saveMasterSeed(new Uint8Array(16));
 });
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
-  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
 });
 
-/** A pulled post: row present, photo not downloaded yet — exactly what the post handler writes. */
-async function makePendingPost(circleId: string, photo: Uint8Array, createdAt: number) {
+/** A pulled post: row present, photo not downloaded yet — what the post handler writes. */
+async function makePendingPost(circleId: string, photo: Uint8Array, createdAt: number): Promise<string> {
   const postId = generateUUID();
-  await insertPost(
-    { id: postId, circleId, caption: 'c', authorPublicKey: 'aa', createdAt, lastViewedAt: null, inAlbum: true },
-    {
-      circleId,
-      entryId: postId,
-      kind: AttachmentKinds.POST_PHOTO,
-      bytes: null,
-      hash: hashBytes(photo),
-      keyVersion: 1,
-      status: AttachmentStatuses.PENDING,
-      fetchAttempts: 0,
-      nextAttemptAt: null,
-      createdAt,
-    }
-  );
+  await applyPost({ id: postId, circleId, authorId: 'sarah', caption: 'c', createdAt, receivedAt: createdAt });
+  await insertAttachment({
+    circleId,
+    entryId: postId,
+    kind: AttachmentKinds.POST_PHOTO,
+    bytes: null,
+    hash: hashBytes(photo),
+    keyVersion: 1,
+    status: AttachmentStatuses.PENDING,
+    fetchAttempts: 0,
+    nextAttemptAt: null,
+    createdAt,
+  });
   return postId;
 }
 
 test('downloads, decrypts, and stores a pending photo', async () => {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
-  const key = (await getCurrentContentKey(circleId))!.key;
+  const circleId = await makeCircle();
   const photo = new Uint8Array([4, 5, 6]);
   const postId = await makePendingPost(circleId, photo, 1000);
-  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, key));
+  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
 
   await drainPhotoQueue();
 
@@ -65,10 +72,12 @@ test('downloads, decrypts, and stores a pending photo', async () => {
   expect(attachment?.bytes).toEqual(photo);
   expect(attachment?.status).toBe('fetched');
   expect(attachment?.fetchAttempts).toBe(0);
+  // Addressed as (circle, the rest of the key) — no syncId any more.
+  expect(getBlob).toHaveBeenCalledWith(circleId, postId);
 });
 
 test('stops without a session, rather than backing every photo off', async () => {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const circleId = await makeCircle();
   const postId = await makePendingPost(circleId, new Uint8Array([1]), 1000);
   await deleteAuthToken();
 
@@ -83,8 +92,8 @@ test('stops without a session, rather than backing every photo off', async () =>
 });
 
 test('fetches newest first, across circles rather than finishing one circle at a time', async () => {
-  const { id: olderCircle } = await createCircle({ name: 'Older' });
-  const { id: newerCircle } = await createCircle({ name: 'Newer' });
+  const olderCircle = await makeCircle();
+  const newerCircle = await makeCircle();
   const photo = new Uint8Array([7]);
   await makePendingPost(olderCircle, photo, 1000);
   const newest = await makePendingPost(newerCircle, photo, 9000);
@@ -98,7 +107,7 @@ test('fetches newest first, across circles rather than finishing one circle at a
 });
 
 test('records a failure with backoff and leaves the photo pending', async () => {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const circleId = await makeCircle();
   const postId = await makePendingPost(circleId, new Uint8Array([1]), 1000);
   (getBlob as jest.Mock).mockRejectedValue(new Error('offline'));
 
@@ -112,7 +121,7 @@ test('records a failure with backoff and leaves the photo pending', async () => 
 });
 
 test('a failed photo is skipped until its backoff expires, so the queue never spins on it', async () => {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const circleId = await makeCircle();
   await makePendingPost(circleId, new Uint8Array([1]), 1000);
   (getBlob as jest.Mock).mockRejectedValue(new Error('offline'));
 
@@ -126,13 +135,12 @@ test('a failed photo is skipped until its backoff expires, so the queue never sp
   expect(await getFetchableAttachments(Date.now(), 1)).toHaveLength(0);
 });
 
-test('rejects bytes that do not match the hash the author signed', async () => {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
-  const key = (await getCurrentContentKey(circleId))!.key;
+test('rejects bytes that do not match the hash inside the entry', async () => {
+  const circleId = await makeCircle();
   const postId = await makePendingPost(circleId, new Uint8Array([1, 1, 1]), 1000);
   // Correctly encrypted, so it decrypts — but they aren't the bytes the
-  // signed entry committed to, which is the swap this check exists for.
-  (getBlob as jest.Mock).mockResolvedValue(encrypt(new Uint8Array([2, 2, 2]), key));
+  // entry committed to, which is the swap this check exists for.
+  (getBlob as jest.Mock).mockResolvedValue(encrypt(new Uint8Array([2, 2, 2]), KEY));
 
   await drainPhotoQueue();
 
@@ -142,14 +150,11 @@ test('rejects bytes that do not match the hash the author signed', async () => {
 });
 
 test('one failing photo does not stop the rest of the queue', async () => {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
-  const key = (await getCurrentContentKey(circleId))!.key;
+  const circleId = await makeCircle();
   const good = new Uint8Array([3, 3, 3]);
   const newestId = await makePendingPost(circleId, new Uint8Array([1]), 9000);
   const olderId = await makePendingPost(circleId, good, 1000);
-  (getBlob as jest.Mock)
-    .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValueOnce(encrypt(good, key));
+  (getBlob as jest.Mock).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(encrypt(good, KEY));
 
   await drainPhotoQueue();
 
@@ -158,13 +163,12 @@ test('one failing photo does not stop the rest of the queue', async () => {
 });
 
 test('stops at the budget, for a background window that cannot run long', async () => {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
-  const key = (await getCurrentContentKey(circleId))!.key;
+  const circleId = await makeCircle();
   const photo = new Uint8Array([8]);
   await makePendingPost(circleId, photo, 3000);
   await makePendingPost(circleId, photo, 2000);
   await makePendingPost(circleId, photo, 1000);
-  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, key));
+  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
 
   await drainPhotoQueue({ maxPhotos: 2 });
 

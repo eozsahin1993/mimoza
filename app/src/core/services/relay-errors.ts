@@ -29,6 +29,19 @@ export class RateLimitedError extends Error {
   }
 }
 
+/**
+ * The request never reached the relay — no radio, no route, a captive
+ * portal. Distinct from every other error here because nothing is wrong
+ * with what was being sent: a queued write must not spend its retry
+ * budget on it and end up in the failed banner for being on a plane.
+ */
+export class NetworkUnreachableError extends Error {
+  constructor() {
+    super('Could not reach the relay.');
+    this.name = 'NetworkUnreachableError';
+  }
+}
+
 /** Thrown by `getUploadTarget` specifically — see its own doc comment for why this isn't necessarily a failure. */
 export class BlobAlreadyExistsError extends Error {
   constructor() {

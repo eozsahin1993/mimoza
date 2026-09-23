@@ -1,1 +1,0 @@
-ALTER TABLE `circles` ADD `push_key_version` integer;

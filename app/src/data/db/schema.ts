@@ -1,225 +1,95 @@
-import { sql } from 'drizzle-orm';
-import { blob, check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, blob } from 'drizzle-orm/sqlite-core';
+
+/**
+ * What this device keeps locally is a projection shaped for the screens,
+ * not a mirror of the relay's tables.
+ *
+ * Three rules keep it honest. The wall depends only on rows a sync keeps
+ * complete: circles, circleMembers, activity and posts. The relay-owned
+ * half of a post is written from relay data and never by a local action,
+ * so there is one writer and nothing to reconcile; optimistic state is
+ * derived at read time from the outbox. Rows fetched on demand,
+ * postComments beyond the preview and postReactions, are a partial cache
+ * and say so through posts.childrenFetchedAt.
+ */
 
 export const circles = sqliteTable('circles', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  /** Cover photo picked on creation, if any — separate from any post's photo. */
-  picture: blob('picture').$type<Uint8Array>(),
+  role: text('role').notNull().default('member'),
+  notifyLevel: text('notify_level').notNull().default('all'),
+  /** The circle's current content key, and the roster's version. A sync compares both against its own. */
+  keyVersion: integer('key_version').notNull().default(1),
+  rosterVersion: integer('roster_version').notNull().default(0),
+  /** Relay-stamped time of the last entry, so a sync can skip a circle with nothing new. */
+  lastEntryAt: integer('last_entry_at').notNull().default(0),
+  /** The cover's content hash. Bytes live in attachments under the same id. */
+  coverId: text('cover_id'),
+  /** This account replaced its keypair, so the keys here are unreadable until a member reseals them. */
+  needsRewrap: integer('needs_rewrap', { mode: 'boolean' }).notNull().default(false),
   /**
-   * `hashBytes(picture)` at the moment it was last written. The cover's
-   * cached file path is versioned by it (see photo-cache.ts's coverFile),
-   * so a changed cover gets a new path without re-reading the blob. Null
-   * for covers stored before this column; circle-cover.ts backfills them.
+   * Opaque relay cursors, one per direction. Only the relay reads them;
+   * this device stores and returns them.
    */
-  pictureHash: text('picture_hash'),
-  /**
-   * The relay-facing address for this circle's log — random, independent
-   * of key material so rotation never repoints it. Stored, never derived.
-   */
-  syncId: text('sync_id').notNull().default(''),
+  postsForwardCursor: text('posts_forward_cursor'),
+  postsBackwardCursor: text('posts_backward_cursor'),
+  activityCursor: text('activity_cursor'),
   createdAt: integer('created_at').notNull(),
-  /**
-   * Which notification categories this circle sends, as a bitmask — see
-   * `PushCategories`. Local is the source of truth: the relay holds routing
-   * rows but has no read endpoint, so a screen would otherwise have nothing
-   * to render. Defaults to everything on; a circle is reachable from the
-   * moment you join without anyone opting in.
-   */
-  pushCategoryMask: integer('push_category_mask').notNull().default(15),
-  /** Silenced outright, independent of the mask, so the categories survive being switched back on. */
-  pushSilenced: integer('push_silenced', { mode: 'boolean' }).notNull().default(false),
-  /**
-   * The content-key version the relay's fanout hash was last written for.
-   * The hash follows the current key, so this lagging after a rotation
-   * means senders' tokens no longer match it and the circle has gone
-   * quiet — see `resyncPushIfStale`. Null until this device first
-   * registers, so a circle nobody enabled push for is never written.
-   */
-  pushKeyVersion: integer('push_key_version'),
-  /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */
-  leftAt: integer('left_at'),
-  /**
-   * How far this device has synced each namespace. Tracked separately
-   * because meta and content sync differently — meta is synced eagerly
-   * and in full, content is paged backward lazily — so one cursor can't
-   * serve both. 0 means never synced.
-   */
-  metaCursor: integer('meta_cursor').notNull().default(0),
-  contentCursor: integer('content_cursor').notNull().default(0),
-  /**
-   * When this device last opened this circle's feed — the unread-count
-   * badge's floor for "new post". Set to `createdAt` at insert time (this
-   * device's own join/creation moment), never left null: a fresh join's
-   * entire pulled-in history must never look unread, and `createdAt`
-   * already means "when this device first knew about this circle" (see
-   * create-circle.ts and join-circle.ts).
-   */
+  /** The unread badge's floor: everything older than this has been seen. */
   lastViewedAt: integer('last_viewed_at').notNull().default(0),
+  /** Set when this device leaves, so already-synced posts stay as a local archive. */
+  leftAt: integer('left_at'),
 });
 
+/**
+ * One row per member ever seen. Departures set leftAt rather than
+ * deleting, so a post or a reaction by someone who has gone still
+ * resolves to a name.
+ */
 export const circleMembers = sqliteTable(
   'circle_members',
   {
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    /** Ed25519 signing key (hex) — see `deriveCircleIdentity`. Verifies who signed a log entry. */
-    identityPublicKey: text('identity_public_key').notNull(),
+    accountId: text('account_id').notNull(),
+    name: text('name').notNull().default(''),
     /**
-     * X25519 sealing key (hex) — see `deriveCircleSealingKeypair`. Needed
-     * to seal a rotated content key to this member. Defaults to '' so
-     * `ALTER TABLE ADD COLUMN` stays valid against existing rows.
+     * This member's picture in this circle, and the content key version
+     * it was sealed under. A picture is circle content, so the same
+     * person has a different one per circle; bytes live in attachments.
      */
-    encPublicKey: text('enc_public_key').notNull().default(''),
-    /**
-     * This member's push routing id (hex) — derived client-side from
-     * their own seed and this circle, not a random per-install value, so
-     * it's stable across their devices without ever needing to be
-     * re-registered. Empty until they publish one, which is also how a
-     * member who has never opted into notifications stays untargetable.
-     */
-    pushRoutingId: text('push_routing_id').notNull().default(''),
-    /**
-     * This member's authority (Ed25519) public key, hex — see
-     * `deriveAuthorityKeypair`. Only its owner can derive it, so it
-     * arrives on their `member_added` with a signature by that key
-     * proving they hold it; whoever promotes them needs it, because the
-     * relay's authority set is keyed on this and not on the identity key.
-     */
-    authorityPublicKey: text('authority_public_key').notNull().default(''),
-    memberId: text('member_id').notNull(),
-    role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
-    name: text('name').notNull(),
-    picture: blob('picture').$type<Uint8Array>(),
-    joinedAt: integer('joined_at').notNull(),
-    /**
-     * Set when an admin removes this member — kept, never deleted (see
-     * `authoredByMember` in sync/entry-handlers/types.ts): the row is
-     * still the "ever-member" proof that a post/comment/reaction authored
-     * before removal must keep passing. `getCircleMembers` filters this
-     * out; `getMemberByPublicKey` deliberately doesn't.
-     */
-    removedAt: integer('removed_at').default(sql`null`),
+    avatarId: text('avatar_id'),
+    avatarKeyVersion: integer('avatar_key_version'),
+    /** X25519, what this member's copy of a content key is sealed to. */
+    publicKey: text('public_key').notNull().default(''),
+    role: text('role').notNull().default('member'),
+    joinedAt: integer('joined_at').notNull().default(0),
+    leftAt: integer('left_at'),
+    needsRewrap: integer('needs_rewrap', { mode: 'boolean' }).notNull().default(false),
   },
-  (t) => [
-    primaryKey({ columns: [t.circleId, t.identityPublicKey] }),
-    uniqueIndex('circle_members_member_id').on(t.circleId, t.memberId),
-  ]
+  (t) => [primaryKey({ columns: [t.circleId, t.accountId] })]
 );
 
 /**
- * Every roster change this circle has seen — one row per event, append-
- * only, the local projection of the `member_added`/`member_removed`/
- * `role_change` entries in meta.
- *
- * Separate from `circle_members` because that table is *state* (who is
- * here now, what can they do) while this is *history* (what happened, in
- * order, and who did it). A single roster row can only hold one
- * `joinedAt`/`removedAt` pair, so it cannot represent someone leaving and
- * later rejoining — and attribution is a property of each event, not of
- * the person: two removals across two stints can have two different
- * admins behind them.
- *
- * Scope is deliberately "things that happen to a member", i.e. exactly
- * the events whose current-state projection is `circle_members`. A future
- * `circle_renamed` or `cover_photo_set` projects onto `circles` instead
- * and belongs elsewhere, or this table grows two unrelated write paths.
- *
- * Names are never stored here — `subjectPublicKey`/`actorPublicKey`
- * resolve against `circle_members` at read time, so a member renaming
- * themselves updates every line they appear in. Same principle as posts:
- * never snapshot a name, so there's nothing here to go stale.
+ * What happened to the circle itself, written by the relay and
+ * interleaved with posts on the wall. subjectName is the name at the
+ * time, so someone who has left stays attributable.
  */
-export const memberEvents = sqliteTable(
-  'member_events',
+export const activity = sqliteTable(
+  'activity',
   {
-    /**
-     * Surrogate key, deliberately not `(circleId, epoch)`. A primary key
-     * can't be nullable, and keying on epoch would foreclose ever writing
-     * a *provisional* row — one inserted by the device performing the
-     * action, before its entry has been appended and assigned an epoch.
-     * Uniqueness of `(circleId, epoch)` is enforced by its own index
-     * below, which is what actually makes replay idempotent.
-     */
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: text('id').primaryKey(),
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    /**
-     * The relay-assigned epoch of the entry this row came from — unique
-     * within a circle's meta namespace, so it is both the idempotency key
-     * for replay (invariant 8) and the canonical ordering. Entries carry
-     * no id of their own that reaches a handler; epoch is the only
-     * per-entry identity there is.
-     */
-    epoch: integer('epoch').notNull(),
-    /**
-     * Local-only, unlike `EntryTypes` — this table is a disposable
-     * projection rebuilt by replaying from epoch 0, so these values can
-     * be renamed freely. Wire format cannot. `account_deleted` replaces
-     * `removed` for a departure triggered by deleting the account, rather
-     * than sharing `removed` plus a separate flag — same reasons `role`
-     * splits `role_changed` by direction instead of a boolean.
-     */
-    kind: text('kind', { enum: ['created', 'added', 'removed', 'role_changed', 'account_deleted'] }).notNull(),
-    /** Who it happened to. */
-    subjectPublicKey: text('subject_public_key').notNull(),
-    /**
-     * Who did it — the entry's signer. Equal to `subjectPublicKey` when
-     * the member acted on themselves: the founder's own `member_added`,
-     * or leaving rather than being removed.
-     */
-    actorPublicKey: text('actor_public_key').notNull(),
-    /** The role granted — `role_changed` only, null otherwise. */
-    role: text('role', { enum: ['admin', 'member'] }),
-    /**
-     * The actor's clock, carried on the entry — never this device's
-     * receipt time, or a device replaying from epoch 0 would date every
-     * event to its own "now" and sort them all to the top of the feed.
-     */
-    occurredAt: integer('occurred_at').notNull(),
+    event: text('event').notNull(),
+    actorId: text('actor_id').notNull(),
+    subjectId: text('subject_id'),
+    subjectName: text('subject_name'),
+    receivedAt: integer('received_at').notNull(),
   },
-  // The unique index is load-bearing, not just a lookup aid: it's what
-  // `onConflictDoNothing` collides against, so replaying an entry updates
-  // nothing instead of appending a duplicate event. It also covers
-  // circleId-prefixed reads, so no separate index on circleId is needed.
-  (t) => [uniqueIndex('member_events_circle_epoch').on(t.circleId, t.epoch)]
-);
-
-export const deviceProfile = sqliteTable(
-  'device_profile',
-  {
-    id: integer('id').primaryKey(),
-    name: text('name').notNull(),
-    picture: blob('picture').$type<Uint8Array>(),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (t) => [check('device_profile_id_check', sql`${t.id} = 0`)]
-);
-
-export const circleInvites = sqliteTable(
-  'circle_invites',
-  {
-    code: text('code').primaryKey(),
-    circleId: text('circle_id')
-      .notNull()
-      .references(() => circles.id, { onDelete: 'cascade' }),
-    createdByPublicKey: text('created_by_public_key').notNull(),
-    createdAt: integer('created_at').notNull(),
-    expiresAt: integer('expires_at').notNull(),
-    revokedAt: integer('revoked_at'),
-    /**
-     * This invite's push routing id on the relay (see
-     * `derivePushInviteRoutingId`), while one exists there. Set only after
-     * it's registered; cleared once the relay has deleted it. Stored rather
-     * than re-derived so a revoked invite's cleanup reads it straight off
-     * the row.
-     */
-    pushRoutingId: text('push_routing_id'),
-  },
-  (t) => [index('circle_invites_circle_id').on(t.circleId)]
+  (t) => [index('activity_circle_received').on(t.circleId, t.receivedAt)]
 );
 
 export const posts = sqliteTable(
@@ -229,58 +99,62 @@ export const posts = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    caption: text('caption').notNull(),
-    /**
-     * The author's circle identity public key (hex, Ed25519) — the same
-     * value a pulled entry's envelope is signed with, and the
-     * `circleMembers` row key. Deliberately *not* a denormalized name or
-     * avatar: both resolve live from `circleMembers` at render time, so a
-     * member renaming themselves updates every post they ever made —
-     * nothing about identity is copied here, only the pubkey that
-     * resolves it.
-     */
-    authorPublicKey: text('author_public_key').notNull(),
+    authorId: text('author_id').notNull(),
+    caption: text('caption').notNull().default(''),
+    /** The author's own clock, from inside the ciphertext: what the wall sorts on. */
     createdAt: integer('created_at').notNull(),
-    /**
-     * When this device last scrolled this post into view, or opened its
-     * details screen — null means never. Backs the "has new comments"
-     * marker: a comment only counts as unseen if it postdates this (see
-     * getUnseenCommentPostIds), so viewing the post again always covers
-     * whatever comments existed on it up to that moment.
-     */
+    /** The relay's clock: what a cursor walks. */
+    receivedAt: integer('received_at').notNull(),
+    inAlbum: integer('in_album', { mode: 'boolean' }).notNull().default(true),
+    deletedAt: integer('deleted_at'),
     lastViewedAt: integer('last_viewed_at'),
     /**
-     * Whether this photo belongs in the circle's album — the archive view
-     * every member shares, rather than only appearing in the feed as it
-     * scrolls past. Chosen when posting and changeable afterwards (see
-     * set-album-visibility.ts). Defaults true so a row that predates the
-     * column, or an entry whose payload lacks the field, reads as
-     * included rather than silently vanishing from the album.
+     * When this post's comments and reactions were last fetched. Null
+     * means never. Compared against updatedAt to decide whether opening
+     * the post needs a call at all.
      */
-    inAlbum: integer('in_album', { mode: 'boolean' }).notNull().default(true),
+    childrenFetchedAt: integer('children_fetched_at'),
+
+    /**
+     * Everything below is the relay's, replaced wholesale by every sync
+     * and never written by a local action. Optimistic state is derived
+     * at read time from the outbox, so there is nothing here to
+     * reconcile when an operation lands.
+     */
+    updatedAt: integer('updated_at').notNull().default(0),
+    commentCount: integer('comment_count').notNull().default(0),
+    /**
+     * Emoji to count, as JSON. The relay counts by an opaque tag; the
+     * tag is decoded here on the way in, while the keys are at hand, so
+     * rendering never touches one.
+     */
+    reactionCounts: text('reaction_counts').notNull().default('{}'),
+    /**
+     * Reactions whose tag this device cannot name yet, made under a key
+     * version it has not been given. They count toward the total and
+     * resolve themselves on the next sync after a reseal.
+     */
+    unnamedReactions: integer('unnamed_reactions').notNull().default(0),
+    /**
+     * The newest comments the relay carries on the post row, by id. The
+     * preview joins these from post_comments, which is also where the
+     * "new comments" marker gets its timestamp.
+     */
+    recentCommentIds: text('recent_comment_ids').notNull().default('[]'),
+    /** What this account did, as a filled state. Which emoji comes from the children fetch. */
+    iReacted: integer('i_reacted', { mode: 'boolean' }).notNull().default(false),
+    iCommented: integer('i_commented', { mode: 'boolean' }).notNull().default(false),
   },
-  (t) => [index('posts_circle_id').on(t.circleId)]
+  (t) => [index('posts_circle_created').on(t.circleId, t.createdAt)]
 );
 
 /**
- * Every encrypted blob this device knows about but may not hold yet —
- * post photos and circle cover photos alike. Modelled as its own table
- * because a blob has a lifecycle its owner doesn't: where to fetch it
- * from, whether it's arrived, and what to do about it if it hasn't. A
- * pulled post exists locally the moment its log entry is applied; its
- * bytes arrive later, out of band (see photo-queue.ts), so "post" and
- * "bytes of that post" are genuinely two things with two states.
+ * Every encrypted blob this device knows about but may not hold yet. A
+ * blob has a lifecycle its owner does not: where to fetch it, whether it
+ * has arrived, and what to do if it has not.
  *
- * Keyed by `(circleId, entryId)` because that's how the relay itself
- * addresses blobs — GET /v1/circles/{syncId}/entries/{entryId}/blob — so
- * one download queue and one backoff policy serve every kind, and a
- * future kind (member avatars, at `{syncId}/avatar/{pubkey}`) is a new
- * `kind` value rather than a new table.
- *
- * Rows are created two ways, and both go through here rather than one
- * path bypassing it: locally-created content inserts `status: 'fetched'`
- * with bytes already in hand, and pulled content inserts
- * `status: 'pending'` with `bytes: null`.
+ * Keyed the way the relay addresses it, so one queue and one backoff
+ * serve post photos, covers and member pictures alike.
  */
 export const attachments = sqliteTable(
   'attachments',
@@ -289,241 +163,28 @@ export const attachments = sqliteTable(
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
     /**
-     * The blob's stable relay-side address within its circle. A post
-     * photo's is its `postId` (the id `drainOutbox` uploads under); a
-     * circle cover's is the literal `'cover'`. Deliberately not a URL —
-     * download URLs are presigned and expire, so they can't be persisted.
-     *
-     * `(circleId, entryId)` is the primary key rather than a synthetic id
-     * because it's exactly how the relay addresses the blob, so there's
-     * no second identity to keep in sync — and it's what makes
-     * re-applying an already-seen entry a no-op instead of a duplicate.
-     */
-    /**
-     * The id this entry is appended under at the relay — passed straight
-     * to `appendEntry`, which makes it the relay's idempotency key, and
-     * for a post also its blob address (`{syncId}/{entryId}` in S3).
-     *
-     * For posts and comments it's the same id as the local row, so every
-     * device ends up naming that content identically. For reactions it's
-     * a fresh id per toggle that refers to nothing local: reusing one
-     * would let the relay read a re-reaction as a retry of the removal
-     * and drop it.
+     * The rest of the relay's key after the circle: a post's id, or
+     * `cover/<coverId>`, or `avatar/<accountId>/<avatarId>`.
      */
     entryId: text('entry_id').notNull(),
-    /**
-     * What this blob is for — decides where the bytes get rendered once
-     * they land, and is why the fetcher itself never has to care.
-     */
-    kind: text('kind', { enum: ['post_photo', 'circle_cover'] }).notNull(),
-    /** Decrypted bytes, once downloaded. Null while status is 'pending'/'failed'. */
+    kind: text('kind').notNull(),
     bytes: blob('bytes').$type<Uint8Array>(),
-    /**
-     * sha256 of the decrypted bytes, from the owning entry's *signed*
-     * payload (see create-post.ts) — what verifies a download, since an
-     * entry's signature can't cover a blob uploaded separately. '' when
-     * nothing signed a hash for it (a circle cover, today).
-     */
-    hash: text('hash').notNull(),
-    /** Which content-key version decrypts the blob — the version its entry used. */
-    keyVersion: integer('key_version').notNull(),
-    status: text('status', { enum: ['pending', 'fetched', 'failed'] }).notNull(),
+    /** The hash inside the ciphertext, checked against the bytes fetched. */
+    hash: text('hash'),
+    keyVersion: integer('key_version'),
+    status: text('status').notNull().default('pending'),
     fetchAttempts: integer('fetch_attempts').notNull().default(0),
-    /** Epoch ms before which a failed download won't be retried; null = eligible now. */
     nextAttemptAt: integer('next_attempt_at'),
-    /**
-     * When the owning content was created, copied here so the download
-     * queue can order by recency without joining anything — see
-     * `getFetchableAttachments`, the hottest query in the photo engine.
-     */
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.circleId, t.entryId] }), index('attachments_circle_id').on(t.circleId)]
-);
-
-export const postReactions = sqliteTable(
-  'post_reactions',
-  {
-    postId: text('post_id')
-      .notNull()
-      .references(() => posts.id, { onDelete: 'cascade' }),
-    /**
-     * The reacting member's circle identity public key (hex, Ed25519) —
-     * same identifier posts and comments use. It was `memberId`, which
-     * is self-assigned per device and never travels on the wire, so a
-     * synced reaction could not be attributed anywhere but its author's
-     * own phone.
-     */
-    authorPublicKey: text('author_public_key').notNull(),
-    /**
-     * One grapheme cluster (a single emoji, however many UTF-16 code
-     * units that takes for ZWJ sequences/skin tones/flags) — not
-     * validated at the schema level; callers are responsible for that.
-     */
-    emoji: text('emoji').notNull(),
-    createdAt: integer('created_at').notNull(),
-  },
-  (t) => [
-    // One row per (post, author, emoji) — reacting again with the same
-    // emoji is a toggle-off (delete the row), not a duplicate; the same
-    // member can still hold several different emoji on one post.
-    primaryKey({ columns: [t.postId, t.authorPublicKey, t.emoji] }),
-    index('post_reactions_post_id').on(t.postId),
-  ]
+  (t) => [primaryKey({ columns: [t.circleId, t.entryId] })]
 );
 
 /**
- * Strict local ordering for locally-created content awaiting push to the
- * relay. `sequenceNum` (not `createdAt`) is what
- * `drainOutbox` pushes in order: a DB-assigned autoincrement is gap-free
- * and unambiguous by construction, where comparing timestamps across
- * (eventually several) locally-originated entry types would not be.
- * `epoch` stays null until the relay confirms the push.
+ * Filled three ways: the preview the relay carries on every post, the
+ * children fetch when a post is opened, and this device's own comments,
+ * inserted pending beside their outbox row.
  */
-export const outbox = sqliteTable(
-  'outbox',
-  {
-    sequenceNum: integer('sequence_num').primaryKey({ autoIncrement: true }),
-    circleId: text('circle_id')
-      .notNull()
-      .references(() => circles.id, { onDelete: 'cascade' }),
-    entryType: text('entry_type', {
-      enum: [
-        'post',
-        'comment',
-        'reaction',
-        'member_added',
-        'profile_update',
-        'member_removed',
-        'role_change',
-        'key_rotation',
-        'cover_photo_set',
-        'circle_renamed',
-        'album_visibility',
-        'post_delete',
-        'push_enabled',
-        'circle_deleted',
-        'account_deleted',
-      ],
-    }).notNull(),
-    /**
-     * The id this entry is appended under at the relay — passed straight
-     * to `appendEntry`, which makes it the relay's idempotency key, and
-     * for a post also its blob address (`{syncId}/{entryId}` in S3).
-     *
-     * For posts and comments it's the same id as the local row, so every
-     * device ends up naming that content identically. For reactions it's
-     * a fresh id per toggle that refers to nothing local: reusing one
-     * would let the relay read a re-reaction as a retry of the removal
-     * and drop it.
-     */
-    entryId: text('entry_id').notNull(),
-    /**
-     * The exact ciphertext `drainOutbox` will POST as-is — built and
-     * encrypted once, at enqueue time, not re-derived from `posts` when
-     * the push actually happens. Two reasons that matters: a retry must
-     * send byte-for-byte the same thing it did the first time (the
-     * relay's idempotency is keyed on entryId, not payload — if a retry's
-     * bytes differed, the relay would silently keep the first attempt's
-     * content and drop the retry's), and a locally-created row can be
-     * queued for a while before it actually goes out, during which
-     * `posts` itself could in principle change under it.
-     */
-    encryptedMeta: blob('encrypted_meta').$type<Uint8Array>().notNull(),
-    /**
-     * Decoupled from `epoch` on purpose: today the two always move
-     * together (pending -> synced, right when epoch is first set), but a
-     * separate status leaves room for a later 'failed' state — a
-     * permanently-failed push and a not-yet-attempted one would otherwise
-     * both just look like `epoch IS NULL`, with no way to tell them apart.
-     */
-    status: text('status', { enum: ['pending', 'synced'] }).notNull(),
-    epoch: integer('epoch'),
-    /**
-     * A blob this entry's push should delete once the entry itself has
-     * landed — the deleted post's id, for a `post_delete`. Null for
-     * everything else, which is nearly every row.
-     *
-     * Not `entryId`: a deletion is its own entry with its own id (the
-     * post's is already taken at the relay, where entryId is the
-     * idempotency key), so the blob's address has nowhere else to ride.
-     * Sitting on the outbox row is what makes the deletion retriable —
-     * it happens whenever the queue drains, which is what lets a photo
-     * be deleted offline.
-     */
-    blobEntryId: text('blob_entry_id'),
-    /**
-     * How this entry must move the relay's authority set when it goes
-     * out, for a `role_change` that promotes or demotes. Null for
-     * everything else — including a demotion of someone the relay never
-     * registered, which has no set entry to remove.
-     *
-     * Sitting on the row for the same reason `blobEntryId` does: it's
-     * what lets the change be made offline. The relay commits the set
-     * mutation and the entry together or not at all, so the drain has to
-     * call a different endpoint for these rows and needs both halves to
-     * build the request — the signature is over the action and target,
-     * and is only produced at drain time, from a seed-derived key this
-     * row never holds.
-     */
-    authorityAction: text('authority_action', { enum: ['add', 'remove'] }),
-    /** The authority public key `authorityAction` applies to. Null whenever that is. */
-    authorityTargetKey: text('authority_target_key'),
-  },
-  (t) => [index('outbox_circle_id').on(t.circleId)]
-);
-
-/**
- * One row per outstanding join request this device has submitted — lets a
- * "pending for Family Circle" screen survive the app being closed and
- * reopened before approval ever lands.
- * `id` is the requester-chosen id used both as the mailbox row's sort key
- * suffix and as the Keychain key for the matching ephemeral secret key
- * (see invite's `keystore.ts`'s `savePendingJoinKeypair`) — the secret key itself
- * never lives here. `status` is 'approved' only for the brief window
- * between decrypting the approval and finishing local setup; the row is
- * deleted entirely once that completes, so there's no long-lived "joined"
- * state to track here.
- */
-export const pendingJoinRequests = sqliteTable('pending_join_requests', {
-  id: text('id').primaryKey(),
-  /**
-   * The local circleId minted when the request was made, parked here
-   * until approval. It has to exist that early because the requester's
-   * identity is derived from it and its public half ships in the request
-   * — and it has to be *remembered*, since deriving the same keypair
-   * again later requires the same id (see server/README.md's identity
-   * model). `completeJoin` adopts this as the circle row's `id`.
-   */
-  circleId: text('circle_id').notNull(),
-  inviteCode: text('invite_code').notNull(),
-  /** From the decrypted invite preview — shown on the pending screen without needing to re-fetch/re-decrypt it. */
-  circleName: text('circle_name').notNull(),
-  /** Also from the decrypted invite preview — the creator's self-reported display name, shown on the pending screen ("X needs to let you in"). Defaults to '' (matches profile?.name ?? '' elsewhere) so ALTER TABLE ADD COLUMN stays valid against existing local rows. */
-  createdByName: text('created_by_name').notNull().default(''),
-  /**
-   * Also from the decrypted invite preview — the invite creator's own
-   * circle-identity public key (hex, Ed25519), kept locally so a later
-   * approval's signature can be verified against it without a second
-   * fetch. See `JoinApprovalEnvelope`'s doc comment for why this matters:
-   * without it, any existing member who knows the invite code could forge
-   * a working approval, not just this invite's actual creator.
-   */
-  createdByPublicKey: text('created_by_public_key').notNull(),
-  /** Hex-encoded X25519 public key; the matching secret key is in Keychain, never here. */
-  ephemeralPublicKey: text('ephemeral_public_key').notNull(),
-  submittedAt: integer('submitted_at').notNull(),
-  status: text('status', { enum: ['pending', 'approved'] }).notNull().default('pending'),
-  /**
-   * The push routing id this request asked to be told at: the future circle's
-   * own routing id (`derivePushRoutingId` over `circleId`), registered
-   * before the request went out. Stored so an incoming push is a lookup,
-   * not a derivation. Null on requests made before it existed. The relay
-   * expires it; nothing here deletes it.
-   */
-  pushRoutingId: text('push_routing_id'),
-});
-
 export const postComments = sqliteTable(
   'post_comments',
   {
@@ -531,20 +192,103 @@ export const postComments = sqliteTable(
     postId: text('post_id')
       .notNull()
       .references(() => posts.id, { onDelete: 'cascade' }),
+    circleId: text('circle_id').notNull(),
+    authorId: text('author_id').notNull(),
+    /** Reserved: the relay stores it and does not act on it yet. */
+    parentCommentId: text('parent_comment_id'),
+    body: text('body').notNull().default(''),
+    createdAt: integer('created_at').notNull(),
+    deletedAt: integer('deleted_at'),
+    /** Written locally and not yet confirmed by a sync. */
+    pending: integer('pending', { mode: 'boolean' }).notNull().default(false),
+  },
+  (t) => [index('post_comments_post_created').on(t.postId, t.createdAt)]
+);
+
+/**
+ * One row per member per emoji, filled when a post is opened and by this
+ * device's own writes. A sync carries counts, not names, so this is a
+ * partial cache and posts.childrenFetchedAt says how partial.
+ *
+ * The emoji is decoded once on the way in, while the key is at hand.
+ */
+export const postReactions = sqliteTable(
+  'post_reactions',
+  {
+    postId: text('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    circleId: text('circle_id').notNull(),
+    accountId: text('account_id').notNull(),
+    tag: text('tag').notNull(),
+    emoji: text('emoji').notNull().default(''),
+    keyVersion: integer('key_version'),
+    createdAt: integer('created_at').notNull(),
     /**
-     * The author's circle identity public key (hex, Ed25519) — the same
-     * identifier posts use, and for the same reason: it is what a synced
-     * entry's signature is verified against, and the `circleMembers` row
-     * key. Replaced `memberId` + `authorName`, neither of which could
-     * survive syncing — `memberId` is self-assigned per device and never
-     * travels on the wire, and a denormalized name froze whatever the
-     * author was called at the time (literally "You" when they had no
-     * profile name yet). Both now resolve live from the roster, so
-     * renaming yourself updates every comment you ever made.
+     * Queued locally and not yet confirmed: 'add' or 'remove'. The card
+     * sums the post's counts plus adds minus removes, so a tap shows
+     * immediately and corrects itself when the relay answers.
      */
-    authorPublicKey: text('author_public_key').notNull(),
-    body: text('body').notNull(),
+    pendingOp: text('pending_op'),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.accountId, t.tag] })]
+);
+
+/** What a queued write is. Membership changes are direct calls, not these. */
+export type OutboxOp =
+  | 'post'
+  | 'comment'
+  | 'reaction'
+  | 'unreact'
+  | 'delete_post'
+  | 'delete_comment'
+  | 'set_visibility';
+
+/**
+ * Content writes queue here and drain in order. Membership operations do
+ * not: they need the current roster anyway, so they are direct calls
+ * that fail in front of the person who made them.
+ */
+export const outbox = sqliteTable(
+  'outbox',
+  {
+    seq: integer('seq').primaryKey({ autoIncrement: true }),
+    circleId: text('circle_id').notNull(),
+    op: text('op').$type<OutboxOp>().notNull(),
+    postId: text('post_id'),
+    entryId: text('entry_id'),
+    /** The plaintext to seal at send time, as JSON. Sealed late, so a key rotation between queueing and sending is not a problem. */
+    plaintext: text('plaintext').notNull().default('{}'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: integer('next_attempt_at'),
+    lastError: text('last_error'),
+    status: text('status').notNull().default('queued'),
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [index('post_comments_post_id').on(t.postId)]
+  (t) => [index('outbox_circle_status').on(t.circleId, t.status)]
 );
+
+/** This device and the account behind it. One row. */
+export const deviceProfile = sqliteTable('device_profile', {
+  accountId: text('account_id').primaryKey(),
+  name: text('name').notNull().default(''),
+  /**
+   * The original picture, kept locally so it can be sealed again for
+   * each circle. There is no account-level avatar on the relay: a
+   * picture is circle content, sealed to that circle's key.
+   */
+  picture: blob('picture').$type<Uint8Array>(),
+  deviceId: text('device_id').notNull().default(''),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/** Asks to join, until the relay answers them. */
+export const pendingRequests = sqliteTable('pending_requests', {
+  circleId: text('circle_id').primaryKey(),
+  inviteCode: text('invite_code').notNull(),
+  circleName: text('circle_name').notNull().default(''),
+  invitedByName: text('invited_by_name').notNull().default(''),
+  submittedAt: integer('submitted_at').notNull(),
+  status: text('status').notNull().default('pending'),
+});

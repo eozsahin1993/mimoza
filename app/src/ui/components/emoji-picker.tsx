@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { REACTION_EMOJI } from '@/core/crypto/reaction-tags';
+
 import { Icon } from '@/ui/components/icon';
 import { Icons, Radius, Space } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
@@ -15,19 +17,6 @@ export type EmojiPickerProps = {
    */
   onClose?: () => void;
 };
-
-/**
- * The whole vocabulary — there is no free-form slot. A fixed set keeps
- * counts meaningful (a hundred near-identical faces would each stand
- * alone) and keeps the feed's tone bounded, which an open emoji keyboard
- * cannot. Order is deliberate: warmth first, then celebration, then the
- * quieter ones.
- *
- * Only the picker is limited. Nothing rejects an emoji outside this set
- * arriving over the log — a future build may add one, and dropping those
- * reactions would lose real history from a newer peer.
- */
-const QUICK_REACTIONS = ['❤️', '🥂', '😂', '😭', '👏', '🙏', '✨', '🧿'];
 
 /**
  * One full-width panel of evenly-divided slots, rather than a row of
@@ -46,7 +35,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
 
   return (
     <View style={[styles.panel, { borderColor: tints.chipIdleBorder, backgroundColor: tints.chipIdleBg }]}>
-      {QUICK_REACTIONS.map((emoji) => (
+      {REACTION_EMOJI.map((emoji) => (
         <Pressable key={emoji} style={styles.slot} onPress={() => onSelect(emoji)}>
           <Text style={styles.emoji}>{emoji}</Text>
         </Pressable>

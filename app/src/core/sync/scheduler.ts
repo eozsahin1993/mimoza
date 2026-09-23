@@ -1,9 +1,8 @@
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
-import { syncStaleCircles } from '@/core/sync/sync-circles';
+import { syncCircles } from '@/core/sync/sync-circles';
 
 /** How often to check in while the app is open. Timers don't fire in the background, so this is a foreground cadence. */
 const FOREGROUND_INTERVAL_MS = 30_000;
@@ -12,9 +11,7 @@ const FOREGROUND_INTERVAL_MS = 30_000;
 let inFlight: Promise<void> | null = null;
 
 /**
- * Cheaply checks every circle for new content (see syncStaleCircles),
- * running a real sync only where one's actually needed, then sets the
- * photo queue going without waiting for it.
+ * One sync pass, then the photo queue set going without waiting for it.
  *
  * Deduped: the app has several independent reasons to check in
  * (foreground, a timer, a pull-to-refresh, a background task) and they
@@ -39,24 +36,7 @@ export function runSync(): Promise<void> {
 
 /** Signed out, every relay route would refuse the pass, so there's no pass to run. */
 async function syncIfSignedIn(): Promise<void> {
-  if (await getAuthToken()) await syncStaleCircles();
-}
-
-/**
- * A sync pass, then a manifest repair — for the two triggers where the
- * repair is worth its request.
- *
- * Deliberately *not* on the timer. Everything that changes what the manifest
- * should say already records it at the point of change (joining, leaving,
- * renaming, and `key-rotation.ts` when a rotation applies), so this exists
- * only to retry those when one failed. A failure that outlives the app being
- * open isn't going to be fixed sooner by asking every thirty seconds, and
- * asking costs a request that almost always finds nothing to do.
- */
-function syncAndRepairManifest(): void {
-  runSync().then(async () => {
-    if (await getAuthToken()) await recordInManifestBestEffort();
-  });
+  if (await getAuthToken()) await syncCircles();
 }
 
 /**
@@ -69,18 +49,15 @@ function syncAndRepairManifest(): void {
  * anything genuinely background is best-effort and additive on top of
  * these, never a replacement for them.
  *
- * The first two also repair the account manifest; the timer deliberately
- * doesn't — see `syncAndRepairManifest`.
- *
  * Safe to start before sign-in, and left running across sign-out: every
  * trigger checks for a session first and does nothing without one, so
  * signing back in resumes it without a restart.
  */
 export function startSyncScheduler(): () => void {
-  syncAndRepairManifest();
+  runSync();
 
   const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
-    if (state === 'active') syncAndRepairManifest();
+    if (state === 'active') runSync();
   });
   const interval = setInterval(runSync, FOREGROUND_INTERVAL_MS);
 

@@ -1,1 +1,0 @@
-ALTER TABLE `circle_invites` ADD `push_routing_id` text;

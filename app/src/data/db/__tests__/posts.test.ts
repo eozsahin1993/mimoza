@@ -1,316 +1,116 @@
-import { generateUUID } from '@/core/crypto/primitives';
 import { initDatabase } from '@/data/db';
-import { AttachmentKinds, AttachmentStatuses, type NewAttachment } from '@/data/db/attachments';
-import { insertComment } from '@/data/db/comments';
-import { insertMember } from '@/data/db/members';
-import { deleteCircle, insertCircle } from '@/data/db/circles';
+import { applyMembership } from '@/data/db/circles';
 import {
-  getAlbumPhotos,
-  getCircleFeed,
-  getCircleFeedPage,
+  applyPost,
+  childrenAreStale,
+  getAlbum,
+  getFeed,
   getPost,
-  getUnseenCommentPostIds,
-  insertPost,
-  markPostViewed,
-  setPostInAlbum,
-  type FeedCursor,
+  markChildrenFetched,
+  markPostDeleted,
+  setInAlbum,
 } from '@/data/db/posts';
 
-const OWN_KEY = 'aa'.repeat(32);
-const OTHER_KEY = 'bb'.repeat(32);
+const NOW = 1_700_000_000_000;
 
-beforeAll(() => initDatabase());
-
-async function makeCircle() {
-  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, syncId: generateUUID(), createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0, lastViewedAt: 0 };
-  await insertCircle(circle);
-  return circle;
+// The database is shared across cases in a file, so ids are unique per
+// case rather than each one cleaning up after itself.
+let next = 0;
+function circleId(): string {
+  next += 1;
+  return `circle-${next}`;
 }
 
-function makePost(circleId: string, overrides: Partial<{ caption: string; createdAt: number; inAlbum: boolean }> = {}) {
+function postId(name: string): string {
+  return `${name}-${next}`;
+}
+
+async function seedCircle(id: string) {
+  await applyMembership(
+    { circleId: id, name: 'Family', role: 'admin', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
+    NOW
+  );
+}
+
+function post(circle: string, id: string, overrides: Partial<Parameters<typeof applyPost>[0]> = {}) {
   return {
-    id: generateUUID(),
-    circleId,
-    caption: overrides.caption ?? 'Nana in the kitchen.',
-    authorPublicKey: 'aa'.repeat(32),
-    createdAt: overrides.createdAt ?? Date.now(),
-    lastViewedAt: null,
-    inAlbum: overrides.inAlbum ?? true,
+    id,
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: 'hello',
+    createdAt: NOW,
+    receivedAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
   };
 }
 
-/** The photo attachment a locally-created post carries: bytes already in hand, nothing to download. */
-function makeAttachment(post: { id: string; circleId: string; createdAt: number }): NewAttachment {
-  return {
-    circleId: post.circleId,
-    entryId: post.id,
-    kind: AttachmentKinds.POST_PHOTO,
-    bytes: new Uint8Array([1, 2, 3]),
-    hash: 'deadbeef',
-    keyVersion: 1,
-    status: AttachmentStatuses.FETCHED,
-    fetchAttempts: 0,
-    nextAttemptAt: null,
-    createdAt: post.createdAt,
-  };
-}
-
-describe('posts CRUD', () => {
-  test('getCircleFeed returns nothing before any post is inserted', async () => {
-    const circle = await makeCircle();
-
-    await expect(getCircleFeed(circle.id)).resolves.toEqual([]);
-  });
-
-  test('a post with no attachment yet reads back with no photo, rather than dropping out', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
-    await insertPost(post);
-
-    const [stored] = await getCircleFeed(circle.id);
-    expect(stored.id).toBe(post.id);
-    expect(stored.hasPhoto).toBe(false);
-    expect(stored.photoStatus).toBeNull();
-  });
-
-  test('insertPost with an attachment reads the photo bytes back on the post', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
-    await insertPost(post, makeAttachment(post));
-
-    const [stored] = await getCircleFeed(circle.id);
-    expect(stored.hasPhoto).toBe(true);
-    expect(stored.photoStatus).toBe('fetched');
-    expect(stored.createdAt).toBe(post.createdAt);
-  });
-
-  test('getCircleFeed resolves the author and photo without the join blanking the post', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
-    await insertMember({
-      circleId: circle.id,
-      identityPublicKey: post.authorPublicKey,
-      encPublicKey: 'bb',
-      memberId: generateUUID(),
-      role: 'admin',
-      name: 'Priya Raman',
-      picture: null,
-      joinedAt: 100,
-      removedAt: null,
-    });
-    await insertPost(post, makeAttachment(post));
-
-    const [row] = await getCircleFeed(circle.id);
-
-    expect(row.authorName).toBe('Priya Raman');
-    expect(row.hasPhoto).toBe(true);
-    // Regression guard for drizzle-team/drizzle-orm#555: joined columns
-    // are emitted without AS aliases and this driver keys rows by column
-    // name, so selecting any column whose name also exists on a joined
-    // table silently overwrites this one. `createdAt` is the canary.
-    expect(row.createdAt).toBe(post.createdAt);
-  });
-
-  test('getCircleFeed returns every post in a circle, newest first', async () => {
-    const circle = await makeCircle();
-    const earlier = makePost(circle.id, { caption: 'Earlier', createdAt: 1000 });
-    const later = makePost(circle.id, { caption: 'Later', createdAt: 2000 });
-    await insertPost(earlier);
-    await insertPost(later);
-
-    const posts = await getCircleFeed(circle.id);
-    expect(posts.map((p) => p.id)).toEqual([later.id, earlier.id]);
-  });
-
-  test('deleting a circle cascades to its posts (ON DELETE CASCADE)', async () => {
-    const circle = await makeCircle();
-    await insertPost(makePost(circle.id));
-
-    await deleteCircle(circle.id);
-
-    await expect(getCircleFeed(circle.id)).resolves.toEqual([]);
-  });
+beforeEach(async () => {
+  await initDatabase();
 });
 
-describe('getCircleFeedPage', () => {
-  test('the first page is the newest `limit` posts, with no cursor', async () => {
-    const circle = await makeCircle();
-    const oldest = makePost(circle.id, { createdAt: 1000 });
-    const middle = makePost(circle.id, { createdAt: 2000 });
-    const newest = makePost(circle.id, { createdAt: 3000 });
-    await insertPost(oldest);
-    await insertPost(middle);
-    await insertPost(newest);
+// The relay owns the counts; this device owns when it last looked.
+test('applying a post replaces the relay half and keeps the local half', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  const id = postId('kept');
+  await applyPost(post(circle, id));
+  await markChildrenFetched(id, NOW + 50);
 
-    const page = await getCircleFeedPage(circle.id, null, 2);
-    expect(page.posts.map((p) => p.id)).toEqual([newest.id, middle.id]);
-    expect(page.hasMore).toBe(true);
-  });
+  await applyPost(post(circle, id, { commentCount: 4, updatedAt: NOW + 100 }));
 
-  test('hasMore is false once the last post is included', async () => {
-    const circle = await makeCircle();
-    await insertPost(makePost(circle.id, { createdAt: 1000 }));
-    await insertPost(makePost(circle.id, { createdAt: 2000 }));
-
-    const page = await getCircleFeedPage(circle.id, null, 2);
-    expect(page.hasMore).toBe(false);
-  });
-
-  test('a cursor continues strictly before the last post it named', async () => {
-    const circle = await makeCircle();
-    const oldest = makePost(circle.id, { createdAt: 1000 });
-    const middle = makePost(circle.id, { createdAt: 2000 });
-    const newest = makePost(circle.id, { createdAt: 3000 });
-    await insertPost(oldest);
-    await insertPost(middle);
-    await insertPost(newest);
-
-    const first = await getCircleFeedPage(circle.id, null, 2);
-    const cursor: FeedCursor = { createdAt: middle.createdAt, id: middle.id };
-    const second = await getCircleFeedPage(circle.id, cursor, 2);
-
-    expect(first.posts.map((p) => p.id)).toEqual([newest.id, middle.id]);
-    expect(second.posts.map((p) => p.id)).toEqual([oldest.id]);
-    expect(second.hasMore).toBe(false);
-  });
-
-  /** `createdAt` alone isn't unique — two posts sharing it still need a deterministic, gap-free split across pages. */
-  test('posts sharing a createdAt still split across pages without a gap or a repeat', async () => {
-    const circle = await makeCircle();
-    const a = makePost(circle.id, { createdAt: 1000, caption: 'a' });
-    const b = makePost(circle.id, { createdAt: 1000, caption: 'b' });
-    const c = makePost(circle.id, { createdAt: 1000, caption: 'c' });
-    await insertPost(a);
-    await insertPost(b);
-    await insertPost(c);
-
-    const first = await getCircleFeedPage(circle.id, null, 2);
-    expect(first.hasMore).toBe(true);
-    const cursor: FeedCursor = { createdAt: first.posts[1].createdAt, id: first.posts[1].id };
-    const second = await getCircleFeedPage(circle.id, cursor, 2);
-
-    const seenIds = [...first.posts, ...second.posts].map((p) => p.id);
-    expect(new Set(seenIds).size).toBe(3);
-    expect(seenIds.sort()).toEqual([a.id, b.id, c.id].sort());
-    expect(second.hasMore).toBe(false);
-  });
+  const row = await getPost(id);
+  expect(row?.commentCount).toBe(4);
+  expect(row?.updatedAt).toBe(NOW + 100);
+  expect(row?.childrenFetchedAt).toBe(NOW + 50);
 });
 
-describe('markPostViewed / getUnseenCommentPostIds', () => {
-  test('markPostViewed bumps lastViewedAt to roughly now', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id, { createdAt: 1000 });
-    await insertPost(post);
+// The wall sorts on the author's own clock, so two caught-up devices
+// agree on the order.
+test('the feed comes back newest first by the author clock', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyPost(post(circle, 'old', { createdAt: NOW - 100, receivedAt: NOW + 500 }));
+  await applyPost(post(circle, 'new', { createdAt: NOW, receivedAt: NOW }));
 
-    await markPostViewed(post.id);
-
-    const stored = await getPost(post.id);
-    expect(stored!.lastViewedAt).toBeGreaterThan(1000);
-    expect(stored!.lastViewedAt).toBeLessThanOrEqual(Date.now());
-  });
-
-  test('a comment from someone else past the join floor makes its post unseen', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id, { createdAt: 500 });
-    await insertPost(post);
-    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OTHER_KEY, body: 'hey', createdAt: 2000 });
-
-    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([post.id]);
-  });
-
-  test("excludes a post whose only new comment is the viewer's own", async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id, { createdAt: 500 });
-    await insertPost(post);
-    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OWN_KEY, body: 'hey', createdAt: 2000 });
-
-    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([]);
-  });
-
-  test('excludes a comment predating the join floor, even on a never-viewed post', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id, { createdAt: 100 });
-    await insertPost(post);
-    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OTHER_KEY, body: 'hey', createdAt: 900 });
-
-    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([]);
-  });
-
-  test('markPostViewed clears a post from the unseen list once its comments predate that view', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id, { createdAt: 500 });
-    await insertPost(post);
-    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OTHER_KEY, body: 'hey', createdAt: 2000 });
-    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([post.id]);
-
-    await markPostViewed(post.id);
-
-    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([]);
-  });
+  expect((await getFeed(circle)).map((row) => row.id)).toEqual(['new', 'old']);
 });
 
-describe('getAlbumPhotos', () => {
-  test('returns in-album photos whose bytes have landed, newest first', async () => {
-    const circle = await makeCircle();
-    const older = makePost(circle.id, { createdAt: 1000 });
-    const newer = makePost(circle.id, { createdAt: 2000 });
-    await insertPost(older, makeAttachment(older));
-    await insertPost(newer, makeAttachment(newer));
+test('a deleted post leaves the feed but keeps its row', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  const id = postId('deleted');
+  await applyPost(post(circle, id));
+  await markPostDeleted(id, NOW + 10);
 
-    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([
-      { id: newer.id, createdAt: 2000, photoStatus: 'fetched' },
-      { id: older.id, createdAt: 1000, photoStatus: 'fetched' },
-    ]);
-  });
+  expect(await getFeed(circle)).toHaveLength(0);
+  const row = await getPost(id);
+  expect(row?.deletedAt).toBe(NOW + 10);
+  expect(row?.caption).toBe('');
+});
 
-  test('leaves out a post that was never added to the album', async () => {
-    const circle = await makeCircle();
-    const kept = makePost(circle.id);
-    const excluded = makePost(circle.id, { inAlbum: false });
-    await insertPost(kept, makeAttachment(kept));
-    await insertPost(excluded, makeAttachment(excluded));
+test('the album is what its authors kept in it', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyPost(post(circle, 'in'));
+  await applyPost(post(circle, 'out'));
+  await setInAlbum('out', false);
 
-    const photos = await getAlbumPhotos(circle.id);
-    expect(photos.map((photo) => photo.id)).toEqual([kept.id]);
-  });
+  expect((await getAlbum(circle)).map((row) => row.id)).toEqual(['in']);
+});
 
-  /**
-   * Deliberately kept, not filtered: the grid holds its place with a
-   * placeholder. Dropping it made a partly-synced album look shorter than
-   * the circle's, which is indistinguishable from one that really has
-   * fewer photos.
-   */
-  test('keeps a photo still downloading, carrying its status', async () => {
-    const circle = await makeCircle();
-    const pending = makePost(circle.id);
-    await insertPost(pending, { ...makeAttachment(pending), bytes: null, status: AttachmentStatuses.PENDING });
+// Opening a post should cost nothing when nothing has changed.
+test('children are stale only when never fetched or older than the post', async () => {
+  const circle = circleId();
+  const id = postId('stale');
+  await seedCircle(circle);
+  await applyPost(post(circle, id, { updatedAt: NOW }));
 
-    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([
-      { id: pending.id, createdAt: pending.createdAt, photoStatus: 'pending' },
-    ]);
-  });
+  expect(childrenAreStale((await getPost(id))!)).toBe(true);
 
-  test("leaves out another circle's photos", async () => {
-    const circle = await makeCircle();
-    const other = await makeCircle();
-    const mine = makePost(circle.id);
-    const theirs = makePost(other.id);
-    await insertPost(mine, makeAttachment(mine));
-    await insertPost(theirs, makeAttachment(theirs));
+  await markChildrenFetched(id, NOW + 10);
+  expect(childrenAreStale((await getPost(id))!)).toBe(false);
 
-    const photos = await getAlbumPhotos(circle.id);
-    expect(photos.map((photo) => photo.id)).toEqual([mine.id]);
-  });
-
-  test('setPostInAlbum moves a photo in and out', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
-    await insertPost(post, makeAttachment(post));
-
-    await setPostInAlbum(post.id, false);
-    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([]);
-
-    await setPostInAlbum(post.id, true);
-    expect((await getAlbumPhotos(circle.id)).map((photo) => photo.id)).toEqual([post.id]);
-  });
+  await applyPost(post(circle, id, { updatedAt: NOW + 20 }));
+  expect(childrenAreStale((await getPost(id))!)).toBe(true);
 });

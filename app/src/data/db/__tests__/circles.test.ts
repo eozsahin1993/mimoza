@@ -1,199 +1,147 @@
-import { generateUUID } from '@/core/crypto/primitives';
 import { initDatabase } from '@/data/db';
-import { insertComment } from '@/data/db/comments';
+import { insertActivity } from '@/data/db/activity';
 import {
+  applyMembership,
   deleteCircle,
-  getAllCircles,
   getCircle,
   getUnreadCount,
-  insertCircle,
+  listCircles,
+  listLeftCircles,
+  markCircleLeft,
   markCircleViewed,
-  updateCircleName,
+  saveCursors,
 } from '@/data/db/circles';
-import { getMemberByPublicKey, insertMember, MemberRoles } from '@/data/db/members';
-import { insertPost, markPostViewed } from '@/data/db/posts';
+import { applyPost } from '@/data/db/posts';
 
-const OWN_KEY = 'aa'.repeat(32);
-const OTHER_KEY = 'bb'.repeat(32);
+const NOW = 1_700_000_000_000;
 
-function makePost(circleId: string, overrides: Partial<{ id: string; authorPublicKey: string; createdAt: number }> = {}) {
+// The database is shared across cases in a file, so each one works in a
+// circle of its own rather than cleaning up after itself.
+let next = 0;
+function circleId(): string {
+  next += 1;
+  return `circle-${next}`;
+}
+
+function membership(circleId: string, overrides: Partial<Parameters<typeof applyMembership>[0]> = {}) {
   return {
-    id: generateUUID(),
     circleId,
-    caption: 'c',
-    authorPublicKey: OTHER_KEY,
-    createdAt: Date.now(),
-    lastViewedAt: null,
-    inAlbum: true,
+    name: 'Family',
+    role: 'admin',
+    notifyLevel: 'all',
+    keyVersion: 1,
+    rosterVersion: 2,
+    lastEntryAt: NOW,
     ...overrides,
   };
 }
 
-function makeComment(postId: string, overrides: Partial<{ authorPublicKey: string; createdAt: number }> = {}) {
-  return {
-    id: generateUUID(),
-    postId,
-    body: 'nice',
-    authorPublicKey: OTHER_KEY,
-    createdAt: Date.now(),
-    ...overrides,
-  };
-}
-
-beforeAll(() => initDatabase());
-
-function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: number; lastViewedAt: number }> = {}) {
-  return {
-    id: generateUUID(),
-    name: 'Nana’s House',
-    picture: null,
-    pictureHash: null,
-    syncId: generateUUID(),
-    createdAt: Date.now(),
-    pushCategoryMask: 3,
-    pushSilenced: false,
-    pushKeyVersion: null,
-    leftAt: null,
-    metaCursor: 0,
-    contentCursor: 0,
-    lastViewedAt: 0,
-    ...overrides,
-  };
-}
-
-describe('circles CRUD', () => {
-  test('insertCircle then getCircle returns the same row', async () => {
-    const circle = makeCircle();
-    await insertCircle(circle);
-
-    await expect(getCircle(circle.id)).resolves.toEqual(circle);
-  });
-
-  test('getCircle returns null for an unknown id', async () => {
-    await expect(getCircle(generateUUID())).resolves.toBeNull();
-  });
-
-  test('getAllCircles returns every inserted circle, ordered by createdAt', async () => {
-    const earlier = makeCircle({ name: 'Earlier', createdAt: 1000 });
-    const later = makeCircle({ name: 'Later', createdAt: 2000 });
-    await insertCircle(later);
-    await insertCircle(earlier);
-
-    const all = await getAllCircles();
-    const ids = all.map((c) => c.id);
-    expect(ids.indexOf(earlier.id)).toBeLessThan(ids.indexOf(later.id));
-  });
-
-  test('updateCircleName changes the stored name', async () => {
-    const circle = makeCircle();
-    await insertCircle(circle);
-
-    await updateCircleName(circle.id, 'The Andersons');
-
-    await expect(getCircle(circle.id)).resolves.toMatchObject({ name: 'The Andersons' });
-  });
-
-  test('deleteCircle removes the row', async () => {
-    const circle = makeCircle();
-    await insertCircle(circle);
-
-    await deleteCircle(circle.id);
-
-    await expect(getCircle(circle.id)).resolves.toBeNull();
-  });
-
-  test('deleting a circle cascades to its members (validates ON DELETE CASCADE + foreign_keys pragma)', async () => {
-    const circle = makeCircle();
-    await insertCircle(circle);
-    const member = {
-      circleId: circle.id,
-      identityPublicKey: 'aa'.repeat(32),
-      encPublicKey: 'cc'.repeat(32),
-      memberId: 'bb'.repeat(16),
-      role: MemberRoles.member,
-      name: 'Grandma',
-      picture: null,
-      joinedAt: Date.now(),
-      removedAt: null,
-    };
-    await insertMember(member);
-
-    await deleteCircle(circle.id);
-
-    await expect(getMemberByPublicKey(circle.id, member.identityPublicKey)).resolves.toBeNull();
-  });
+beforeEach(async () => {
+  await initDatabase();
 });
 
-describe('markCircleViewed / getUnreadCount', () => {
-  test('markCircleViewed bumps lastViewedAt to roughly now', async () => {
-    const circle = makeCircle({ createdAt: 1000 });
-    await insertCircle(circle);
+// A sync writes the relay's fields and nothing else: cursors and the
+// unread floor belong to this device.
+test('applying a membership leaves local state alone', async () => {
+  const circle = circleId();
+  await applyMembership(membership(circle), NOW);
+  await saveCursors(circle, { postsForward: 'cursor-1', activity: 'cursor-a' });
+  await markCircleViewed(circle, NOW + 500);
 
-    await markCircleViewed(circle.id);
+  await applyMembership(membership(circle, { name: 'Renamed', rosterVersion: 3 }), NOW + 1000);
 
-    const updated = await getCircle(circle.id);
-    expect(updated!.lastViewedAt).toBeGreaterThan(1000);
-    expect(updated!.lastViewedAt).toBeLessThanOrEqual(Date.now());
+  const row = await getCircle(circle);
+  expect(row?.name).toBe('Renamed');
+  expect(row?.rosterVersion).toBe(3);
+  expect(row?.postsForwardCursor).toBe('cursor-1');
+  expect(row?.activityCursor).toBe('cursor-a');
+  expect(row?.lastViewedAt).toBe(NOW + 500);
+});
+
+// Rejoining a circle you left clears the mark rather than leaving it
+// filed under departures.
+test('a membership that comes back is no longer left', async () => {
+  const circle = circleId();
+  await applyMembership(membership(circle), NOW);
+  await markCircleLeft(circle, NOW + 10);
+  const inList = async (list: () => Promise<{ id: string }[]>) =>
+    (await list()).some((row) => row.id === circle);
+
+  expect(await inList(listCircles)).toBe(false);
+  expect(await inList(listLeftCircles)).toBe(true);
+
+  await applyMembership(membership(circle), NOW + 20);
+  expect(await inList(listCircles)).toBe(true);
+  expect(await inList(listLeftCircles)).toBe(false);
+});
+
+// The badge counts posts and what happened to the circle alike, since
+// both appear on the wall.
+test('unread counts posts and activity since the last look', async () => {
+  const circle = circleId();
+  await applyMembership(membership(circle), NOW);
+  await markCircleViewed(circle, NOW);
+
+  await applyPost({
+    id: 'post-old',
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: 'old',
+    createdAt: NOW - 100,
+    receivedAt: NOW - 100,
+  });
+  await applyPost({
+    id: 'post-new',
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: 'new',
+    createdAt: NOW + 100,
+    receivedAt: NOW + 100,
+  });
+  await insertActivity({
+    id: 'activity-1',
+    circleId: circle,
+    event: 'joined',
+    actorId: 'acc-2',
+    receivedAt: NOW + 200,
   });
 
-  test('counts a post from someone else past lastViewedAt, excludes one from the viewer themselves', async () => {
-    const circle = makeCircle({ createdAt: 1000, lastViewedAt: 1000 });
-    await insertCircle(circle);
-    await insertPost(makePost(circle.id, { authorPublicKey: OTHER_KEY, createdAt: 2000 }));
-    await insertPost(makePost(circle.id, { authorPublicKey: OWN_KEY, createdAt: 2000 }));
+  expect(await getUnreadCount(circle)).toBe(2);
 
-    await expect(getUnreadCount(circle.id, OWN_KEY, circle.createdAt, circle.lastViewedAt)).resolves.toBe(1);
+  await markCircleViewed(circle, NOW + 300);
+  expect(await getUnreadCount(circle)).toBe(0);
+});
+
+// A deleted post is still a row, so it must not be counted as news.
+test('a deleted post does not count as unread', async () => {
+  const circle = circleId();
+  await applyMembership(membership(circle), NOW);
+  await markCircleViewed(circle, NOW);
+  await applyPost({
+    id: 'post-1',
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: '',
+    createdAt: NOW + 100,
+    receivedAt: NOW + 100,
+    deletedAt: NOW + 150,
   });
 
-  test('a post from before lastViewedAt does not count', async () => {
-    const circle = makeCircle({ createdAt: 1000, lastViewedAt: 3000 });
-    await insertCircle(circle);
-    await insertPost(makePost(circle.id, { authorPublicKey: OTHER_KEY, createdAt: 2000 }));
+  expect(await getUnreadCount(circle)).toBe(0);
+});
 
-    await expect(getUnreadCount(circle.id, OWN_KEY, circle.createdAt, circle.lastViewedAt)).resolves.toBe(0);
+test('deleting a circle takes its rows with it', async () => {
+  const circle = circleId();
+  await applyMembership(membership(circle), NOW);
+  await applyPost({
+    id: 'post-1',
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: 'x',
+    createdAt: NOW,
+    receivedAt: NOW,
   });
 
-  test('a reaction never contributes to the count — getUnreadCount only ever queries posts and comments', async () => {
-    const circle = makeCircle({ createdAt: 1000, lastViewedAt: 1000 });
-    await insertCircle(circle);
-    const post = makePost(circle.id, { authorPublicKey: OWN_KEY, createdAt: 500 });
-    await insertPost(post);
-
-    await expect(getUnreadCount(circle.id, OWN_KEY, circle.createdAt, circle.lastViewedAt)).resolves.toBe(0);
-  });
-
-  test('a comment on a never-opened old post counts, from someone else, past the join floor', async () => {
-    const circle = makeCircle({ createdAt: 1000, lastViewedAt: 1000 });
-    await insertCircle(circle);
-    const oldPost = makePost(circle.id, { createdAt: 500 }); // predates the join — the post itself is not "new"
-    await insertPost(oldPost);
-    await insertComment(makeComment(oldPost.id, { authorPublicKey: OTHER_KEY, createdAt: 2000 }));
-    await insertComment(makeComment(oldPost.id, { authorPublicKey: OWN_KEY, createdAt: 2000 }));
-
-    await expect(getUnreadCount(circle.id, OWN_KEY, circle.createdAt, circle.lastViewedAt)).resolves.toBe(1);
-  });
-
-  test('a comment predating the join never counts, even though the post is never individually viewed', async () => {
-    const circle = makeCircle({ createdAt: 1000, lastViewedAt: 1000 });
-    await insertCircle(circle);
-    const oldPost = makePost(circle.id, { createdAt: 100 });
-    await insertPost(oldPost);
-    await insertComment(makeComment(oldPost.id, { authorPublicKey: OTHER_KEY, createdAt: 900 }));
-
-    await expect(getUnreadCount(circle.id, OWN_KEY, circle.createdAt, circle.lastViewedAt)).resolves.toBe(0);
-  });
-
-  test('opening the post (markPostViewed) clears comments up to that moment, but not ones after', async () => {
-    const circle = makeCircle({ createdAt: 1000, lastViewedAt: 1000 });
-    await insertCircle(circle);
-    const oldPost = makePost(circle.id, { createdAt: 500 });
-    await insertPost(oldPost);
-    await insertComment(makeComment(oldPost.id, { authorPublicKey: OTHER_KEY, createdAt: 2000 }));
-
-    await markPostViewed(oldPost.id);
-    await expect(getUnreadCount(circle.id, OWN_KEY, circle.createdAt, circle.lastViewedAt)).resolves.toBe(0);
-
-    await insertComment(makeComment(oldPost.id, { authorPublicKey: OTHER_KEY, createdAt: Date.now() + 10_000 }));
-    await expect(getUnreadCount(circle.id, OWN_KEY, circle.createdAt, circle.lastViewedAt)).resolves.toBe(1);
-  });
+  await deleteCircle(circle);
+  expect(await getCircle(circle)).toBeNull();
 });

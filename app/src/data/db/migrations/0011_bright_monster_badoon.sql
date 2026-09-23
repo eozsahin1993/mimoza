@@ -1,1 +1,0 @@
-ALTER TABLE `circle_members` ADD `push_routing_id` text DEFAULT '' NOT NULL;

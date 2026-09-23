@@ -1,1 +1,0 @@
-ALTER TABLE `circles` ADD `push_silenced` integer DEFAULT false NOT NULL;

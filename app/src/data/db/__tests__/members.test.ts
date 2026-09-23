@@ -1,101 +1,97 @@
-import { generateUUID } from '@/core/crypto/primitives';
 import { initDatabase } from '@/data/db';
-import { insertCircle } from '@/data/db/circles';
-import {
-  getCircleMembers,
-  getMemberByMemberId,
-  getMemberByPublicKey,
-  insertMember,
-  MemberRole,
-  MemberRoles,
-  updateMemberProfile,
-} from '@/data/db/members';
+import { applyMembership } from '@/data/db/circles';
+import { applyRoster, getMember, listEveryMemberSeen, listMembers, rememberDepartedMember, setMemberAvatar } from '@/data/db/members';
 
-beforeAll(() => initDatabase());
+const NOW = 1_700_000_000_000;
 
-async function makeCircle() {
-  const circle = {
-    id: generateUUID(),
-    name: 'Test Circle',
-    picture: null,
-    syncId: generateUUID(),
-    createdAt: Date.now(),
-    leftAt: null,
-    metaCursor: 0,
-    contentCursor: 0,
-    lastViewedAt: 0,
-  };
-  await insertCircle(circle);
-  return circle;
+let next = 0;
+function circleId(): string {
+  next += 1;
+  return `circle-${next}`;
 }
 
-function makeMember(
-  circleId: string,
-  overrides: Partial<{ name: string; role: MemberRole; joinedAt: number }> = {},
-) {
+async function seedCircle(id: string) {
+  await applyMembership(
+    { circleId: id, name: 'Family', role: 'admin', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
+    NOW
+  );
+}
+
+function member(accountId: string, overrides: Partial<Parameters<typeof applyRoster>[1][number]> = {}) {
   return {
-    circleId,
-    identityPublicKey: `pk-${generateUUID()}`,
-    encPublicKey: `x25519-${generateUUID()}`,
-    pushRoutingId: '',
-    authorityPublicKey: '',
-    memberId: generateUUID(),
-    role: overrides.role ?? MemberRoles.member,
-    name: overrides.name ?? 'Grandma',
-    picture: null,
-    joinedAt: overrides.joinedAt ?? Date.now(),
-    removedAt: null,
+    circleId: '',
+    accountId,
+    name: accountId,
+    publicKey: 'pk-' + accountId,
+    role: 'member',
+    joinedAt: NOW,
+    ...overrides,
   };
 }
 
-describe('members CRUD', () => {
-  test('insertMember then getMemberByPublicKey returns the same row', async () => {
-    const circle = await makeCircle();
-    const member = makeMember(circle.id);
-    await insertMember(member);
+beforeEach(async () => {
+  await initDatabase();
+});
 
-    await expect(getMemberByPublicKey(circle.id, member.identityPublicKey)).resolves.toEqual(member);
-  });
+// A roster read is the whole truth about who is in a circle now.
+test('a roster replaces who is in the circle', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
 
-  test('getMemberByMemberId resolves the same row via the compact reference', async () => {
-    const circle = await makeCircle();
-    const member = makeMember(circle.id);
-    await insertMember(member);
+  await applyRoster(circle, [member('acc-1'), member('acc-2')], NOW);
+  expect((await listMembers(circle)).map((row) => row.accountId).sort()).toEqual(['acc-1', 'acc-2']);
 
-    await expect(getMemberByMemberId(circle.id, member.memberId)).resolves.toEqual(member);
-  });
+  await applyRoster(circle, [member('acc-1'), member('acc-3')], NOW + 100);
+  expect((await listMembers(circle)).map((row) => row.accountId).sort()).toEqual(['acc-1', 'acc-3']);
+});
 
-  test('a duplicate (circleId, identityPublicKey) pair is rejected by the composite primary key', async () => {
-    const circle = await makeCircle();
-    const member = makeMember(circle.id);
-    await insertMember(member);
+// Someone who left is marked, not deleted: their old posts still have to
+// resolve to a name.
+test('a member who leaves keeps their name', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1', { name: 'Ali' }), member('acc-2')], NOW);
+  await applyRoster(circle, [member('acc-2')], NOW + 100);
 
-    await expect(insertMember({ ...member, pushRoutingId: '',
-    memberId: generateUUID() })).rejects.toThrow();
-  });
+  const departed = await getMember(circle, 'acc-1');
+  expect(departed?.leftAt).toBe(NOW + 100);
+  expect(departed?.name).toBe('Ali');
+  expect(await listMembers(circle)).toHaveLength(1);
+  expect(await listEveryMemberSeen(circle)).toHaveLength(2);
+});
 
-  test('getCircleMembers returns every member of a circle, ordered by joinedAt', async () => {
-    const circle = await makeCircle();
-    const earlier = makeMember(circle.id, { name: 'Earlier', joinedAt: 1000 });
-    const later = makeMember(circle.id, { name: 'Later', joinedAt: 2000 });
-    await insertMember(later);
-    await insertMember(earlier);
+// Rejoining clears the mark rather than leaving a ghost.
+test('a member who comes back is present again', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1')], NOW);
+  await applyRoster(circle, [], NOW + 100);
+  await applyRoster(circle, [member('acc-1')], NOW + 200);
 
-    const roster = await getCircleMembers(circle.id);
-    const ids = roster.map((m) => m.identityPublicKey);
-    expect(ids.indexOf(earlier.identityPublicKey)).toBeLessThan(ids.indexOf(later.identityPublicKey));
-  });
+  expect((await getMember(circle, 'acc-1'))?.leftAt).toBeNull();
+});
 
-  test('updateMemberProfile changes name and picture', async () => {
-    const circle = await makeCircle();
-    const member = makeMember(circle.id);
-    await insertMember(member);
+// A deleted account never appears on a roster again, so the name comes
+// from the activity row that recorded it.
+test('a departed account can be remembered by name alone', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await rememberDepartedMember(circle, 'acc-gone', 'Sarah', NOW);
 
-    const picture = new Uint8Array([1, 2, 3]);
-    await updateMemberProfile(circle.id, member.identityPublicKey, { name: 'New Name', picture });
+  const remembered = await getMember(circle, 'acc-gone');
+  expect(remembered?.name).toBe('Sarah');
+  expect(remembered?.leftAt).toBe(NOW);
+  expect(await listMembers(circle)).toHaveLength(0);
+});
 
-    const updated = await getMemberByPublicKey(circle.id, member.identityPublicKey);
-    expect(updated?.name).toBe('New Name');
-    expect(updated?.picture).toEqual(picture);
-  });
+// A picture is circle content, so it is recorded per membership.
+test('a picture belongs to a membership', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1')], NOW);
+  await setMemberAvatar(circle, 'acc-1', 'hash-1', 2);
+
+  const row = await getMember(circle, 'acc-1');
+  expect(row?.avatarId).toBe('hash-1');
+  expect(row?.avatarKeyVersion).toBe(2);
 });

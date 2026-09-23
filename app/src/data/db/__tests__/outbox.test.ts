@@ -1,107 +1,74 @@
-import { generateUUID } from '@/core/crypto/primitives';
 import { initDatabase } from '@/data/db';
-import { AttachmentKinds, AttachmentStatuses, type NewAttachment } from '@/data/db/attachments';
-import { deleteCircle, insertCircle } from '@/data/db/circles';
-import { getCircleFeed } from '@/data/db/posts';
-import { getPendingOutboxEntries, insertPostAndEnqueue, markOutboxEntrySynced, type NewOutboxEntry } from '@/data/db/outbox';
+import { discard, done, due, enqueue, failed, queuedFor, retryLater } from '@/data/db/outbox';
 
-beforeAll(() => initDatabase());
+const NOW = 1_700_000_000_000;
 
-async function makeCircle() {
-  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, syncId: generateUUID(), createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0, lastViewedAt: 0 };
-  await insertCircle(circle);
-  return circle;
+let next = 0;
+function circleId(): string {
+  next += 1;
+  return `circle-${next}`;
 }
 
-function makePost(circleId: string) {
-  return { id: generateUUID(), circleId, caption: 'Nana in the kitchen.', authorPublicKey: 'aa'.repeat(32), createdAt: Date.now(), lastViewedAt: null, inAlbum: true };
-}
+beforeEach(async () => {
+  await initDatabase();
+});
 
-function makeAttachment(post: { id: string; circleId: string; createdAt: number }): NewAttachment {
-  return {
-    circleId: post.circleId,
-    entryId: post.id,
-    kind: AttachmentKinds.POST_PHOTO,
-    bytes: new Uint8Array([1, 2, 3]),
-    hash: 'deadbeef',
-    keyVersion: 1,
-    status: AttachmentStatuses.FETCHED,
-    fetchAttempts: 0,
-    nextAttemptAt: null,
-    createdAt: post.createdAt,
-  };
-}
+// Writes drain in the order they were made: a comment must never
+// overtake the post it belongs to.
+test('queued writes come back in order', async () => {
+  const circle = circleId();
+  const first = await enqueue({ circleId: circle, op: 'post', postId: 'post-1', createdAt: NOW });
+  const second = await enqueue({ circleId: circle, op: 'comment', postId: 'post-1', createdAt: NOW });
 
-function makeOutboxEntry(circleId: string, entryId: string): NewOutboxEntry {
-  return { circleId, entryType: 'post', entryId, status: 'pending', epoch: null, blobEntryId: null, encryptedMeta: new Uint8Array([9, 9, 9]) };
-}
+  const queue = (await due(circle, NOW)).filter((row) => row.circleId === circle);
+  expect(queue.map((row) => row.seq)).toEqual([first, second]);
+});
 
-describe('outbox', () => {
-  test('getPendingOutboxEntries returns nothing before any entry is queued', async () => {
-    const circle = await makeCircle();
+// A row waiting on backoff is not due yet, and becomes due when its time
+// comes.
+test('backoff keeps a row out of the queue until it is time', async () => {
+  const circle = circleId();
+  const seq = await enqueue({ circleId: circle, op: 'post', createdAt: NOW });
+  await retryLater(seq, 1, NOW + 1000, 'network');
 
-    await expect(getPendingOutboxEntries(circle.id)).resolves.toEqual([]);
-  });
+  expect((await due(circle, NOW)).some((row) => row.seq === seq)).toBe(false);
+  expect((await due(circle, NOW + 1000)).some((row) => row.seq === seq)).toBe(true);
+});
 
-  test('insertPostAndEnqueue queues a pending entry alongside the post', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
+// Past the budget a write stops retrying and becomes something the
+// person is told about.
+test('a write that keeps failing is marked failed rather than retried forever', async () => {
+  const circle = circleId();
+  const seq = await enqueue({ circleId: circle, op: 'post', createdAt: NOW });
+  await retryLater(seq, 5, NOW + 1000, 'gone');
 
-    await insertPostAndEnqueue(post, makeAttachment(post), makeOutboxEntry(circle.id, post.id));
+  expect((await due(circle, NOW + 5000)).some((row) => row.seq === seq)).toBe(false);
+  const stuck = await failed(circle);
+  expect(stuck).toHaveLength(1);
+  expect(stuck[0].lastError).toBe('gone');
+});
 
-    const pending = await getPendingOutboxEntries(circle.id);
-    expect(pending).toHaveLength(1);
-    expect(pending[0]).toMatchObject({ circleId: circle.id, entryType: 'post', entryId: post.id, status: 'pending', epoch: null });
-    expect(pending[0].encryptedMeta).toEqual(new Uint8Array([9, 9, 9]));
+test('a completed write leaves the queue', async () => {
+  const circle = circleId();
+  const seq = await enqueue({ circleId: circle, op: 'post', createdAt: NOW });
+  await done(seq);
+  expect((await due(circle, NOW)).some((row) => row.seq === seq)).toBe(false);
+});
 
-    const posts = await getCircleFeed(circle.id);
-    expect(posts).toHaveLength(1);
-    expect(posts[0]).toMatchObject({ id: post.id, caption: post.caption, createdAt: post.createdAt });
-    // The attachment went in atomically with the post and the outbox row.
-    expect(posts[0].hasPhoto).toBe(true);
-  });
+// The card adjusts by what is queued for that post, so it has to be
+// readable on its own.
+test('a post has its own queued writes', async () => {
+  const circle = circleId();
+  await enqueue({ circleId: circle, op: 'reaction', postId: 'post-a', createdAt: NOW });
+  await enqueue({ circleId: circle, op: 'comment', postId: 'post-b', createdAt: NOW });
 
-  test('pending entries come back in the exact order they were created', async () => {
-    const circle = await makeCircle();
-    const first = makePost(circle.id);
-    const second = makePost(circle.id);
-    const third = makePost(circle.id);
-    await insertPostAndEnqueue(first, makeAttachment(first), makeOutboxEntry(circle.id, first.id));
-    await insertPostAndEnqueue(second, makeAttachment(second), makeOutboxEntry(circle.id, second.id));
-    await insertPostAndEnqueue(third, makeAttachment(third), makeOutboxEntry(circle.id, third.id));
+  expect((await queuedFor('post-a')).map((row) => row.op)).toEqual(['reaction']);
+});
 
-    const pending = await getPendingOutboxEntries(circle.id);
-    expect(pending.map((e) => e.entryId)).toEqual([first.id, second.id, third.id]);
-  });
-
-  test('markOutboxEntrySynced removes the entry from the pending list', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
-    await insertPostAndEnqueue(post, makeAttachment(post), makeOutboxEntry(circle.id, post.id));
-    const [pending] = await getPendingOutboxEntries(circle.id);
-
-    await markOutboxEntrySynced(pending.sequenceNum, 42);
-
-    await expect(getPendingOutboxEntries(circle.id)).resolves.toEqual([]);
-  });
-
-  test('a failed enqueue rolls back the post too — never one without the other', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
-    const entryForNonexistentCircle = makeOutboxEntry(generateUUID(), post.id);
-
-    await expect(insertPostAndEnqueue(post, makeAttachment(post), entryForNonexistentCircle)).rejects.toThrow();
-
-    await expect(getCircleFeed(circle.id)).resolves.toEqual([]);
-  });
-
-  test('deleting a circle cascades to its outbox entries (ON DELETE CASCADE)', async () => {
-    const circle = await makeCircle();
-    const post = makePost(circle.id);
-    await insertPostAndEnqueue(post, makeAttachment(post), makeOutboxEntry(circle.id, post.id));
-
-    await deleteCircle(circle.id);
-
-    await expect(getPendingOutboxEntries(circle.id)).resolves.toEqual([]);
-  });
+test('a failed write can be discarded', async () => {
+  const circle = circleId();
+  const seq = await enqueue({ circleId: circle, op: 'post', createdAt: NOW });
+  await retryLater(seq, 5, NOW, 'gone');
+  await discard(seq);
+  expect(await failed(circle)).toHaveLength(0);
 });

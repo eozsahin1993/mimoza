@@ -3,14 +3,13 @@ import { sql } from 'drizzle-orm';
 import { db, reopenDatabase } from '@/data/db/connection';
 import { runMigrations } from '@/data/db/migrations/run';
 import {
+  activity,
   attachments,
-  circleInvites,
   circleMembers,
   circles,
   deviceProfile,
-  memberEvents,
   outbox,
-  pendingJoinRequests,
+  pendingRequests,
   postComments,
   postReactions,
   posts,
@@ -22,16 +21,6 @@ export async function getAllCircleIds(): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-/**
- * Wipes every locally-stored row — circles, posts and their attachments,
- * comments, reactions, invites, membership and its event log, the outbox,
- * pending join requests, and the device profile. Deletes children before parents explicitly rather than relying
- * on SQLite foreign-key cascade, since this connection doesn't turn PRAGMA
- * foreign_keys on. Doesn't touch the Keychain/Keystore (circle identities,
- * circle secrets, the master seed, pending-join ephemeral keypairs) —
- * that's a separate concern, see services/keystore/; callers that want a
- * full device reset need both.
- */
 /**
  * Drops every table and re-runs migrations from scratch — a real reset,
  * unlike `resetAllLocalData`, which leaves the schema and its recorded
@@ -57,15 +46,19 @@ export async function resetDatabaseSchema(): Promise<void> {
   await runMigrations();
 }
 
+/**
+ * Wipes every row, children before parents — this connection does not
+ * turn on `PRAGMA foreign_keys`, so nothing cascades. Leaves the
+ * keystore alone; a full device reset needs both.
+ */
 export async function resetAllLocalData(): Promise<void> {
   await db.delete(postComments);
   await db.delete(postReactions);
   await db.delete(outbox);
   await db.delete(attachments);
   await db.delete(posts);
-  await db.delete(circleInvites);
-  await db.delete(pendingJoinRequests);
-  await db.delete(memberEvents);
+  await db.delete(activity);
+  await db.delete(pendingRequests);
   await db.delete(circleMembers);
   await db.delete(circles);
   await db.delete(deviceProfile);

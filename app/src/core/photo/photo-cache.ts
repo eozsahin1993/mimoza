@@ -1,7 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
-import { COVER_ENTRY_ID } from '@/data/db/attachments';
-
 /**
  * Decrypted photos, written once to disk so screens can hand `<Image>` a
  * `file://` path instead of a base64 data URI.
@@ -19,6 +17,9 @@ import { COVER_ENTRY_ID } from '@/data/db/attachments';
  * again from the bytes it already has.
  */
 const PHOTO_DIRECTORY = 'photos';
+
+/** Filename segment for a cover, so one can't collide with a post's id. */
+const COVER = 'cover';
 
 function photoFile(circleId: string, entryId: string): File {
   // The relay addresses a blob as (syncId, entryId); locally the same
@@ -61,18 +62,14 @@ export function deleteCirclePhotoFiles(circleId: string): void {
 }
 
 /**
- * A circle's cover lives at the fixed `COVER_ENTRY_ID`, unlike a post
- * photo — replacing one overwrites the same slot rather than adding a
- * new one. The filename is suffixed with the content's own hash (unlike
- * `photoFile`, whose entryId is already unique per post) specifically so
- * a changed cover gets a genuinely different path: reusing the same path
- * for new bytes is invisible to both this cache's own "does it exist"
- * check and `expo-image`'s native cache, which both key on the path
- * string, not on what's actually in the file.
+ * Suffixed with the cover's own id, so a changed cover gets a genuinely
+ * different path. Reusing one path for new bytes is invisible to both
+ * this cache's "does it exist" check and expo-image's native cache,
+ * which key on the string rather than on what is in the file.
  */
 function coverFile(circleId: string, hash: string): File {
   const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
-  return new File(directory, `${circleId}-${COVER_ENTRY_ID}-${hash}.jpg`);
+  return new File(directory, `${circleId}-${COVER}-${hash}.jpg`);
 }
 
 /**
@@ -84,7 +81,7 @@ export function writeCoverFile(circleId: string, bytes: Uint8Array, hash: string
   const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
   directory.create({ intermediates: true, idempotent: true });
 
-  const prefix = `${circleId}-${COVER_ENTRY_ID}-`;
+  const prefix = `${circleId}-${COVER}-`;
   for (const entry of directory.list()) {
     if (entry instanceof File && entry.name.startsWith(prefix) && entry.name !== `${prefix}${hash}.jpg`) {
       entry.delete();

@@ -1,85 +1,84 @@
 import { and, asc, eq } from 'drizzle-orm';
 
-import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
-import { type NewAttachment } from '@/data/db/attachments';
-import { type Post } from '@/data/db/posts';
-import { attachments, outbox, posts } from '@/data/db/schema';
+import { outbox } from '@/data/db/schema';
+
+export type { OutboxOp } from '@/data/db/schema';
 
 export type OutboxEntry = typeof outbox.$inferSelect;
-/** The authority fields default to null — only a promotion or demotion sets them. */
-export type NewOutboxEntry = Omit<OutboxEntry, 'sequenceNum' | 'authorityAction' | 'authorityTargetKey'> &
-  Partial<Pick<OutboxEntry, 'authorityAction' | 'authorityTargetKey'>>;
+export type NewOutboxEntry = typeof outbox.$inferInsert;
 
-/** How a queued entry must move the relay's authority set — see `authorityAction` on the schema. */
-export type OutboxAuthorityAction = NonNullable<OutboxEntry['authorityAction']>;
-
-/** The states an outbox entry can be in — see `status` on `outbox` in schema.ts. */
-export type OutboxStatus = OutboxEntry['status'];
-
-/** Named values for `OutboxStatus`, so call sites never hand-type the raw strings. */
-export const OutboxStatuses: Record<OutboxStatus, OutboxStatus> = {
-  pending: 'pending',
-  synced: 'synced',
-};
-
-function normalizeOutboxEntry(entry: OutboxEntry): OutboxEntry {
-  return { ...entry, encryptedMeta: normalizeBlob(entry.encryptedMeta) as Uint8Array };
+export async function enqueue(entry: NewOutboxEntry): Promise<number> {
+  const [row] = await db.insert(outbox).values(entry).returning({ seq: outbox.seq });
+  return row.seq;
 }
 
-export async function insertOutboxEntry(entry: NewOutboxEntry): Promise<void> {
-  await db.insert(outbox).values(entry);
-}
-
-/** Every not-yet-synced entry for a circle, in the exact order they were created. */
-export async function getPendingOutboxEntries(circleId: string): Promise<OutboxEntry[]> {
+/**
+ * What to send for one circle now: its queued rows in the order they
+ * were made, up to the first one still waiting out a backoff.
+ *
+ * Stopping there rather than skipping past is the point. A comment must
+ * never overtake the post it is on, so a row that failed holds back
+ * everything queued behind it until it goes out.
+ */
+export async function due(circleId: string, now: number): Promise<OutboxEntry[]> {
   const rows = await db
     .select()
     .from(outbox)
-    .where(and(eq(outbox.circleId, circleId), eq(outbox.status, OutboxStatuses.pending)))
-    .orderBy(asc(outbox.sequenceNum));
-  return rows.map(normalizeOutboxEntry);
+    .where(and(eq(outbox.circleId, circleId), eq(outbox.status, 'queued')))
+    .orderBy(asc(outbox.seq));
+
+  const waiting = rows.findIndex((row) => row.nextAttemptAt !== null && row.nextAttemptAt > now);
+  return waiting === -1 ? rows : rows.slice(0, waiting);
+}
+
+export async function done(seq: number): Promise<void> {
+  await db.delete(outbox).where(eq(outbox.seq, seq));
 }
 
 /**
- * Drops a circle's not-yet-pushed entries, leaving pushed ones alone.
- *
- * Only for entries that have become impossible rather than merely
- * failed: today that's a queued departure on a circle this device has
- * since been removed from by an admin, where the keys needed to sign the
- * push are already gone and the removal it announces has happened
- * anyway. Never use it to clear a backlog — a pending entry is content
- * that exists locally and nowhere else.
+ * A failure that is worth another go. The delay grows with each attempt;
+ * past the budget the row is marked failed and surfaces as a banner
+ * rather than retrying forever.
  */
-export async function discardPendingOutboxEntries(circleId: string): Promise<void> {
-  await db.delete(outbox).where(and(eq(outbox.circleId, circleId), eq(outbox.status, OutboxStatuses.pending)));
-}
-
-/** Marks an entry as pushed — called once the relay has confirmed it and assigned an epoch. */
-export async function markOutboxEntrySynced(sequenceNum: number, epoch: number): Promise<void> {
-  await db.update(outbox).set({ status: OutboxStatuses.synced, epoch }).where(eq(outbox.sequenceNum, sequenceNum));
+export async function retryLater(seq: number, attempts: number, at: number, error: string): Promise<void> {
+  const budget = 5;
+  if (attempts >= budget) {
+    await db.update(outbox).set({ status: 'failed', attempts, lastError: error }).where(eq(outbox.seq, seq));
+    return;
+  }
+  await db
+    .update(outbox)
+    .set({ attempts, nextAttemptAt: at, lastError: error })
+    .where(eq(outbox.seq, seq));
 }
 
 /**
- * Inserts a locally-created post, its photo attachment, and the outbox row
- * that will push it, atomically — a crash between any two would otherwise
- * leave a post that never gets pushed, an outbox row with no post behind
- * it, or a post whose photo the download queue would try to fetch back
- * from the relay despite it having originated here.
- *
- * The attachment goes in as `status: 'fetched'` with bytes already in
- * hand: a locally-created post has nothing to download. Only for posts
- * created on this device — a post materialized by `pullLog` must never go
- * through here, or it would bounce straight back out to the relay.
+ * Waits without spending an attempt — for a failure that says nothing
+ * about the write itself, so the budget stays for refusals the relay
+ * actually made. Flat rather than growing: there is no server to be
+ * gentle with, and the scheduler comes back every 30 seconds anyway.
  */
-export async function insertPostAndEnqueue(
-  post: Post,
-  attachment: NewAttachment,
-  outboxEntry: NewOutboxEntry
-): Promise<void> {
-  db.transaction((tx) => {
-    tx.insert(posts).values(post).run();
-    tx.insert(attachments).values(attachment).run();
-    tx.insert(outbox).values(outboxEntry).run();
-  });
+export async function defer(seq: number, at: number, error: string): Promise<void> {
+  await db.update(outbox).set({ nextAttemptAt: at, lastError: error }).where(eq(outbox.seq, seq));
+}
+
+export async function failed(circleId?: string): Promise<OutboxEntry[]> {
+  const where = circleId
+    ? and(eq(outbox.status, 'failed'), eq(outbox.circleId, circleId))
+    : eq(outbox.status, 'failed');
+  return db.select().from(outbox).where(where).orderBy(asc(outbox.seq));
+}
+
+export async function discard(seq: number): Promise<void> {
+  await db.delete(outbox).where(eq(outbox.seq, seq));
+}
+
+/** Everything queued for one post, which is what the card adjusts by. */
+export async function queuedFor(postId: string): Promise<OutboxEntry[]> {
+  return db
+    .select()
+    .from(outbox)
+    .where(and(eq(outbox.postId, postId), eq(outbox.status, 'queued')))
+    .orderBy(asc(outbox.seq));
 }

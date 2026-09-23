@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import { NativeModules, Platform } from 'react-native';
 
 import { getAuthToken } from '@/core/services/keystore/auth-token';
-import { SessionExpiredError } from '@/core/services/relay-errors';
+import { NetworkUnreachableError, SessionExpiredError } from '@/core/services/relay-errors';
 import { noteSessionExpired } from '@/core/services/session';
 
 /**
@@ -110,10 +110,17 @@ export async function authorizedFetch(path: string, init: RequestInit = {}): Pro
   if (!token) {
     throw new Error('Not signed in.');
   }
-  const response = await fetch(`${baseUrl()}${path}`, {
-    ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}` },
-  });
+  // fetch rejects rather than answering when the request never left the
+  // device. Named here, once, so no caller has to sniff a message.
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl()}${path}`, {
+      ...init,
+      headers: { ...init.headers, Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new NetworkUnreachableError();
+  }
   if (response.status === 401) {
     await noteSessionExpired();
     throw new SessionExpiredError();

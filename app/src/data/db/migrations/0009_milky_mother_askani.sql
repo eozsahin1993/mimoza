@@ -1,1 +1,0 @@
-ALTER TABLE `posts` ADD `in_album` integer DEFAULT true NOT NULL;

@@ -1,226 +1,156 @@
-jest.mock('@/core/services/log-relay');
-jest.mock('@/features/account/usecases/account-manifest');
+import { initDatabase } from '@/data/db';
+import { applyMembership } from '@/data/db/circles';
+import { applyPost } from '@/data/db/posts';
+import { applyReactions, listReactors, queueReaction, settleReaction, summarise } from '@/data/db/reactions';
 
-import { bytesToHex } from '@noble/curves/utils.js';
+const NOW = 1_700_000_000_000;
+const ME = 'acc-me';
 
-import {
-  AttachmentKinds,
-  AttachmentStatuses,
-  addReaction,
-  getPostReactionSummaries,
-  getPostReactionSummary,
-  getPostReactors,
-  hasOtherReaction,
-  initDatabase,
-  insertPost,
-  MemberRoles,
-  recordMemberAddedLocally,
-  updateMemberProfile,
-} from '@/data/db';
-import { createCircle } from '@/features/circle/usecases/create-circle';
-import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
-import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
-import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
+let next = 0;
+function postId(): string {
+  next += 1;
+  return `post-${next}`;
+}
 
-beforeAll(async () => {
+async function seedPost(id: string, relay: { counts?: Record<string, number>; unnamed?: number; iReacted?: boolean } = {}) {
+  await applyPost({
+    id,
+    circleId: 'circle-1',
+    authorId: 'acc-author',
+    caption: 'x',
+    createdAt: NOW,
+    receivedAt: NOW,
+    updatedAt: NOW,
+    reactionCounts: JSON.stringify(relay.counts ?? {}),
+    unnamedReactions: relay.unnamed ?? 0,
+    iReacted: relay.iReacted ?? false,
+  });
+}
+
+beforeEach(async () => {
   await initDatabase();
-  await saveMasterSeed(new Uint8Array(16));
-});
-
-beforeEach(() => {
-  jest.clearAllMocks();
-  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
-  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
-});
-
-async function circleWithPost() {
-  const { id: circleId } = await createCircle({ name: 'Family Circle' });
-  const author = (await getCircleIdentity(circleId))!;
-  const postId = generateUUID();
-  await insertPost(
-    { id: postId, circleId, caption: 'c', authorPublicKey: bytesToHex(author.publicKey), createdAt: 1000, lastViewedAt: null, inAlbum: true },
+  // A post belongs to a circle, and the row is a foreign key.
+  await applyMembership(
     {
-      circleId, entryId: postId, kind: AttachmentKinds.POST_PHOTO, bytes: null, hash: 'h', keyVersion: 1,
-      status: AttachmentStatuses.PENDING, fetchAttempts: 0, nextAttemptAt: null, createdAt: 1000,
-    }
+      circleId: 'circle-1',
+      name: 'Family',
+      role: 'admin',
+      notifyLevel: 'all',
+      keyVersion: 1,
+      rosterVersion: 1,
+    },
+    NOW
   );
-  return { circleId, postId };
-}
-
-/** A member on the roster, so their reaction can resolve to a name. */
-async function member(circleId: string, name: string) {
-  const key = bytesToHex(generateIdentity().publicKey);
-  await recordMemberAddedLocally({
-    circleId,
-    subjectPublicKey: key,
-    joinedAt: 1_000,
-    profile: { encPublicKey: 'cc', memberId: generateUUID(), role: MemberRoles.member, name, picture: null },
-  });
-  return key;
-}
-
-describe('getPostReactors', () => {
-  test('lists everyone who reacted, in the order they did', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const ro = await member(circleId, 'Aunt Ro');
-    const dad = await member(circleId, 'Dad');
-    const nana = await member(circleId, 'Nana');
-
-    await addReaction({ postId, authorPublicKey: dad, emoji: '❤️', createdAt: 2_000 });
-    await addReaction({ postId, authorPublicKey: ro, emoji: '❤️', createdAt: 1_000 });
-    await addReaction({ postId, authorPublicKey: nana, emoji: '😭', createdAt: 3_000 });
-
-    expect(await getPostReactors(circleId, postId)).toEqual(['Aunt Ro', 'Dad', 'Nana']);
-  });
-
-  /** The screen lists people, not reactions — two emoji from one person is still one person. */
-  test('names someone once however many emoji they used', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const theo = await member(circleId, 'Theo');
-    const lena = await member(circleId, 'Lena');
-
-    await addReaction({ postId, authorPublicKey: theo, emoji: '❤️', createdAt: 1_000 });
-    await addReaction({ postId, authorPublicKey: theo, emoji: '🙏', createdAt: 2_000 });
-    await addReaction({ postId, authorPublicKey: lena, emoji: '✨', createdAt: 3_000 });
-
-    expect(await getPostReactors(circleId, postId)).toEqual(['Theo', 'Lena']);
-  });
-
-  /** The chips' counts still include them; a list padded with "Unknown member" reads worse than a short one. */
-  test('omits a reactor this device has no roster row for', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const known = await member(circleId, 'Priya');
-    const stranger = bytesToHex(generateIdentity().publicKey);
-
-    await addReaction({ postId, authorPublicKey: known, emoji: '🙏', createdAt: 1_000 });
-    await addReaction({ postId, authorPublicKey: stranger, emoji: '🙏', createdAt: 2_000 });
-
-    expect(await getPostReactors(circleId, postId)).toEqual(['Priya']);
-  });
-
-  test('resolves names live, so a rename reaches an old reaction', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const key = await member(circleId, 'Tom');
-    await addReaction({ postId, authorPublicKey: key, emoji: '✨', createdAt: 1_000 });
-
-    await updateMemberProfile(circleId, key, { name: 'Tomás', picture: null });
-
-    expect(await getPostReactors(circleId, postId)).toEqual(['Tomás']);
-  });
-
-  test('a post nobody reacted to has nobody', async () => {
-    const { circleId, postId } = await circleWithPost();
-
-    expect(await getPostReactors(circleId, postId)).toEqual([]);
-  });
-
-  test('ignores reactions on other posts', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const other = await circleWithPost();
-    const key = await member(circleId, 'Ruth');
-    await addReaction({ postId: other.postId, authorPublicKey: key, emoji: '❤️', createdAt: 1_000 });
-
-    expect(await getPostReactors(circleId, postId)).toEqual([]);
-  });
 });
 
-/** The chips render in this order on both the feed and the post screen, so it can't be left to SQLite. */
-test('the chip summary is ordered by when each emoji was first used', async () => {
-  const { circleId, postId } = await circleWithPost();
-  const a = await member(circleId, 'Lena');
-  const b = await member(circleId, 'Tomás');
-  const c = await member(circleId, 'Ruth');
+// The card renders from the relay's counts, not from rows: a sync
+// carries how many reacted, never who.
+test('a summary comes from the post, with the unnamed ones in the total', async () => {
+  const post = postId();
+  await seedPost(post, { counts: { '❤️': 3, '😂': 1 }, unnamed: 2 });
 
-  await addReaction({ postId, authorPublicKey: a, emoji: '🙏', createdAt: 3_000 });
-  await addReaction({ postId, authorPublicKey: b, emoji: '❤️', createdAt: 1_000 });
-  await addReaction({ postId, authorPublicKey: c, emoji: '😭', createdAt: 2_000 });
-
-  const summary = await getPostReactionSummary(postId, a);
-
-  expect(summary.map((row) => row.emoji)).toEqual(['❤️', '😭', '🙏']);
+  const summary = await summarise(post, ME);
+  expect(summary.counts).toEqual({ '❤️': 3, '😂': 1 });
+  expect(summary.total).toBe(6);
+  expect(summary.iReacted).toBe(false);
 });
 
-describe('hasOtherReaction', () => {
-  test('is false for a reactor with no reactions on the post at all', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const someone = await member(circleId, 'Someone');
+// A tap shows immediately, before the relay has answered.
+test('a queued reaction is counted at read time', async () => {
+  const post = postId();
+  await seedPost(post, { counts: { '❤️': 1 } });
+  await queueReaction(
+    { postId: post, circleId: 'circle-1', accountId: ME, tag: 'tag-heart', emoji: '❤️', createdAt: NOW },
+    'add'
+  );
 
-    expect(await hasOtherReaction(postId, someone, '❤️')).toBe(false);
-  });
-
-  /** Their only reaction is the one being excluded — not "some other" one. */
-  test('is false when their only reaction is the one being asked about', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const dad = await member(circleId, 'Dad');
-    await addReaction({ postId, authorPublicKey: dad, emoji: '❤️', createdAt: 1_000 });
-
-    expect(await hasOtherReaction(postId, dad, '❤️')).toBe(false);
-  });
-
-  test('is true once they hold a different emoji on the same post', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const dad = await member(circleId, 'Dad');
-    await addReaction({ postId, authorPublicKey: dad, emoji: '❤️', createdAt: 1_000 });
-
-    expect(await hasOtherReaction(postId, dad, '🙏')).toBe(true);
-  });
-
-  test("ignores another member's reactions on the same post", async () => {
-    const { circleId, postId } = await circleWithPost();
-    const dad = await member(circleId, 'Dad');
-    const nana = await member(circleId, 'Nana');
-    await addReaction({ postId, authorPublicKey: nana, emoji: '❤️', createdAt: 1_000 });
-
-    expect(await hasOtherReaction(postId, dad, '🙏')).toBe(false);
-  });
-
-  test('ignores a reaction on a different post', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const { postId: otherPost } = await circleWithPost();
-    const dad = await member(circleId, 'Dad');
-    await addReaction({ postId: otherPost, authorPublicKey: dad, emoji: '❤️', createdAt: 1_000 });
-
-    expect(await hasOtherReaction(postId, dad, '🙏')).toBe(false);
-  });
+  const summary = await summarise(post, ME);
+  expect(summary.counts['❤️']).toBe(2);
+  expect(summary.total).toBe(2);
+  expect(summary.iReacted).toBe(true);
 });
 
-describe('getPostReactionSummaries', () => {
-  /**
-   * The batch exists only to save a query per post — if it ever disagreed
-   * with the single-post version, the feed and the post screen would show
-   * different chips for the same post.
-   */
-  test('matches the per-post summary, ordering included', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const me = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
-    const other = bytesToHex(generateIdentity().publicKey);
-    await addReaction({ postId, authorPublicKey: other, emoji: '🙏', createdAt: 1_000 });
-    await addReaction({ postId, authorPublicKey: me, emoji: '❤️', createdAt: 2_000 });
-    await addReaction({ postId, authorPublicKey: other, emoji: '❤️', createdAt: 3_000 });
+// Taking one back does the same in reverse, and an emoji nobody is left
+// holding disappears rather than sitting at zero.
+test('a queued removal is subtracted, and an empty emoji drops out', async () => {
+  const post = postId();
+  await seedPost(post, { counts: { '❤️': 1 }, iReacted: true });
+  await queueReaction(
+    { postId: post, circleId: 'circle-1', accountId: ME, tag: 'tag-heart', emoji: '❤️', createdAt: NOW },
+    'remove'
+  );
 
-    const batched = (await getPostReactionSummaries([postId], me)).get(postId);
+  const summary = await summarise(post, ME);
+  expect(summary.counts['❤️']).toBeUndefined();
+  expect(summary.total).toBe(0);
+  expect(summary.iReacted).toBe(false);
+});
 
-    expect(batched).toEqual(await getPostReactionSummary(postId, me));
-    expect(batched).toEqual([
-      { emoji: '🙏', count: 1, reactedByMe: false },
-      { emoji: '❤️', count: 2, reactedByMe: true },
-    ]);
-  });
+// The relay's answer replaces the optimistic state rather than adding to
+// it, so a confirmed reaction is counted exactly once.
+test('settling a reaction leaves the relay count standing alone', async () => {
+  const post = postId();
+  await seedPost(post, { counts: { '❤️': 1 } });
+  await queueReaction(
+    { postId: post, circleId: 'circle-1', accountId: ME, tag: 'tag-heart', emoji: '❤️', createdAt: NOW },
+    'add'
+  );
 
-  test('keeps each post to its own reactions, and omits one with none', async () => {
-    const { circleId, postId } = await circleWithPost();
-    const { postId: quiet } = await circleWithPost();
-    const me = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
-    await addReaction({ postId, authorPublicKey: me, emoji: '❤️', createdAt: 1_000 });
+  // What the relay answers with, applied the way a sync would.
+  await seedPost(post, { counts: { '❤️': 2 }, iReacted: true });
+  await settleReaction(post, ME, 'tag-heart');
 
-    const summaries = await getPostReactionSummaries([postId, quiet], me);
+  const summary = await summarise(post, ME);
+  expect(summary.counts['❤️']).toBe(2);
+  expect(summary.iReacted).toBe(true);
+});
 
-    expect(summaries.get(postId)).toHaveLength(1);
-    expect(summaries.get(quiet)).toBeUndefined();
-  });
+test('settling a removal takes the row with it', async () => {
+  const post = postId();
+  await seedPost(post, { counts: { '❤️': 1 }, iReacted: true });
+  await queueReaction(
+    { postId: post, circleId: 'circle-1', accountId: ME, tag: 'tag-heart', emoji: '❤️', createdAt: NOW },
+    'remove'
+  );
+  await settleReaction(post, ME, 'tag-heart');
 
-  test('an empty page costs no query at all', async () => {
-    expect((await getPostReactionSummaries([], 'aa')).size).toBe(0);
-  });
+  await seedPost(post, { counts: {}, iReacted: false });
+  const summary = await summarise(post, ME);
+  expect(summary.total).toBe(0);
+  expect(summary.iReacted).toBe(false);
+});
+
+// Who reacted only arrives with the children fetch, and that answer
+// replaces the set rather than merging into it.
+test('the children fetch replaces confirmed rows but keeps pending ones', async () => {
+  const post = postId();
+  await seedPost(post, { counts: { '❤️': 1 } });
+  await applyReactions(post, [
+    { postId: post, circleId: 'circle-1', accountId: 'acc-ali', tag: 'tag-heart', emoji: '❤️', createdAt: NOW },
+  ]);
+  await queueReaction(
+    { postId: post, circleId: 'circle-1', accountId: ME, tag: 'tag-laugh', emoji: '😂', createdAt: NOW },
+    'add'
+  );
+
+  await applyReactions(post, [
+    { postId: post, circleId: 'circle-1', accountId: 'acc-jo', tag: 'tag-heart', emoji: '❤️', createdAt: NOW },
+  ]);
+
+  const reactors = await listReactors(post);
+  expect(reactors.map((row) => row.accountId).sort()).toEqual(['acc-jo', ME].sort());
+});
+
+// A member may hold several at once, so rows are keyed by emoji too.
+test('one member can hold several reactions', async () => {
+  const post = postId();
+  await seedPost(post);
+  await applyReactions(post, [
+    { postId: post, circleId: 'circle-1', accountId: 'acc-ali', tag: 'tag-heart', emoji: '❤️', createdAt: NOW },
+    { postId: post, circleId: 'circle-1', accountId: 'acc-ali', tag: 'tag-laugh', emoji: '😂', createdAt: NOW },
+  ]);
+
+  const reactors = await listReactors(post);
+  expect(reactors).toHaveLength(2);
+  expect(reactors.map((row) => row.emoji).sort()).toEqual(['❤️', '😂']);
 });

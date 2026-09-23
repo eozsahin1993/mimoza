@@ -1,189 +1,138 @@
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
-import { circleMembers, outbox, postReactions, posts } from '@/data/db/schema';
-import type { NewOutboxEntry } from '@/data/db/outbox';
+import { circleMembers, postReactions, posts } from '@/data/db/schema';
 
-export type PostReaction = typeof postReactions.$inferSelect;
+export type Reaction = typeof postReactions.$inferSelect;
+export type NewReaction = typeof postReactions.$inferInsert;
 
-/** Idempotent by construction: the primary key is (post, author, emoji). */
-export async function addReaction(reaction: PostReaction): Promise<void> {
-  await db.insert(postReactions).values(reaction).onConflictDoNothing();
-}
-
-export async function removeReaction(postId: string, authorPublicKey: string, emoji: string): Promise<void> {
-  await db
-    .delete(postReactions)
-    .where(and(eq(postReactions.postId, postId), eq(postReactions.authorPublicKey, authorPublicKey), eq(postReactions.emoji, emoji)));
-}
-
-export async function hasReacted(postId: string, authorPublicKey: string, emoji: string): Promise<boolean> {
-  const rows = await db
-    .select()
-    .from(postReactions)
-    .where(and(eq(postReactions.postId, postId), eq(postReactions.authorPublicKey, authorPublicKey), eq(postReactions.emoji, emoji)))
-    .limit(1);
-  return rows.length > 0;
-}
+/** What a card shows: emoji, how many, and whether you are among them. */
+export type ReactionSummary = {
+  counts: Record<string, number>;
+  total: number;
+  iReacted: boolean;
+};
 
 /**
- * Whether authorPublicKey already holds some other active reaction on this
- * post — used to tell a genuinely new reactor (who should notify the post's
- * owner) from someone adding a second or third emoji to a post they've
- * already reacted to (who shouldn't notify anyone again).
+ * Replaces a post's reactions with what the children fetch returned.
+ * Pending rows survive: they are this device's own, not yet confirmed.
  */
-export async function hasOtherReaction(postId: string, authorPublicKey: string, emoji: string): Promise<boolean> {
-  const rows = await db
+export async function applyReactions(postId: string, reactions: NewReaction[]): Promise<void> {
+  await db.delete(postReactions).where(and(eq(postReactions.postId, postId), sql`${postReactions.pendingOp} is null`));
+  for (const reaction of reactions) {
+    await db
+      .insert(postReactions)
+      .values({ ...reaction, pendingOp: null })
+      .onConflictDoUpdate({
+        target: [postReactions.postId, postReactions.accountId, postReactions.tag],
+        set: { emoji: reaction.emoji ?? '', keyVersion: reaction.keyVersion ?? null, pendingOp: null },
+      });
+  }
+}
+
+/** A tap, before the relay has answered. */
+export async function queueReaction(reaction: NewReaction, op: 'add' | 'remove'): Promise<void> {
+  await db
+    .insert(postReactions)
+    .values({ ...reaction, pendingOp: op })
+    .onConflictDoUpdate({
+      target: [postReactions.postId, postReactions.accountId, postReactions.tag],
+      set: { pendingOp: op },
+    });
+}
+
+/** Called when the relay confirms, in the same transaction as the post. */
+export async function settleReaction(postId: string, accountId: string, tag: string): Promise<void> {
+  const [row] = await db
     .select()
     .from(postReactions)
     .where(
       and(
         eq(postReactions.postId, postId),
-        eq(postReactions.authorPublicKey, authorPublicKey),
-        ne(postReactions.emoji, emoji)
+        eq(postReactions.accountId, accountId),
+        eq(postReactions.tag, tag)
       )
     )
     .limit(1);
-  return rows.length > 0;
-}
+  if (!row) return;
 
-export type ReactionSummary = {
-  emoji: string;
-  count: number;
-  reactedByMe: boolean;
-};
-
-/**
- * Reactions for a post, grouped by emoji, in the order each emoji was
- * first used. The ordering is load-bearing rather than cosmetic: the post
- * screen renders these as chips directly above `getPostReactionDetails`'s
- * breakdown of the same reactions, and without an explicit `ORDER BY`
- * SQLite is free to return the groups however its grouping strategy
- * happens to produce them — so the two lists would disagree.
- */
-export async function getPostReactionSummary(postId: string, ownPublicKey: string): Promise<ReactionSummary[]> {
-  const rows = await db
-    .select({
-      emoji: postReactions.emoji,
-      count: sql<number>`count(*)`,
-      reactedByMe: sql<number>`max(case when ${postReactions.authorPublicKey} = ${ownPublicKey} then 1 else 0 end)`,
-    })
-    .from(postReactions)
-    .where(eq(postReactions.postId, postId))
-    .groupBy(postReactions.emoji)
-    .orderBy(asc(sql`min(${postReactions.createdAt})`));
-
-  return rows.map((row) => ({ emoji: row.emoji, count: row.count, reactedByMe: row.reactedByMe === 1 }));
+  if (row.pendingOp === 'remove') {
+    await db
+      .delete(postReactions)
+      .where(
+        and(
+          eq(postReactions.postId, postId),
+          eq(postReactions.accountId, accountId),
+          eq(postReactions.tag, tag)
+        )
+      );
+    return;
+  }
+  await db
+    .update(postReactions)
+    .set({ pendingOp: null })
+    .where(
+      and(
+        eq(postReactions.postId, postId),
+        eq(postReactions.accountId, accountId),
+        eq(postReactions.tag, tag)
+      )
+    );
 }
 
 /**
- * The above for a whole page of posts, in one query rather than one per
- * post — same grouping and same ordering, just not repeated N times.
- * Posts with no reactions are absent from the map rather than holding an
- * empty array.
+ * The card's reaction state: the relay's counts, adjusted by whatever
+ * this device has queued and the relay has not answered yet.
  */
-export async function getPostReactionSummaries(
-  postIds: string[],
-  ownPublicKey: string
-): Promise<Map<string, ReactionSummary[]>> {
-  const byPost = new Map<string, ReactionSummary[]>();
-  if (postIds.length === 0) return byPost;
+export async function summarise(postId: string, accountId: string): Promise<ReactionSummary> {
+  const [post] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
+  if (!post) return { counts: {}, total: 0, iReacted: false };
 
-  const rows = await db
-    .select({
-      postId: postReactions.postId,
-      emoji: postReactions.emoji,
-      count: sql<number>`count(*)`,
-      reactedByMe: sql<number>`max(case when ${postReactions.authorPublicKey} = ${ownPublicKey} then 1 else 0 end)`,
-    })
+  const counts: Record<string, number> = JSON.parse(post.reactionCounts);
+  let total = Object.values(counts).reduce((sum, n) => sum + n, 0) + post.unnamedReactions;
+  let iReacted = post.iReacted;
+
+  const pending = await db
+    .select()
     .from(postReactions)
-    .where(inArray(postReactions.postId, postIds))
-    .groupBy(postReactions.postId, postReactions.emoji)
-    .orderBy(asc(sql`min(${postReactions.createdAt})`));
+    .where(and(eq(postReactions.postId, postId), eq(postReactions.accountId, accountId)));
 
-  for (const row of rows) {
-    const summaries = byPost.get(row.postId) ?? [];
-    summaries.push({ emoji: row.emoji, count: row.count, reactedByMe: row.reactedByMe === 1 });
-    byPost.set(row.postId, summaries);
+  for (const row of pending) {
+    if (row.pendingOp === 'add') {
+      counts[row.emoji] = (counts[row.emoji] ?? 0) + 1;
+      total += 1;
+      iReacted = true;
+    }
+    if (row.pendingOp === 'remove') {
+      counts[row.emoji] = Math.max((counts[row.emoji] ?? 0) - 1, 0);
+      total = Math.max(total - 1, 0);
+      if (counts[row.emoji] === 0) delete counts[row.emoji];
+    }
+  }
+  if (pending.some((row) => row.pendingOp === 'remove') && !pending.some((row) => row.pendingOp === 'add')) {
+    iReacted = pending.some((row) => row.pendingOp === null);
   }
 
-  return byPost;
+  return { counts, total, iReacted };
 }
 
-/**
- * Everyone who reacted to a post, in the order they first did, each named
- * once however many emoji they used — the post screen lists people, not
- * reactions, so someone who left both a ❤️ and a 🙏 is one name.
- *
- * Deliberately a second query rather than fields on
- * `getPostReactionSummary`: the feed reads that one for every post it
- * renders and needs no names, so the join belongs only here.
- *
- * A reactor with no roster row on this device contributes no name rather
- * than an "Unknown member" placeholder — the chips' counts already
- * account for them, and a list of real names reads better than one padded
- * with apologies.
- */
-export async function getPostReactors(circleId: string, postId: string): Promise<string[]> {
+/** Who reacted, for the post screen. Empty until the post is opened. */
+export async function listReactors(postId: string): Promise<{ accountId: string; name: string; emoji: string }[]> {
   const rows = await db
-    .select({ authorPublicKey: postReactions.authorPublicKey, name: circleMembers.name })
+    .select({ reaction: postReactions, name: circleMembers.name })
     .from(postReactions)
     .leftJoin(
       circleMembers,
-      and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, postReactions.authorPublicKey))
-    )
-    .where(eq(postReactions.postId, postId))
-    .orderBy(asc(postReactions.createdAt));
-
-  const seen = new Set<string>();
-  const names: string[] = [];
-  for (const row of rows) {
-    if (!row.name || seen.has(row.authorPublicKey)) continue;
-    seen.add(row.authorPublicKey);
-    names.push(row.name);
-  }
-  return names;
-}
-
-/**
- * Applies a local reaction toggle and queues it for sync atomically —
- * same reasoning as `insertPostAndEnqueue`. Split across two writes, a
- * crash between them leaves the reaction showing on this device and
- * queued nowhere, so it would never reach anyone and nothing would ever
- * notice: unlike a failed push, there's no pending row left to retry.
- */
-export async function toggleReactionAndEnqueue(
-  reaction: PostReaction,
-  reacted: boolean,
-  outboxEntry: NewOutboxEntry
-): Promise<void> {
-  db.transaction((tx) => {
-    if (reacted) {
-      tx.insert(postReactions).values(reaction).onConflictDoNothing().run();
-    } else {
-      tx.delete(postReactions)
-        .where(
-          and(
-            eq(postReactions.postId, reaction.postId),
-            eq(postReactions.authorPublicKey, reaction.authorPublicKey),
-            eq(postReactions.emoji, reaction.emoji)
-          )
-        )
-        .run();
-    }
-    tx.insert(outbox).values(outboxEntry).run();
-  });
-}
-
-/** Deletes one author's reactions on other people's posts in a circle — the author's own posts take their reactions with them separately. */
-export async function deleteReactionsByAuthor(circleId: string, authorPublicKey: string): Promise<void> {
-  await db.delete(postReactions).where(
-    and(
-      eq(postReactions.authorPublicKey, authorPublicKey),
-      inArray(
-        postReactions.postId,
-        db.select({ id: posts.id }).from(posts).where(eq(posts.circleId, circleId))
+      and(
+        eq(circleMembers.circleId, postReactions.circleId),
+        eq(circleMembers.accountId, postReactions.accountId)
       )
     )
-  );
+    .where(and(eq(postReactions.postId, postId), sql`${postReactions.pendingOp} is not 'remove'`));
+
+  return rows.map((row) => ({
+    accountId: row.reaction.accountId,
+    name: row.name ?? '',
+    emoji: row.reaction.emoji,
+  }));
 }

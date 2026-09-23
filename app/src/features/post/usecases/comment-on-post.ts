@@ -1,66 +1,56 @@
-import { bytesToHex } from '@noble/curves/utils.js';
-
-import { getPost, insertCommentAndEnqueue, OutboxStatuses, type Comment, type NewOutboxEntry } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
-import { drainOutbox } from '@/features/circle/usecases/sync-circle';
+import { getProfile, queueComment, queueCommentDeletion } from '@/data/db';
 import { generateUUID } from '@/core/crypto/primitives';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { drainOutbox } from '@/core/sync/drain-outbox';
 
 /**
- * Adds a comment as this device's own circle identity, and queues it for
- * every other member. No-ops on an empty/whitespace-only body.
- *
- * Built and signed here, once, then stored as ciphertext — the drain must
- * send byte-for-byte what was signed, since the relay's idempotency keys
- * on entryId rather than payload (see `encryptedMeta` on `outbox` in
- * schema.ts). The author is carried only as a public key: the name shown
- * beside a comment resolves live from the roster at render time, so
- * renaming yourself updates every comment you ever wrote.
- *
- * Triggers a drain but doesn't wait on it — commenting has to work
- * offline, and the outbox is retried by every later sync pass anyway.
+ * Writes a comment and queues it. The row is inserted pending, so it
+ * shows straight away and is counted on top of the relay's own count
+ * until the write lands and replaces both.
  */
-export async function addComment(circleId: string, postId: string, body: string): Promise<void> {
-  const trimmed = body.trim();
-  if (!trimmed) return;
-
-  const identity = await getCircleIdentity(circleId);
-  if (!identity) throw new Error('No identity for this circle on this device.');
-  const current = await getCurrentContentKey(circleId);
-  if (!current) throw new Error('No content key on this device.');
+export async function commentOnPost(circleId: string, postId: string, body: string): Promise<string> {
+  const profile = await getProfile();
+  if (!profile) throw new Error('No profile on this device.');
 
   const commentId = generateUUID();
   const createdAt = Date.now();
-  // postAuthorPubkey lets a receiving device say "on your photo" without a
-  // post lookup — the iOS extension has no database to ask. Optional on
-  // read: entries written before it existed just get the generic copy.
-  const postAuthorPubkey = (await getPost(postId))?.authorPublicKey;
-  const encryptedMeta = buildAndEncryptLogEntry(
-    EntryTypes.COMMENT,
-    { commentId, postId, body: trimmed, createdAt, postAuthorPubkey },
-    identity,
-    current.key
+
+  queueComment(
+    {
+      id: commentId,
+      postId,
+      circleId,
+      authorId: profile.accountId,
+      body,
+      createdAt,
+    },
+    {
+      circleId,
+      op: 'comment',
+      postId,
+      entryId: commentId,
+      plaintext: JSON.stringify({ body, createdAt }),
+      createdAt,
+    }
   );
 
-  const comment: Comment = {
-    id: commentId,
-    postId,
-    authorPublicKey: bytesToHex(identity.publicKey),
-    body: trimmed,
-    createdAt,
-  };
+  drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
+  return commentId;
+}
 
-  const outboxEntry: NewOutboxEntry = {
+/**
+ * Removes a comment. The relay enforces author-or-admin; this only
+ * queues it, and a refusal surfaces through the outbox banner rather
+ * than being guessed at here.
+ */
+export async function deleteComment(circleId: string, postId: string, commentId: string): Promise<void> {
+  const at = Date.now();
+  queueCommentDeletion(commentId, at, {
     circleId,
-    entryType: EntryTypes.COMMENT,
+    op: 'delete_comment',
+    postId,
     entryId: commentId,
-    status: OutboxStatuses.pending,
-    epoch: null,
-    blobEntryId: null,
-    encryptedMeta,
-  };
-
-  await insertCommentAndEnqueue(comment, outboxEntry);
+    createdAt: at,
+  });
 
   drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
 }

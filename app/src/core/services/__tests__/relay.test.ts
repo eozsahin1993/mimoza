@@ -21,12 +21,16 @@ jest.mock('@/core/services/keystore/auth-token', () => ({
 }));
 
 import Constants from 'expo-constants';
-import { bytesToHex } from '@noble/curves/utils.js';
 
 import { BlobAlreadyExistsError, RateLimitedError, SessionExpiredError } from '@/core/services/relay-errors';
 import { setSessionExpiredListener } from '@/core/services/session';
-import { appendEntry, bootstrapCircle, fetchEntries, fetchEpochs, rotateLog } from '@/core/services/log-relay';
-import { getBlob, getCoverPhotoUploadTarget, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import { BlobPaths, getBlob, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import { listCircles } from '@/features/circle/services/circle-relay';
+import { walkEntries } from '@/features/post/services/post-relay';
+
+function jsonResponse(body: unknown, ok = true, status = 200) {
+  return { ok, status, json: async () => body, text: async () => JSON.stringify(body) } as Response;
+}
 
 const RELAY_URL = 'http://localhost:8080';
 const AUTH_TOKEN = 'test-session-token';
@@ -58,9 +62,9 @@ describe('the relay address in development', () => {
     process.env.EXPO_PUBLIC_RELAY_PORT = '8090';
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ circles: [] }));
 
-    await fetchEpochs([]);
+    await listCircles();
 
-    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('http://192.168.0.126:8090/v1/epochs/peek');
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('http://192.168.0.126:8090/v1/circles');
   });
 
   // A staging build is a dev build with a packager attached.
@@ -69,17 +73,17 @@ describe('the relay address in development', () => {
     process.env.EXPO_PUBLIC_RELAY_URL = 'https://staging-api.joinmimoza.com';
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ circles: [] }));
 
-    await fetchEpochs([]);
+    await listCircles();
 
-    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('https://staging-api.joinmimoza.com/v1/epochs/peek');
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('https://staging-api.joinmimoza.com/v1/circles');
   });
 
   test('falls back to the configured URL when there is no dev server to ask', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ circles: [] }));
 
-    await fetchEpochs([]);
+    await listCircles();
 
-    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(`${RELAY_URL}/v1/epochs/peek`);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(`${RELAY_URL}/v1/circles`);
   });
 });
 
@@ -96,7 +100,7 @@ describe('a 401 from the relay', () => {
     setSessionExpiredListener(expired);
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 401));
 
-    await expect(fetchEntries('sync-a', 'content', 0)).rejects.toBeInstanceOf(SessionExpiredError);
+    await expect(listCircles()).rejects.toBeInstanceOf(SessionExpiredError);
 
     expect(mockDeleteAuthToken).toHaveBeenCalled();
     expect(expired).toHaveBeenCalledTimes(1);
@@ -109,9 +113,9 @@ describe('a 401 from the relay', () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 401));
 
     await Promise.allSettled([
-      fetchEntries('sync-a', 'content', 0),
-      fetchEntries('sync-b', 'content', 0),
-      fetchEntries('sync-c', 'content', 0),
+      walkEntries('c1', 'post'),
+      walkEntries('c2', 'post'),
+      walkEntries('c3', 'post'),
     ]);
 
     expect(expired).toHaveBeenCalledTimes(1);
@@ -124,238 +128,107 @@ describe('a 401 from the relay', () => {
     setSessionExpiredListener(expired);
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
 
-    await expect(fetchEntries('sync-a', 'content', 0)).rejects.toBeInstanceOf(RateLimitedError);
+    await expect(getBlob('c1', 'post-1')).rejects.toBeInstanceOf(RateLimitedError);
 
     expect(mockDeleteAuthToken).not.toHaveBeenCalled();
     expect(expired).not.toHaveBeenCalled();
   });
 });
 
-function jsonResponse(body: unknown, ok = true, status = 200) {
-  return { ok, status, json: async () => body, text: async () => JSON.stringify(body) } as Response;
-}
-
-describe('bootstrapCircle', () => {
-  test('POSTs the hex-encoded authority key and the write-token hash', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, true, 201));
-    const founderKey = new Uint8Array([1, 2, 3]);
-
-    await bootstrapCircle('sync-a', founderKey, 'deadbeef');
-
-    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a`);
-    expect(init.method).toBe('POST');
-    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
-    expect(JSON.parse(init.body)).toEqual({ founderAuthorityPublicKey: bytesToHex(founderKey), initialWriteTokenHash: 'deadbeef' });
-  });
-
-  test('throws when the relay responds with an error status', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 409));
-
-    await expect(bootstrapCircle('sync-a', new Uint8Array([1]), 'deadbeef')).rejects.toThrow();
-  });
-});
-
-describe('appendEntry', () => {
-  test('POSTs namespace, base64-encoded encryptedMeta, keyVersion, the hex-encoded write token, and the hex-encoded author identity key', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ epoch: 3, receivedAt: 12345 }));
-    const writeToken = new Uint8Array([9, 9]);
-    const authorIdentityPublicKey = new Uint8Array([7, 7]);
-
-    const result = await appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1, 2, 3]), 2, writeToken, authorIdentityPublicKey);
-
-    expect(result).toEqual({ epoch: 3, receivedAt: 12345 });
-    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries`);
-    expect(init.method).toBe('POST');
-    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
-    expect(JSON.parse(init.body)).toEqual({
-      namespace: 'content',
-      entryId: 'post-1',
-      encryptedMeta: Buffer.from([1, 2, 3]).toString('base64'),
-      keyVersion: 2,
-      writeToken: bytesToHex(writeToken),
-      authorIdentityPublicKey: bytesToHex(authorIdentityPublicKey),
-    });
-  });
-
-  test('throws when the relay responds with an error status', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 500));
-
-    await expect(
-      appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]), new Uint8Array([1]))
-    ).rejects.toThrow();
-  });
-
-  test('throws without calling fetch when there is no stored session', async () => {
-    mockGetAuthToken.mockResolvedValue(null);
-
-    await expect(
-      appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]), new Uint8Array([1]))
-    ).rejects.toThrow('Not signed in.');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  test('throws RateLimitedError specifically on a 429', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
-
-    await expect(
-      appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]), new Uint8Array([1]))
-    ).rejects.toBeInstanceOf(RateLimitedError);
-  });
-});
-
-describe('rotateLog', () => {
-  test('POSTs every field hex-encoded where applicable', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ epoch: 1, receivedAt: 1 }));
-    const currentToken = new Uint8Array([1]);
-    const authorityKey = new Uint8Array([2]);
-    const signature = new Uint8Array([3]);
-
-    await rotateLog('sync-a', 'rotate-1', new Uint8Array([9]), 1, currentToken, 'newhash', authorityKey, signature);
-
-    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/rotate`);
-    expect(JSON.parse(init.body)).toEqual({
-      entryId: 'rotate-1',
-      encryptedMeta: Buffer.from([9]).toString('base64'),
-      currentKeyVersion: 1,
-      currentWriteToken: bytesToHex(currentToken),
-      newWriteTokenHash: 'newhash',
-      authorityPublicKey: bytesToHex(authorityKey),
-      signature: bytesToHex(signature),
-    });
-  });
-
-  test('throws when the relay responds with an error status', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 403));
-
-    await expect(
-      rotateLog('sync-a', 'rotate-1', new Uint8Array([1]), 1, new Uint8Array([1]), 'h', new Uint8Array([1]), new Uint8Array([1]))
-    ).rejects.toThrow();
-  });
-
-  test('throws RateLimitedError specifically on a 429', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
-
-    await expect(
-      rotateLog('sync-a', 'rotate-1', new Uint8Array([1]), 1, new Uint8Array([1]), 'h', new Uint8Array([1]), new Uint8Array([1]))
-    ).rejects.toBeInstanceOf(RateLimitedError);
-  });
-});
-
-describe('fetchEntries', () => {
-  test('GETs with the namespace and since query params and decodes each entry', async () => {
-    const encoded = Buffer.from([9, 9, 9]).toString('base64');
-    (global.fetch as jest.Mock).mockResolvedValue(
-      jsonResponse({ entries: [{ epoch: 1, keyVersion: 2, encryptedMeta: encoded, receivedAt: 111 }], currentEpoch: 1 })
-    );
-
-    const result = await fetchEntries('sync-a', 'meta', 0);
-
-    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries?namespace=meta&sinceEpoch=0`);
-    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
-    expect(result.entries).toEqual([{ epoch: 1, keyVersion: 2, encryptedMeta: new Uint8Array([9, 9, 9]), receivedAt: 111 }]);
-    expect(result.currentEpoch).toBe(1);
-  });
-
-  test('throws when the relay responds with an error status', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 404));
-
-    await expect(fetchEntries('sync-a', 'content', 0)).rejects.toThrow();
-  });
-
-  test('throws RateLimitedError specifically on a 429', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
-
-    await expect(fetchEntries('sync-a', 'content', 0)).rejects.toBeInstanceOf(RateLimitedError);
+/**
+ * Every blob is addressed as the circle plus the rest of the key, and
+ * every key is written once — so a changed cover or picture is a new
+ * path rather than a replacement, and the edge can cache them forever.
+ */
+describe('blob addressing', () => {
+  test.each([
+    [BlobPaths.photo('post-1'), 'post-1'],
+    [BlobPaths.cover('cover-9'), 'cover/cover-9'],
+    [BlobPaths.uploadAvatar('avatar-3'), 'avatar/avatar-3'],
+    [BlobPaths.avatar('acct-2', 'avatar-3'), 'avatar/acct-2/avatar-3'],
+  ])('%s', (path, expected) => {
+    expect(path).toBe(expected);
   });
 });
 
 describe('getUploadTarget', () => {
-  test('POSTs the hex-encoded write token and uploader public key in the body', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3/bucket', fields: { key: 'sync-a/post-1' } }));
-    const writeToken = new Uint8Array([9, 9]);
-    const uploaderPublicKey = new Uint8Array([1, 2, 3]);
+  test('asks the relay for a presigned target, authorized by the session alone', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3/bucket', fields: { key: 'c1/post-1' } }));
 
-    const result = await getUploadTarget('sync-a', 'post-1', writeToken, uploaderPublicKey);
+    const result = await getUploadTarget('c1', BlobPaths.photo('post-1'));
 
-    expect(result).toEqual({ url: 'https://s3/bucket', fields: { key: 'sync-a/post-1' } });
+    expect(result).toEqual({ url: 'https://s3/bucket', fields: { key: 'c1/post-1' } });
     const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries/post-1/upload`);
+    expect(url).toBe(`${RELAY_URL}/v1/circles/c1/blobs/post-1/upload-target`);
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({
-      writeToken: bytesToHex(writeToken),
-      uploaderPublicKey: bytesToHex(uploaderPublicKey),
-    });
     expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
   });
 
-  test('throws BlobAlreadyExistsError specifically on a 409, distinct from other error statuses', async () => {
+  test('a cover and a picture go to their own paths', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3', fields: {} }));
+
+    await getUploadTarget('c1', BlobPaths.cover('cover-9'));
+    await getUploadTarget('c1', BlobPaths.uploadAvatar('avatar-3'));
+
+    expect((global.fetch as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
+      `${RELAY_URL}/v1/circles/c1/blobs/cover/cover-9/upload-target`,
+      `${RELAY_URL}/v1/circles/c1/blobs/avatar/avatar-3/upload-target`,
+    ]);
+  });
+
+  // The first upload wins, so a 409 on a retry means the earlier attempt
+  // actually landed — not a failure.
+  test('throws BlobAlreadyExistsError specifically on a 409', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 409));
 
-    await expect(getUploadTarget('sync-a', 'post-1', new Uint8Array([1]), new Uint8Array([1]))).rejects.toBeInstanceOf(
-      BlobAlreadyExistsError
-    );
+    await expect(getUploadTarget('c1', 'post-1')).rejects.toBeInstanceOf(BlobAlreadyExistsError);
   });
 
   test('throws a plain error on a non-409 error status', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 403));
 
-    const err = await getUploadTarget('sync-a', 'post-1', new Uint8Array([1]), new Uint8Array([1])).catch((e) => e);
+    const err = await getUploadTarget('c1', 'post-1').catch((e) => e);
     expect(err).not.toBeInstanceOf(BlobAlreadyExistsError);
   });
 
   test('throws RateLimitedError specifically on a 429', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
 
-    await expect(getUploadTarget('sync-a', 'post-1', new Uint8Array([1]), new Uint8Array([1]))).rejects.toBeInstanceOf(
-      RateLimitedError
-    );
-  });
-});
-
-describe('getCoverPhotoUploadTarget', () => {
-  test('POSTs the hex-encoded write token, authority public key, and signature in the body', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3/bucket', fields: { key: 'sync-a/cover' } }));
-    const writeToken = new Uint8Array([9, 9]);
-    const authorityPublicKey = new Uint8Array([1, 2, 3]);
-    const signature = new Uint8Array([4, 5, 6]);
-
-    const result = await getCoverPhotoUploadTarget('sync-a', writeToken, authorityPublicKey, signature);
-
-    expect(result).toEqual({ url: 'https://s3/bucket', fields: { key: 'sync-a/cover' } });
-    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/cover-photo/upload`);
-    expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({
-      writeToken: bytesToHex(writeToken),
-      authorityPublicKey: bytesToHex(authorityPublicKey),
-      signature: bytesToHex(signature),
-    });
-    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
-  });
-
-  test('throws when the relay responds with an error status', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 403));
-
-    await expect(getCoverPhotoUploadTarget('sync-a', new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3]))).rejects.toThrow();
+    await expect(getUploadTarget('c1', 'post-1')).rejects.toBeInstanceOf(RateLimitedError);
   });
 });
 
 describe('getBlob', () => {
+  test('follows the signed URL the relay hands back', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonResponse({ url: 'https://cdn/signed' }))
+      .mockResolvedValueOnce({ ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer });
+
+    const bytes = await getBlob('c1', BlobPaths.photo('post-1'));
+
+    expect(bytes).toEqual(new Uint8Array([1, 2, 3]));
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(`${RELAY_URL}/v1/circles/c1/blobs/post-1`);
+    expect((global.fetch as jest.Mock).mock.calls[1][0]).toBe('https://cdn/signed');
+  });
+
+  // Ordinary, not an error: a circle with no cover, a member with no picture.
+  test('nothing uploaded there yet is null', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 404));
+
+    expect(await getBlob('c1', BlobPaths.cover('cover-9'))).toBeNull();
+  });
+
   test('throws RateLimitedError specifically on a 429', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
 
-    await expect(getBlob('sync-a', 'post-1')).rejects.toBeInstanceOf(RateLimitedError);
+    await expect(getBlob('c1', 'post-1')).rejects.toBeInstanceOf(RateLimitedError);
   });
 });
 
 describe('uploadBlob', () => {
-  test('writes the bytes to a temp file, then uploads it with the target’s fields as multipart parameters', async () => {
+  test('writes the bytes to a temp file, then uploads it with the target\u2019s fields as multipart parameters', async () => {
     mockFile.upload.mockResolvedValue({ status: 200, body: '', headers: {} });
-    const fields = { key: 'sync-a/post-1', 'Content-Type': 'application/octet-stream' };
+    const fields = { key: 'c1/post-1', 'Content-Type': 'application/octet-stream' };
     const bytes = new Uint8Array([1, 2, 3]);
 
     await uploadBlob({ url: 'https://s3/bucket', fields }, bytes);

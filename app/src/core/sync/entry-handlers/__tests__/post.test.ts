@@ -1,201 +1,198 @@
-jest.mock('@/core/services/log-relay');
-jest.mock('@/features/account/usecases/account-manifest');
+import { applyMembership, getAttachment, getPost, initDatabase, listComments } from '@/data/db';
+import { sealContent } from '@/core/crypto/content';
+import { reactionTag, reactionTagKey, reactionTagTable } from '@/core/crypto/reaction-tags';
+import { applyPostEntry } from '@/core/sync/entry-handlers/post';
+import type { EntryContext } from '@/core/sync/entry-handlers/types';
+import type { Entry } from '@/features/post/services/post-relay';
 
-import { bytesToHex } from '@noble/curves/utils.js';
+const NOW = 1_700_000_000_000;
+const KEY_V1 = new Uint8Array(32).fill(1);
+const KEY_V2 = new Uint8Array(32).fill(2);
 
-import { getAttachment, getCircleFeed, getPendingOutboxEntries, initDatabase, markAttachmentFetched } from '@/data/db';
-import { createCircle } from '@/features/circle/usecases/create-circle';
-import type { LogEntryEnvelope } from '@/core/sync/log-entry';
-import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
-import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
-import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
-import { postHandler } from '@/core/sync/entry-handlers/post';
-
-beforeAll(async () => {
-  await initDatabase();
-  await saveMasterSeed(new Uint8Array(16));
-});
-
-beforeEach(() => {
-  jest.clearAllMocks();
-  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
-  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
-});
-
-/** See member-added.test.ts: handlers only see already-verified envelopes, so the signature here is inert. */
-function envelope(authorPubkey: string, payload: unknown): LogEntryEnvelope {
-  return { type: 'post', payload, authorPubkey, signature: 'unchecked-by-this-layer' };
+let next = 0;
+function ids() {
+  next += 1;
+  return { circleId: `circle-${next}`, postId: `post-${next}`, commentId: `comment-${next}` };
 }
 
-function payloadFor(overrides: Partial<Record<string, unknown>> = {}) {
+function context(circleId: string, keys: Record<number, Uint8Array> = { 1: KEY_V1 }): EntryContext {
+  const tagKey = reactionTagKey(circleId, keys);
+  return { circleId, accountId: 'me', keys, tagKey, tags: reactionTagTable(tagKey) };
+}
+
+function entry(postId: string, overrides: Partial<Entry> = {}): Entry {
   return {
-    postId: generateUUID(),
-    caption: 'Nana in the kitchen',
-    photoHash: 'abc123',
-    createdAt: 5000,
+    entryId: postId,
+    type: 'post',
+    authorId: 'sarah',
+    receivedAt: NOW,
     keyVersion: 1,
+    ciphertext: sealContent({ caption: 'at the lake', createdAt: NOW - 500, photoHash: 'abc' }, KEY_V1),
+    hasBlob: true,
+    commentCount: 0,
+    updatedAt: NOW,
     ...overrides,
   };
 }
 
-describe('predicate', () => {
-  test('accepts a post from someone on the roster', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
-
-    await expect(
-      postHandler.predicate(circleId, envelope(bytesToHex(founder.publicKey), payloadFor()))
-    ).resolves.toBe(true);
-  });
-
-  test('rejects a post from someone this device has never seen join', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const stranger = generateIdentity();
-
-    await expect(
-      postHandler.predicate(circleId, envelope(bytesToHex(stranger.publicKey), payloadFor()))
-    ).resolves.toBe(false);
-  });
-
-  test.each([
-    ['a non-object payload', 42],
-    ['a missing postId', { caption: 'x', photoHash: 'a', createdAt: 1, keyVersion: 1 }],
-    ['an empty postId', { postId: '', caption: 'x', photoHash: 'a', createdAt: 1, keyVersion: 1 }],
-    ['a non-numeric createdAt', { postId: 'p', caption: 'x', photoHash: 'a', createdAt: 'soon', keyVersion: 1 }],
-    ['a missing keyVersion', { postId: 'p', caption: 'x', photoHash: 'a', createdAt: 1 }],
-  ])('rejects %s even from a real member', async (_label, payload) => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
-
-    await expect(postHandler.predicate(circleId, envelope(bytesToHex(founder.publicKey), payload))).resolves.toBe(
-      false
-    );
-  });
+beforeAll(async () => {
+  await initDatabase();
 });
 
-describe('apply', () => {
-  test('writes the post and an attachment awaiting download', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
-    const payload = payloadFor({ photoHash: 'deadbeef' });
+async function seed(circleId: string) {
+  await applyMembership(
+    { circleId, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
+    NOW
+  );
+}
 
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload), 1);
+describe('applying a post from a walk', () => {
+  test('decrypts the caption and keeps the author’s own clock', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
 
-    const [post] = await getCircleFeed(circleId);
-    expect(post).toMatchObject({ id: payload.postId, caption: 'Nana in the kitchen', createdAt: 5000 });
-    expect(post.hasPhoto).toBe(false);
+    await applyPostEntry(context(circleId), entry(postId));
 
-    const attachment = await getAttachment(circleId, payload.postId as string);
-    expect(attachment).toMatchObject({
-      kind: 'post_photo',
-      status: 'pending',
-      hash: 'deadbeef',
-      // The attachment's own createdAt mirrors the post's, since the
-      // download queue orders by it.
-      createdAt: 5000,
-    });
+    const post = await getPost(postId);
+    expect(post?.caption).toBe('at the lake');
+    expect(post?.createdAt).toBe(NOW - 500);
+    expect(post?.receivedAt).toBe(NOW);
+    expect(post?.inAlbum).toBe(true);
   });
 
-  test('records the author from the envelope, not from this device', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const other = generateIdentity();
-    const otherKey = bytesToHex(other.publicKey);
+  test('records the photo so the download queue can go find it', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
 
-    await postHandler.apply(circleId, envelope(otherKey, payloadFor()), 1);
+    await applyPostEntry(context(circleId), entry(postId));
 
-    const [post] = await getCircleFeed(circleId);
-    expect(post.authorPublicKey).toBe(otherKey);
+    const attachment = await getAttachment(circleId, postId);
+    expect(attachment?.hash).toBe('abc');
+    expect(attachment?.keyVersion).toBe(1);
+    expect(attachment?.bytes).toBeNull();
   });
 
-  test('carries the entry key version, so a rotated key cannot be assumed later', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
-    // This device's current version is 1; the entry was written under 3.
-    const payload = payloadFor({ keyVersion: 3 });
+  test('names the tags it can and counts the rest as unnamed', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
+    const tagKey = reactionTagKey(circleId, { 1: KEY_V1 })!;
 
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload), 1);
+    await applyPostEntry(
+      context(circleId),
+      entry(postId, {
+        reactionCounts: {
+          [reactionTag('❤️', tagKey)]: 3,
+          // An emoji outside this build's palette, from a newer peer.
+          'a-tag-this-build-cannot-name': 2,
+          // Dropped to zero by an unreact; the relay leaves the key.
+          [reactionTag('🥂', tagKey)]: 0,
+        },
+      })
+    );
 
-    const attachment = await getAttachment(circleId, payload.postId as string);
-    // The blob was encrypted under version 3 — decrypting it with whatever
-    // happens to be current would fail after any rotation.
-    expect(attachment?.keyVersion).toBe(3);
+    const post = await getPost(postId);
+    expect(JSON.parse(post!.reactionCounts)).toEqual({ '❤️': 3 });
+    expect(post?.unnamedReactions).toBe(2);
   });
 
-  test('does not queue the pulled post back out to the relay', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
+  // The tag key comes from version 1 and never rotates, so a count made
+  // before a rotation is still named after one.
+  test('a rotation does not make old counts unnameable', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
+    const beforeRotation = reactionTagKey(circleId, { 1: KEY_V1 })!;
 
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor()), 1);
+    await applyPostEntry(
+      context(circleId, { 1: KEY_V1, 2: KEY_V2 }),
+      entry(postId, { reactionCounts: { [reactionTag('❤️', beforeRotation)]: 2 } })
+    );
 
-    // insertPostAndEnqueue would have echoed it straight back to the relay
-    // it just arrived from.
-    expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
+    expect(JSON.parse((await getPost(postId))!.reactionCounts)).toEqual({ '❤️': 2 });
+    expect((await getPost(postId))?.unnamedReactions).toBe(0);
   });
 
-  test('applying the same entry twice leaves one post', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
-    const entry = envelope(bytesToHex(founder.publicKey), payloadFor());
+  // Two circles must never share a tag for the same emoji, or the relay
+  // could carry a guess from one circle into another.
+  test('the same emoji tags differently in a different circle', async () => {
+    const one = reactionTagKey('circle-a', { 1: KEY_V1 })!;
+    const other = reactionTagKey('circle-b', { 1: KEY_V1 })!;
 
-    await postHandler.apply(circleId, entry, 1);
-    await postHandler.apply(circleId, entry, 1);
-
-    expect(await getCircleFeed(circleId)).toHaveLength(1);
+    expect(reactionTag('❤️', one)).not.toBe(reactionTag('❤️', other));
   });
 
-  test('a post that already has its photo is not reset to pending by a replay', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
-    const payload = payloadFor();
-    const entry = envelope(bytesToHex(founder.publicKey), payload);
-    await postHandler.apply(circleId, entry, 1);
+  test('stores the preview comments and names them on the post', async () => {
+    const { circleId, postId, commentId } = ids();
+    await seed(circleId);
 
-    await markAttachmentFetched(circleId, payload.postId as string, new Uint8Array([1, 2, 3]));
-    await postHandler.apply(circleId, entry, 1);
+    await applyPostEntry(
+      context(circleId),
+      entry(postId, {
+        commentCount: 1,
+        recentComments: [
+          {
+            commentId,
+            authorId: 'ali',
+            keyVersion: 1,
+            ciphertext: sealContent({ body: 'lovely', createdAt: NOW - 100 }, KEY_V1),
+            receivedAt: NOW,
+          },
+        ],
+      })
+    );
 
-    const attachment = await getAttachment(circleId, payload.postId as string);
-    expect(attachment?.status).toBe('fetched');
-    expect(attachment?.bytes).toEqual(new Uint8Array([1, 2, 3]));
+    expect(JSON.parse((await getPost(postId))!.recentCommentIds)).toEqual([commentId]);
+    const comments = await listComments(postId);
+    expect(comments).toHaveLength(1);
+    expect(comments[0].body).toBe('lovely');
+    expect(comments[0].pending).toBe(false);
   });
 
-  test('carries an explicit inAlbum: false through to the row', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
+  test('a post whose key this device lacks is skipped, not half-written', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
 
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor({ inAlbum: false })), 1);
+    await applyPostEntry(context(circleId, { 2: KEY_V2 }), entry(postId));
 
-    const [post] = await getCircleFeed(circleId);
-    expect(post.inAlbum).toBe(false);
+    expect(await getPost(postId)).toBeNull();
   });
 
-  /**
-   * The replay-safety guard. Entries are immutable and replay must be
-   * deterministic (SYNC_DESIGN invariant 1), so an entry written before
-   * `inAlbum` existed has to keep applying forever — if parse ever starts
-   * demanding the field, every one of those posts silently disappears on
-   * the next replay, permanently.
-   */
-  test('an entry predating inAlbum still applies, and lands in the album', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    const founder = (await getCircleIdentity(circleId))!;
-    const payload = payloadFor();
-    expect(payload).not.toHaveProperty('inAlbum');
+  // The row that stood in the feed is the one that has to receive the
+  // deletion, so a deleted post is still written even though it carries
+  // no ciphertext at all.
+  test('a deletion lands on a post this device never saw', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
 
-    await expect(
-      postHandler.predicate(circleId, envelope(bytesToHex(founder.publicKey), payload))
-    ).resolves.toBe(true);
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload), 1);
+    await applyPostEntry(
+      context(circleId),
+      entry(postId, { ciphertext: undefined, hasBlob: false, deletedAt: NOW + 10 })
+    );
 
-    const [post] = await getCircleFeed(circleId);
-    expect(post.inAlbum).toBe(true);
+    const post = await getPost(postId);
+    expect(post?.deletedAt).toBe(NOW + 10);
+    expect(post?.caption).toBe('');
   });
 
-  test('a malformed payload is a no-op rather than a crash', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  test('a second walk replaces the relay’s half and leaves the local half alone', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
+    await applyPostEntry(context(circleId), entry(postId));
 
-    await expect(postHandler.apply(circleId, envelope('aa', { nonsense: true }), 1)).resolves.toBeUndefined();
+    await applyPostEntry(context(circleId), entry(postId, { commentCount: 4, iCommented: true, updatedAt: NOW + 99 }));
 
-    expect(await getCircleFeed(circleId)).toHaveLength(0);
+    const post = await getPost(postId);
+    expect(post?.commentCount).toBe(4);
+    expect(post?.iCommented).toBe(true);
+    expect(post?.updatedAt).toBe(NOW + 99);
+    expect(post?.childrenFetchedAt).toBeNull();
+  });
+
+  test('a post taken out of the album is not in it', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
+
+    await applyPostEntry(context(circleId), entry(postId, { visibility: 'feed' }));
+
+    expect((await getPost(postId))?.inAlbum).toBe(false);
   });
 });

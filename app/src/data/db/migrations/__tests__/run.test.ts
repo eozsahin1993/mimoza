@@ -7,20 +7,41 @@ test('applies every real migration in one pass', async () => {
   await expect(runMigrations()).resolves.toBeUndefined();
 
   const tables = await db.all<{ name: string }>(sql`SELECT name FROM sqlite_master WHERE type = 'table'`);
-  const tableNames = tables.map((t) => t.name);
-  expect(tableNames).toEqual(
-    expect.arrayContaining(['circles', 'circle_members', 'posts', 'attachments', 'pending_join_requests', '__migrations'])
+  expect(tables.map((table) => table.name)).toEqual(
+    expect.arrayContaining([
+      'circles',
+      'circle_members',
+      'activity',
+      'posts',
+      'attachments',
+      'post_comments',
+      'post_reactions',
+      'outbox',
+      'device_profile',
+      'pending_requests',
+      '__migrations',
+    ])
   );
 
-  // Every migration declares its table's final column set (ALTERs were
-  // folded back into whichever migration creates the table), so a column
-  // added late in the schema's life still has to be present after a
-  // single pass — `role` and `attachments.kind` are the canaries.
-  const columns = await db.all<{ name: string }>(sql`PRAGMA table_info(circle_members)`);
-  expect(columns.map((c) => c.name)).toContain('role');
+  // The relay-owned block on a post and the cursors on a circle are what
+  // a sync writes; a migration missing one fails as a confusing "no such
+  // column" much later.
+  const postColumns = await db.all<{ name: string }>(sql`PRAGMA table_info(posts)`);
+  expect(postColumns.map((column) => column.name)).toEqual(
+    expect.arrayContaining([
+      'updated_at',
+      'comment_count',
+      'reaction_counts',
+      'unnamed_reactions',
+      'recent_comment_ids',
+      'i_reacted',
+      'i_commented',
+      'children_fetched_at',
+    ])
+  );
 
-  const attachmentColumns = await db.all<{ name: string }>(sql`PRAGMA table_info(attachments)`);
-  expect(attachmentColumns.map((c) => c.name)).toEqual(
-    expect.arrayContaining(['circle_id', 'entry_id', 'kind', 'bytes', 'hash', 'key_version', 'status'])
+  const circleColumns = await db.all<{ name: string }>(sql`PRAGMA table_info(circles)`);
+  expect(circleColumns.map((column) => column.name)).toEqual(
+    expect.arrayContaining(['posts_forward_cursor', 'posts_backward_cursor', 'activity_cursor', 'needs_rewrap'])
   );
 });
