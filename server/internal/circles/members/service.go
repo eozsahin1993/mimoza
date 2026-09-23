@@ -39,6 +39,12 @@ type bucket interface {
 	Delete(ctx context.Context, key string) error
 }
 
+// ender ends a circle whose last member has just left. The sweep lives
+// in the circle slice; this is the one place outside it that needs one.
+type ender interface {
+	End(ctx context.Context, circleID string) error
+}
+
 type Service struct {
 	Store store
 	// Notify is nil in tests that do not care who hears about a change.
@@ -48,6 +54,9 @@ type Service struct {
 	// Profiles fills in names, avatars and the public keys members seal
 	// content keys to. A roster without them is a list of opaque ids.
 	Profiles profiles
+	// Circles ends one that has just emptied. Nil in tests that do not
+	// care what happens to the rows afterwards.
+	Circles ender
 }
 
 // RosterMember is one member with the person behind them: the
@@ -231,6 +240,19 @@ func (s *Service) Leave(ctx context.Context, circleID, accountID string, expecte
 	if err != nil {
 		return err
 	}
+
+	// The last one out takes the circle with them. Left standing, its
+	// meta, entries and photos would be unreachable forever: nothing
+	// lists a circle nobody is in, and DELETE /circles wants an admin
+	// this account has just stopped being.
+	roster, err := s.Store.ListMembers(ctx, circleID)
+	if err != nil {
+		return err
+	}
+	if len(roster) == 1 && roster[0].AccountID == accountID && s.Circles != nil {
+		return s.Circles.End(ctx, circleID)
+	}
+
 	if err := s.Store.LeaveCircle(ctx, circleID, accountID, s.nameOf(ctx, accountID), expectedVersion, sealed); err != nil {
 		return err
 	}

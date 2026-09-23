@@ -90,16 +90,20 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	}
 
 	circlesMux := http.NewServeMux()
-	circle.Register(circlesMux, &circle.Service{
+	// Shared, because leaving as the last member ends the circle, and
+	// the sweep that does it lives here.
+	circleService := &circle.Service{
 		Store:    circle.NewStore(deps.Circles),
 		Blobs:    deps.Blobs,
 		Requests: requests.NewStore(deps.Circles),
-	}, readLimit, writeLimit)
+	}
+	circle.Register(circlesMux, circleService, readLimit, writeLimit)
 	members.Register(circlesMux, &members.Service{
 		Store:    members.NewStore(deps.Circles),
 		Profiles: deps.Accounts,
 		Blobs:    deps.Blobs,
 		Notify:   notifier,
+		Circles:  circleService,
 	}, readLimit, writeLimit)
 	posts.Register(circlesMux, &posts.Service{
 		Store:  posts.NewStore(deps.Circles),

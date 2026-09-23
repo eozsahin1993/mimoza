@@ -123,6 +123,15 @@ func (s *Service) Delete(ctx context.Context, circleID, accountID string) error 
 	if err := s.requireAdmin(ctx, circleID, accountID); err != nil {
 		return err
 	}
+	return s.End(ctx, circleID)
+}
+
+// End ends a circle with no caller to authorize: the last member has
+// just left, so there is nobody left to be an admin and requireAdmin
+// would refuse the only person who could ask. Deleting the rows without
+// this would leave the meta, every entry and every blob unreachable
+// forever — nothing lists a circle nobody is in.
+func (s *Service) End(ctx context.Context, circleID string) error {
 	if err := s.Store.DeleteCircle(ctx, circleID); err != nil {
 		return err
 	}

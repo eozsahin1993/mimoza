@@ -131,7 +131,14 @@ func serviceFor(store *fakeStore, profiles *fakeProfiles) *Service {
 	if profiles == nil {
 		profiles = named(nil)
 	}
-	return &Service{Store: store, Profiles: profiles}
+	return &Service{Store: store, Profiles: profiles, Circles: &fakeEnder{}}
+}
+
+type fakeEnder struct{ ended string }
+
+func (f *fakeEnder) End(_ context.Context, circleID string) error {
+	f.ended = circleID
+	return nil
 }
 
 func roster(members ...circles.Member) *fakeStore {
@@ -167,15 +174,23 @@ func TestLeave_RefusesTheLastAdminWhileOthersRemain(t *testing.T) {
 
 // The same rule, the other way round: an admin alone in a circle is free
 // to go, since there is nobody left to strand.
-func TestLeave_AllowsTheLastAdminWhenNobodyElseIsLeft(t *testing.T) {
+// The last one out takes the circle with them. Leaving the rows behind
+// would strand the meta, every entry and every photo: nothing lists a
+// circle nobody is in, and DELETE /circles wants an admin this account
+// has just stopped being.
+func TestLeave_EndsTheCircleWhenTheLastMemberGoes(t *testing.T) {
 	store := roster(adminMember("admin-1"))
 	service := serviceFor(store, nil)
+	ender := service.Circles.(*fakeEnder)
 
 	if err := service.Leave(context.Background(), "circle-1", "admin-1", 1, nil); err != nil {
 		t.Fatal(err)
 	}
-	if store.left != "admin-1" {
-		t.Error("expected the departure to reach the store")
+	if ender.ended != "circle-1" {
+		t.Error("expected the circle to be ended, not merely left")
+	}
+	if store.left != "" {
+		t.Error("expected no ordinary departure, which would have kept the rows")
 	}
 }
 
