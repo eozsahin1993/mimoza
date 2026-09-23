@@ -17,23 +17,20 @@ import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-gro
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Fonts, Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
-import { MemberRoles, type Member, type MemberRole } from '@/data/db';
+import { getProfile, type Member } from '@/data/db';
+import { MemberRoles, type MemberRole } from '@/features/circle/usecases/change-member-role';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { loadCircleDetails, type CircleDetails } from '@/features/circle/usecases/circle-details';
-import { buildDebugKeysetFlags } from '@/features/circle/usecases/debug-keyset';
 import { getOrCreateInvite, replaceInvite } from '@/features/invite/usecases/invite-to-circle';
-import { departingSuccessor } from '@/features/circle/usecases/authority';
 import { leaveCircle } from '@/features/circle/usecases/leave-circle';
 import { removeMember } from '@/features/circle/usecases/remove-member';
 import { renameCircle } from '@/features/circle/usecases/rename-circle';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
 import {
-  PushLevels,
-  setCircleLevel,
-  setCircleSilenced,
-  type CirclePushPreferences,
-  type PushLevelId,
+  NotifyLevels,
+  setCircleNotifyLevel,
+  type NotifyLevel,
 } from '@/features/push-notifications/usecases/push-preferences';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showDone, showError } from '@/core/services/messages';
@@ -52,7 +49,6 @@ function daysUntil(expiresAt: number): number {
 /** Stable identity, so `avatarUris`' memo doesn't bust on every render. */
 const NO_MEMBERS: Member[] = [];
 
-const NO_PUSH_PREFERENCES: CirclePushPreferences = { silenced: false, level: 'comments', categories: [] };
 
 export default function CircleDetailsScreen() {
   const { t } = useTranslation();
@@ -73,7 +69,8 @@ export default function CircleDetailsScreen() {
   const admin = details?.ownIsAdmin ?? false;
   const ownPublicKey = details?.ownPublicKey ?? null;
   const invite = details?.invite ?? null;
-  const push = details?.push ?? NO_PUSH_PREFERENCES;
+  const notifyLevel = (details?.notifyLevel ?? 'all') as NotifyLevel;
+  const silenced = notifyLevel === 'none';
 
   /**
    * Only an admin may write `member_added` or change a role, so a circle
@@ -81,7 +78,7 @@ export default function CircleDetailsScreen() {
    * again, including re-adding that person. No entry repairs it after the
    * fact, so promoting a second admin first is the only fix there is.
    */
-  const soleAdmin = admin && members.filter((member) => member.role === MemberRoles.admin).length === 1;
+  const soleAdmin = admin && members.filter((member) => member.role === MemberRoles.ADMIN).length === 1;
   // A sole member's "leave" actually runs `deleteCircleForEveryone`, so
   // the row and the alert say Delete to match. `leaveCircle` re-checks
   // against a fresh roster before deleting; this only picks the words.
@@ -92,19 +89,6 @@ export default function CircleDetailsScreen() {
     setDetails(await loadCircleDetails(circleId));
     setCoverUri(await resolveCircleCoverUri(circleId));
   }, [circleId]);
-
-  // Encoded once per roster change rather than on every render. Member
-  // pictures are avatar-sized thumbnails, so a data URI is cheap here —
-  // unlike a circle cover, which goes through the photo cache instead.
-  const avatarUris = useMemo(
-    () =>
-      new Map(
-        members
-          .filter((member) => member.picture)
-          .map((member) => [member.identityPublicKey, bytesToDataUri(member.picture!)]),
-      ),
-    [members],
-  );
 
   function formatExpiry(expiresAt: number): string {
     const days = daysUntil(expiresAt);
@@ -134,7 +118,7 @@ export default function CircleDetailsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeMember(circleId, member.identityPublicKey);
+              await removeMember(circleId, member.accountId);
               await reload();
             } catch (err) {
               console.error('Failed to remove member', err);
@@ -149,12 +133,12 @@ export default function CircleDetailsScreen() {
   async function handleSetRole(member: Member, role: MemberRole) {
     if (!circleId) return;
     try {
-      await setMemberRole(circleId, member.identityPublicKey, role);
+      await setMemberRole(circleId, member.accountId, role);
       await reload();
       // Nothing on the roster moves until the relay accepts the change
       // and the entry syncs back, so say so rather than leave the tap
       // looking like it did nothing.
-      showDone(role === MemberRoles.admin ? t('circle.details.becomesAdmin') : t('circle.details.stopsBeingAdmin'));
+      showDone(role === MemberRoles.ADMIN ? t('circle.details.becomesAdmin') : t('circle.details.stopsBeingAdmin'));
     } catch (err) {
       console.error('Failed to change member role', err);
       showError(t('circle.details.roleChangeFailed'));
@@ -163,16 +147,16 @@ export default function CircleDetailsScreen() {
 
   const memberMenuOptions: ActionSheetOption[] = memberMenu
     ? [
-        memberMenu.role === MemberRoles.admin
+        memberMenu.role === MemberRoles.ADMIN
           ? {
               label: t('circle.details.removeAdmin'),
               icon: Icons.demote,
-              onPress: () => handleSetRole(memberMenu, MemberRoles.member),
+              onPress: () => handleSetRole(memberMenu, MemberRoles.MEMBER),
             }
           : {
               label: t('circle.details.makeAdmin'),
               icon: Icons.promote,
-              onPress: () => handleSetRole(memberMenu, MemberRoles.admin),
+              onPress: () => handleSetRole(memberMenu, MemberRoles.ADMIN),
             },
         {
           label: t('circle.details.removeFromCircle'),
@@ -189,7 +173,7 @@ export default function CircleDetailsScreen() {
     // first and is what this row reads, so a failed relay call still leaves
     // the toggle showing what was actually stored.
     try {
-      await setCircleSilenced(circleId, silenced);
+      await setCircleNotifyLevel(circleId, ownPublicKey ?? '', silenced ? 'none' : 'all');
     } catch (err) {
       console.error('Failed to change notification settings', err);
       showError(t('circle.details.relayUnreachable'));
@@ -197,11 +181,11 @@ export default function CircleDetailsScreen() {
     await reload();
   }
 
-  async function handleLevelChange(level: PushLevelId) {
+  async function handleLevelChange(level: NotifyLevel) {
     if (!circleId) return;
     setLevelPicker(false);
     try {
-      await setCircleLevel(circleId, level);
+      await setCircleNotifyLevel(circleId, ownPublicKey ?? '', level);
     } catch (err) {
       console.error('Failed to change notification settings', err);
       showError(t('circle.details.relayUnreachable'));
@@ -273,7 +257,6 @@ export default function CircleDetailsScreen() {
     // Named rather than left as a surprise: leaving as the last admin
     // hands the circle to someone, and this is where that can be
     // cancelled and overridden with "Make admin" on someone else.
-    const successor = await departingSuccessor(circleId).catch(() => null);
     const name = circle?.name;
     Alert.alert(
       lastMember
@@ -287,11 +270,7 @@ export default function CircleDetailsScreen() {
         ? name
           ? t('circle.details.deleteMessage', { name })
           : t('circle.details.deleteMessageUnnamed')
-        : successor
-          ? successor.name
-            ? t('circle.details.leaveMessageSuccessor', { name: successor.name })
-            : t('circle.details.leaveMessageSuccessorUnnamed')
-          : t('circle.details.leaveMessage'),
+        : t('circle.details.leaveMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -340,17 +319,6 @@ export default function CircleDetailsScreen() {
     }
   }
 
-  async function handleCopyDebugKeyset() {
-    if (!circleId) return;
-    try {
-      const flags = await buildDebugKeysetFlags(circleId);
-      await Clipboard.setStringAsync(flags);
-      showDone('Keyset copied for decryptlog');
-    } catch (err) {
-      console.error('Failed to build debug keyset', err);
-      showError('Could not copy the keyset');
-    }
-  }
 
 
   /**
@@ -403,19 +371,19 @@ export default function CircleDetailsScreen() {
   const settingsGroups: SettingsGroup[] = [
     {
       title: t('circle.details.notifications'),
-      footnote: push.silenced
+      footnote: silenced
         ? t('circle.details.notificationsSilencedFootnote')
         : t('circle.details.notificationsFootnote'),
       rows: [
         {
           label: t('circle.details.silence'),
           description: t('circle.details.silenceDescription'),
-          control: { kind: 'switch', value: push.silenced, onValueChange: handleSilenceChange },
+          control: { kind: 'switch', value: silenced, onValueChange: handleSilenceChange },
         },
         {
           label: t('settings.notifyMeAbout'),
-          control: { kind: 'value', text: t(`settings.pushLevels.${push.level}`) },
-          disabled: push.silenced,
+          control: { kind: 'value', text: t(`settings.notifyLevels.${notifyLevel}`) },
+          disabled: notifyLevel === 'none',
           onPress: () => setLevelPicker(true),
         },
       ],
@@ -492,18 +460,17 @@ export default function CircleDetailsScreen() {
   /** One roster row. The menu is offered on everyone but the reader — nobody demotes or removes themselves here. */
   function renderMember(member: Member) {
     return (
-      <View key={member.identityPublicKey} style={[styles.memberRow, { borderBottomColor: tints.chipIdleBorder }]}>
+      <View key={member.accountId} style={[styles.memberRow, { borderBottomColor: tints.chipIdleBorder }]}>
         <Avatar
           size={44}
-          uri={avatarUris.get(member.identityPublicKey)}
-          name={member.name}
-          colorSeed={member.identityPublicKey}
+                    name={member.name}
+          colorSeed={member.accountId}
         />
 
         <View style={styles.memberInfo}>
           <View style={styles.memberNameRow}>
             <ThemedText type="titleSmall">{member.name || t('circle.details.unnamedMember')}</ThemedText>
-            {member.role === MemberRoles.admin ? (
+            {member.role === MemberRoles.ADMIN ? (
               <View style={[styles.adminBadge, { backgroundColor: theme.accent }]}>
                 <ThemedText type="labelSmall" themeColor="accentLabel" style={styles.adminBadgeText}>
                   {t('circle.details.admin')}
@@ -516,7 +483,7 @@ export default function CircleDetailsScreen() {
           </ThemedText>
         </View>
 
-        {admin && member.identityPublicKey !== ownPublicKey ? (
+        {admin && member.accountId !== ownPublicKey ? (
           <Pressable hitSlop={12} style={styles.memberMenuButton} onPress={() => setMemberMenu(member)}>
             <Icon icon={Icons.more} size={20} color={theme.muted} />
           </Pressable>
@@ -542,14 +509,6 @@ export default function CircleDetailsScreen() {
 
           <SettingsGroups groups={settingsGroups} />
 
-          {__DEV__ ? (
-            <View style={styles.debugZone}>
-              <ThemedText type="labelMedium">
-                Debug
-              </ThemedText>
-              <SecondaryButton label="Copy keyset for decryptlog" onPress={handleCopyDebugKeyset} />
-            </View>
-          ) : null}
         </ScrollView>
       </ThemedSafeAreaView>
 
@@ -576,8 +535,8 @@ export default function CircleDetailsScreen() {
         visible={levelPicker}
         onClose={() => setLevelPicker(false)}
         title={t('settings.notifyMeAbout')}
-        options={PushLevels.map((level) => ({ id: level.id, label: t(`settings.pushLevels.${level.id}`) }))}
-        selected={push.level}
+        options={NotifyLevels.map((level) => ({ id: level, label: t(`settings.notifyLevels.${level}`) }))}
+        selected={notifyLevel}
         onSelect={handleLevelChange}
       />
 
@@ -585,9 +544,8 @@ export default function CircleDetailsScreen() {
         visible={memberMenu !== null}
         onClose={() => setMemberMenu(null)}
         title={memberMenu?.name || t('circle.details.thisMember')}
-        avatarUri={memberMenu ? avatarUris.get(memberMenu.identityPublicKey) : undefined}
         avatarName={memberMenu?.name}
-        avatarColorSeed={memberMenu?.identityPublicKey}
+        avatarColorSeed={memberMenu?.accountId}
         options={memberMenuOptions}
       />
     </ThemedView>

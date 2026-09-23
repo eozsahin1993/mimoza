@@ -8,7 +8,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Space, Spacing } from '@/ui/theme/tokens';
-import { getPendingJoinRequest } from '@/data/db';
+import { getRequest } from '@/data/db';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 
 /**
@@ -19,7 +19,9 @@ const CHECK_INTERVAL_MS = 5_000;
 
 export default function JoinPendingScreen() {
   const { t } = useTranslation();
-  const { requestId } = useLocalSearchParams<{ requestId: string }>();
+  // Keyed by circle, not by request: an ask is one per circle, and the
+  // relay's circle list is what answers it.
+  const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [circleName, setCircleName] = useState('');
   const [inviterName, setInviterName] = useState('');
   const [gone, setGone] = useState(false);
@@ -38,31 +40,31 @@ export default function JoinPendingScreen() {
   // component state carried from the previous screen.
   useFocusEffect(
     useCallback(() => {
-      if (!requestId) return;
+      if (!circleId) return;
 
-      getPendingJoinRequest(requestId).then((pending) => {
+      getRequest(circleId).then((pending) => {
         if (!pending) {
           setGone(true);
           return;
         }
         setCircleName(pending.circleName);
-        setInviterName(pending.createdByName);
+        setInviterName(pending.invitedByName);
       });
 
       let stopped = false;
       const check = () => {
         if (stopped) return;
-        checkPendingJoinRequest(requestId)
+        checkPendingJoinRequest(circleId)
           .then((result) => {
             if (stopped) return;
-            if (result.joined) {
+            if (result.state === 'approved') {
               stopped = true;
               router.replace({ pathname: '/circle/feed', params: { circleId: result.circleId, justJoined: '1' } });
               return;
             }
             // Denied, or aged out. Nothing will ever answer it, so say so
             // rather than leaving this screen waiting indefinitely.
-            if ('gone' in result) {
+            if (result.state === 'gone') {
               stopped = true;
               setGone(true);
             }
@@ -81,11 +83,11 @@ export default function JoinPendingScreen() {
         clearInterval(interval);
         subscription.remove();
       };
-    }, [requestId]),
+    }, [circleId]),
   );
 
   function handleCancel() {
-    if (!requestId) return;
+    if (!circleId) return;
     Alert.alert(t('invite.pending.withdrawTitle'), t('invite.pending.withdrawMessage'), [
       { text: t('invite.pending.keepWaiting'), style: 'cancel' },
       {
@@ -93,7 +95,7 @@ export default function JoinPendingScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await cancelPendingJoinRequest(requestId);
+            await cancelPendingJoinRequest(circleId);
           } catch (err) {
             console.error('Failed to withdraw join request', err);
           }

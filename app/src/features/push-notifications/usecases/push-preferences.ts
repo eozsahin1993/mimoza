@@ -2,6 +2,9 @@ import { setNotifyLevel, type NotifyLevel } from '@/features/push-notifications/
 
 export type { NotifyLevel };
 
+/** The levels a circle offers, in order. `none` is the silence switch, not a choice here. */
+export const NotifyLevels: NotifyLevel[] = ['photos', 'comments', 'all'];
+
 /**
  * Which notifications one circle sends this account. Everything the old
  * mask-and-fanout-hash model needed — a category bitmask synced to the

@@ -20,12 +20,18 @@ export async function previewInvite(code: string): Promise<InvitePreview> {
 }
 
 /** Remembered locally so the pending screen survives a restart. Asking twice replaces the first ask. */
-export async function requestToJoin(code: string): Promise<{ circleId: string; requestId: string }> {
+export async function requestToJoin(
+  code: string,
+  seen: { circleName: string; invitedByName: string }
+): Promise<{ circleId: string; requestId: string }> {
   const request = await askOnRelay(code);
+  // What the preview already showed, so the waiting screen names the
+  // circle straight away rather than after the next sync.
   await upsertRequest({
     circleId: request.circleId,
     inviteCode: code,
-    circleName: '',
+    circleName: seen.circleName,
+    invitedByName: seen.invitedByName,
     submittedAt: request.createdAt,
     status: request.status,
   });

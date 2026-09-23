@@ -64,6 +64,12 @@
       "requests": "Requests to join only",
       "answers": "Answers to your requests only",
       "off": "Off"
+    },
+    "notifyLevels": {
+      "photos": "New photos only",
+      "comments": "Photos and comments",
+      "all": "Photos, comments and reactions",
+      "none": "Off"
     }
   },
   "account": {

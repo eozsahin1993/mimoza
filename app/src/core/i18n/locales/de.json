@@ -64,6 +64,12 @@
       "requests": "Nur Beitrittsanfragen",
       "answers": "Nur Antworten auf deine Anfragen",
       "off": "Aus"
+    },
+    "notifyLevels": {
+      "photos": "Nur neue Fotos",
+      "comments": "Fotos und Kommentare",
+      "all": "Fotos, Kommentare und Reaktionen",
+      "none": "Aus"
     }
   },
   "account": {

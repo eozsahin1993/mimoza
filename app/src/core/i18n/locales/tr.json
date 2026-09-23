@@ -64,6 +64,12 @@
       "requests": "Sadece katılma istekleri",
       "answers": "Sadece isteklerine gelen yanıtlar",
       "off": "Kapalı"
+    },
+    "notifyLevels": {
+      "photos": "Sadece yeni fotoğraflar",
+      "comments": "Fotoğraflar ve yorumlar",
+      "all": "Fotoğraflar, yorumlar ve tepkiler",
+      "none": "Kapalı"
     }
   },
   "account": {

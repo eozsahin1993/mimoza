@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/circles"
 )
 
@@ -17,15 +18,23 @@ type store interface {
 	RevokeInvite(ctx context.Context, circleID, code string) error
 }
 
+// profiles names whoever shared the code. Someone deciding whether to
+// ask should see a person, not an account id.
+type profiles interface {
+	GetProfile(ctx context.Context, accountID string) (accounts.Profile, error)
+}
+
 type Service struct {
 	Store store
 	// Retention is how long a new code lasts. A code that never expired
 	// would be a standing way in, long after whoever shared it forgot.
 	Retention time.Duration
+	Profiles  profiles
 }
 
 // Preview is what a circle looks like from outside: enough to decide
-// whether to ask, and nothing about who is in it.
+// whether to ask, and nothing about who is in it. InvitedBy is a
+// display name, not an id.
 type Preview struct {
 	CircleID    string
 	Name        string
@@ -89,11 +98,19 @@ func (s *Service) Preview(ctx context.Context, code string) (Preview, error) {
 	if err != nil {
 		return Preview{}, err
 	}
+	// Nameless rather than failing: a profile that cannot be read is no
+	// reason to refuse someone a look at the circle.
+	invitedBy := ""
+	if s.Profiles != nil {
+		if profile, err := s.Profiles.GetProfile(ctx, invite.CreatedBy); err == nil {
+			invitedBy = profile.Name
+		}
+	}
 	return Preview{
 		CircleID:    circle.ID,
 		Name:        circle.Name,
 		MemberCount: len(roster),
-		InvitedBy:   invite.CreatedBy,
+		InvitedBy:   invitedBy,
 	}, nil
 }
 

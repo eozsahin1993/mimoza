@@ -5,7 +5,7 @@ import { Dialog } from '@/ui/components/dialog';
 export type NotificationPromptDialogProps = {
   visible: boolean;
   /** A request this device is waiting on, if any — the reason gets specific. */
-  waitingOn?: { circleName: string; createdByName: string };
+  waitingOn?: { circleName: string; invitedByName: string };
   onTurnOn: () => void;
   onNotNow: () => void;
 };
@@ -24,8 +24,8 @@ export function NotificationPromptDialog({ visible, waitingOn, onTurnOn, onNotNo
       visible={visible}
       title={t('notifications.prompt.title')}
       message={
-        waitingOn?.createdByName
-          ? t('notifications.prompt.bodyWaiting', { name: waitingOn.createdByName, circle: waitingOn.circleName })
+        waitingOn?.invitedByName
+          ? t('notifications.prompt.bodyWaiting', { name: waitingOn.invitedByName, circle: waitingOn.circleName })
           : t('notifications.prompt.body')
       }
       confirmLabel={t('notifications.prompt.turnOn')}

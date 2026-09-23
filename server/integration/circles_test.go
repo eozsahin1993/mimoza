@@ -18,6 +18,7 @@ func TestCircles_JoinAndPost(t *testing.T) {
 	admin := relay.SignIn()
 	joiner := relay.SignIn()
 
+	admin.Put(api("/account/profile"), harness.Body{"name": "Nadia"}).Expect(http.StatusOK)
 	circleID := createCircle(t, admin, "Family")
 
 	// The admin posts before anyone else is in, so the joiner's first
@@ -35,10 +36,13 @@ func TestCircles_JoinAndPost(t *testing.T) {
 		CircleID    string `json:"circleId"`
 		Name        string `json:"name"`
 		MemberCount int    `json:"memberCount"`
+		InvitedBy   string `json:"invitedBy"`
 	}
 	joiner.Get(api("/invites/" + invite.Code)).Expect(http.StatusOK).Decode(&preview)
 	harness.AssertEqual(t, preview.Name, "Family", "the preview names the circle")
 	harness.AssertEqual(t, preview.MemberCount, 1, "the preview counts its members")
+	// A person, not an account id: this is what the join sheet shows.
+	harness.AssertEqual(t, preview.InvitedBy, "Nadia", "the preview names who shared the code")
 
 	// Not a member yet: the circle's entries are not readable.
 	joiner.Get(api("/circles/" + circleID + "/entries?type=post")).Expect(http.StatusForbidden)

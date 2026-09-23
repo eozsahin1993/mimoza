@@ -64,6 +64,12 @@
       "requests": "Demandes pour rejoindre uniquement",
       "answers": "Réponses à tes demandes uniquement",
       "off": "Désactivées"
+    },
+    "notifyLevels": {
+      "photos": "Nouvelles photos uniquement",
+      "comments": "Photos et commentaires",
+      "all": "Photos, commentaires et réactions",
+      "none": "Désactivé"
     }
   },
   "account": {

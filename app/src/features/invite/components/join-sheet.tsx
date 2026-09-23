@@ -8,7 +8,6 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { Space, Spacing } from '@/ui/theme/tokens';
 import { findPendingJoinRequestForInvite, previewInvite, requestToJoin } from '@/features/invite/usecases/join-circle';
-import { bytesToDataUri, parsePictureThumbnail } from '@/core/photo/image';
 import { showError } from '@/core/services/messages';
 
 /**
@@ -36,8 +35,6 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
   const [phase, setPhase] = useState<Phase>('checking');
   const [circleName, setCircleName] = useState('');
   const [inviterName, setInviterName] = useState('');
-  const [inviterPictureUri, setInviterPictureUri] = useState<string | undefined>();
-  const [inviterPublicKey, setInviterPublicKey] = useState<string | undefined>();
 
   useEffect(() => {
     if (!code) return;
@@ -48,16 +45,14 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
     (async () => {
       try {
         const preview = await previewInvite(code);
-        // Validated rather than trusted: it comes from whoever made the
-        // invite, same as the name beside it.
-        const picture = parsePictureThumbnail(preview.createdByPicture);
         const already = await findPendingJoinRequestForInvite(code);
         if (stale) return;
 
         setCircleName(preview.name);
-        setInviterName(preview.createdByName);
-        setInviterPictureUri(picture ? bytesToDataUri(picture) : undefined);
-        setInviterPublicKey(preview.createdByPublicKey);
+        // A name and nothing else. Someone outside the circle has no
+        // key, so there is no picture to show them — Avatar falls back
+        // to initials.
+        setInviterName(preview.invitedBy);
         setPhase(already ? 'waiting' : 'asking');
       } catch (err) {
         console.error('Failed to load invite preview', err);
@@ -75,7 +70,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
     if (!code) return;
     setPhase('submitting');
     try {
-      await requestToJoin(code);
+      await requestToJoin(code, { circleName, invitedByName: inviterName });
       setPhase('waiting');
       onRequested();
     } catch (err) {
@@ -105,7 +100,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
                 rather than screen-height. The circle's name carries the
                 weight; who sent the key is context, not the headline. */}
             <View style={styles.header}>
-              <Avatar size={48} uri={inviterPictureUri} name={inviterName} colorSeed={inviterPublicKey} />
+              <Avatar size={48} name={inviterName} />
               <View style={styles.headerText}>
                 <ThemedText type="labelSmall" themeColor="muted" numberOfLines={1}>
                   {inviterName ? t('invite.join.invitedBy', { name: inviterName }) : t('invite.join.invited')}

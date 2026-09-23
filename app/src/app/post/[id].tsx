@@ -22,20 +22,19 @@ import { ThemedView } from '@/ui/theme/themed-view';
 import { Fonts, Icons, PhotoAspect, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import {
   getAttachment,
-  getCircleSummary,
-  getFeedPost,
-  getPostComments,
+  getCircle,
+  getMember,
+  getPost,
+  listComments,
+  listReactors,
   getProfile,
-  markPostViewed,
-  getPostReactors,
   type CommentWithAuthor,
-  type FeedPost,
-  type ReactionSummary,
+  type Post,
 } from '@/data/db';
-import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
-import { addComment } from '@/features/post/usecases/comment-on-post';
+import { commentOnPost } from '@/features/post/usecases/comment-on-post';
 import { deletePost } from '@/features/post/usecases/delete-post';
-import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
+import { openPost } from '@/features/post/usecases/open-post';
+import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { showError, showMessage } from '@/core/services/messages';
@@ -59,6 +58,9 @@ function describeReactors(names: string[], expanded: boolean, t: TFunction): str
     : t('post.details.reacted', { names: shown.join(', '), count: shown.length });
 }
 
+/** One emoji's chip: the relay's count, and whether one of them is yours. */
+type ReactionChipView = { emoji: string; count: number; reactedByMe: boolean };
+
 export default function PostDetailsScreen() {
   const { t } = useTranslation();
   const language = useLanguage();
@@ -66,10 +68,12 @@ export default function PostDetailsScreen() {
   const { id: postId, circleId } = useLocalSearchParams<{ id: string; circleId: string }>();
 
   const [circleName, setCircleName] = useState('');
-  const [post, setPost] = useState<FeedPost | null>(null);
+  const [authorName, setAuthorName] = useState('');
+  const [photoStatus, setPhotoStatus] = useState<string | undefined>();
+  const [post, setPost] = useState<Post | null>(null);
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [profileName, setProfileName] = useState<string | undefined>();
-  const [reactions, setReactions] = useState<ReactionSummary[]>([]);
+  const [reactions, setReactions] = useState<ReactionChipView[]>([]);
   const [reactors, setReactors] = useState<string[]>([]);
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -84,42 +88,53 @@ export default function PostDetailsScreen() {
   const load = useCallback(async () => {
     if (!circleId || !postId) return;
 
-    const [circle, feedPost, profile, reactionSummary, details, postComments, identity, isAdmin] = await Promise.all([
-      getCircleSummary(circleId),
-      getFeedPost(circleId, postId),
+    const [circle, storedPost, profile, summary, everyReactor, postComments] = await Promise.all([
+      getCircle(circleId),
+      getPost(postId),
       getProfile(),
-      getReactionsForPost(circleId, postId),
-      getPostReactors(circleId, postId),
-      getPostComments(circleId, postId),
-      getCircleIdentity(circleId),
-      isCircleAdmin(circleId),
+      getReactions(postId),
+      listReactors(postId),
+      listComments(postId),
     ]);
 
     setCircleName(circle?.name ?? '');
-    setPost(feedPost);
+    setPost(storedPost);
     setProfileName(profile?.name);
-    setReactions(reactionSummary);
-    setReactors(details);
     setComments(postComments);
-    const mine = identity != null && bytesToHex(identity.publicKey) === feedPost?.authorPublicKey;
-    setOwnPost(mine);
-    setCanEditPost(mine || isAdmin);
+    setReactors(everyReactor.filter((reactor) => reactor.name).map((reactor) => reactor.name));
 
-    if (feedPost?.hasPhoto) {
+    // One chip per emoji, and whether it is one of yours — the post row
+    // carries a single iReacted, which cannot say which emoji.
+    const mineByEmoji = new Set(
+      everyReactor.filter((reactor) => reactor.accountId === profile?.accountId).map((reactor) => reactor.emoji)
+    );
+    setReactions(
+      Object.entries(summary.counts).map(([emoji, count]) => ({ emoji, count, reactedByMe: mineByEmoji.has(emoji) }))
+    );
+
+    const mine = profile != null && profile.accountId === storedPost?.authorId;
+    setOwnPost(mine);
+    setCanEditPost(mine || (await getMember(circleId, profile?.accountId ?? ''))?.role === 'admin');
+
+    // Every member sees the author's name from the roster, which keeps
+    // someone who has left attributable.
+    const author = storedPost ? await getMember(circleId, storedPost.authorId) : null;
+    setAuthorName(author?.name ?? '');
+
+    const attachment = await getAttachment(circleId, postId);
+    setPhotoStatus(attachment?.status);
+    if (attachment) {
       let uri = ensurePhotoUri(circleId, postId, () => null);
-      if (!uri) {
-        const attachment = await getAttachment(circleId, postId);
-        if (attachment?.bytes) uri = writePhotoFile(circleId, postId, attachment.bytes);
-      }
+      if (!uri && attachment.bytes) uri = writePhotoFile(circleId, postId, attachment.bytes);
       setPhotoUri(uri ?? undefined);
     } else {
       setPhotoUri(undefined);
     }
 
-    // Covers a post the feed hasn't rendered yet (e.g. a future deep link
-    // straight into one) — the feed's own scroll-viewability tracking
-    // already covers the ordinary case of getting here from it.
-    markPostViewed(postId).catch((err) => console.error('Failed to mark the post viewed', err));
+    // Marks it seen and refreshes the comments and reactions behind what
+    // is already on screen, if the relay has touched the post since they
+    // were last fetched.
+    openPost(circleId, postId).catch((err) => console.error('Failed to open the post', err));
   }, [circleId, postId]);
 
   useFocusEffect(
@@ -141,13 +156,10 @@ export default function PostDetailsScreen() {
   async function handleSelectReaction(emoji: string) {
     if (!circleId || !postId) return;
     await toggleReaction(circleId, postId, emoji);
-    const [summary, details] = await Promise.all([
-      getReactionsForPost(circleId, postId),
-      getPostReactors(circleId, postId),
-    ]);
-    setReactions(summary);
-    setReactors(details);
     setShowPicker(false);
+    // Re-read rather than patch: summarise already folds the queued tap
+    // into the relay's counts, so this is the same number the wall shows.
+    await load();
   }
 
   async function handleToggleAlbum() {
@@ -201,8 +213,8 @@ export default function PostDetailsScreen() {
     if (!circleId || !postId || !commentText.trim()) return;
     const body = commentText;
     setCommentText('');
-    await addComment(circleId, postId, body);
-    setComments(await getPostComments(circleId, postId));
+    await commentOnPost(circleId, postId, body);
+    setComments(await listComments(postId));
   }
 
   return (
@@ -241,7 +253,7 @@ export default function PostDetailsScreen() {
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />
             ) : (
-              <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(post?.photoStatus)} />
+              <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(photoStatus)} />
             )}
 
             {post ? (
@@ -257,7 +269,7 @@ export default function PostDetailsScreen() {
                     gets the bookmark in the header that changes it. */}
                 <View style={[styles.byline, post.caption ? null : styles.bylineAlone]}>
                   <ThemedText type="labelSmall" themeColor="muted">
-                    {post.authorName || profileName || t('post.unknownMember')} · {formatTimestamp(post.createdAt, language)}
+                    {authorName || profileName || t('post.unknownMember')} · {formatTimestamp(post.createdAt, language)}
                   </ThemedText>
                   {post.inAlbum ? (
                     <>
@@ -325,9 +337,8 @@ export default function PostDetailsScreen() {
                 <View key={comment.id} style={styles.commentRow}>
                   <Avatar
                     size={36}
-                    uri={comment.authorPicture ? bytesToDataUri(comment.authorPicture) : undefined}
                     name={comment.authorName || profileName}
-                    colorSeed={comment.authorPublicKey}
+                    colorSeed={comment.authorId}
                   />
                   <View style={styles.commentBody}>
                     <View style={styles.commentByline}>
@@ -372,7 +383,7 @@ export default function PostDetailsScreen() {
       <ActionSheet
         visible={showActions}
         onClose={() => setShowActions(false)}
-        title={post?.authorName ? t('post.details.authorsPhoto', { name: post.authorName }) : t('post.details.thisPhoto')}
+        title={authorName ? t('post.details.authorsPhoto', { name: authorName }) : t('post.details.thisPhoto')}
         subtitle={post ? `${formatDay(post.createdAt, language)} · ${circleName}` : undefined}
         avatarUri={photoUri}
         avatarRadius={Radius.input}

@@ -117,6 +117,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	circleinvites.Register(circlesMux, &circleinvites.Service{
 		Store:     circleinvites.NewStore(deps.Circles),
 		Retention: deps.InviteRetention,
+		Profiles:  deps.Accounts,
 	}, readLimit, writeLimit)
 	requests.Register(circlesMux, &requests.Service{
 		Store:     requests.NewStore(deps.Circles),

@@ -21,15 +21,15 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Space, Spacing } from '@/ui/theme/tokens';
 import {
-  getAllPendingJoinRequests,
-  getCircleMemberCount,
-  getNewestPostCreatedAt,
+  countMembers,
+  getFeed,
   getProfile,
   getUnreadCount,
   listCircles,
-  type CircleListRow,
+  listRequests,
+  type Circle,
+  type PendingRequest,
 } from '@/data/db';
-import type { PendingJoinRequest } from '@/data/db/pending-join-requests';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
@@ -39,10 +39,10 @@ import { bytesToDataUri } from '@/core/photo/image';
 import { formatAgo } from '@/core/utils/time';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
 import { showError } from '@/core/services/messages';
-import { syncAllCircles } from '@/core/sync/sync-circles';
+import { syncCircles } from '@/core/sync/sync-circles';
 import { useLanguage } from '@/core/i18n/use-language';
 
-type CircleListItem = CircleListRow & {
+type CircleListItem = Circle & {
   memberCount: number;
   photoUri?: string;
   newCount: number;
@@ -52,14 +52,11 @@ type CircleListItem = CircleListRow & {
 
 /**
  * The unread badge's count — 0 (not shown at all) whenever this device has
- * no circle identity yet, which briefly happens between joining and that
- * join actually completing. No badge is the honest state there, not an
- * error to surface.
+ * Everything newer than the last time this circle was opened — posts and
+ * roster changes alike, which is what the row's dot counts.
  */
-async function resolveUnreadCount(circle: CircleListRow): Promise<number> {
-  const identity = await getCircleIdentity(circle.id);
-  if (!identity) return 0;
-  return getUnreadCount(circle.id, bytesToHex(identity.publicKey), circle.createdAt, circle.lastViewedAt);
+async function resolveUnreadCount(circle: Circle): Promise<number> {
+  return getUnreadCount(circle.id);
 }
 
 export default function CircleListScreen() {
@@ -75,7 +72,7 @@ export default function CircleListScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // Circles asked for but not yet let into — shown above the real ones so
   // a request isn't invisible until you happen to reopen /join/pending.
-  const [pending, setPending] = useState<PendingJoinRequest[]>([]);
+  const [pending, setPending] = useState<PendingRequest[]>([]);
   // The invite code a link handed over, if any — the join sheet opens over
   // this screen rather than being a route of its own.
   const [joinCode, setJoinCode] = useState<string | null>(null);
@@ -95,13 +92,15 @@ export default function CircleListScreen() {
     const allCircles = await listCircles();
     const withCounts = await Promise.all(
       allCircles.map(async (circle) => {
-        const [memberCount, photoUri, newCount, newestPostAt] = await Promise.all([
-          getCircleMemberCount(circle.id),
+        const [memberCount, photoUri, newCount, newest] = await Promise.all([
+          countMembers(circle.id),
           resolveCircleCoverUri(circle.id),
           resolveUnreadCount(circle),
-          getNewestPostCreatedAt(circle.id),
+          getFeed(circle.id, 1),
         ]);
-        return { ...circle, memberCount, photoUri, newCount, newestPostAt };
+        // The newest post's own clock, for the row's timestamp. The
+        // circle's lastEntryAt is the relay's and counts activity too.
+        return { ...circle, memberCount, photoUri, newCount, newestPostAt: newest[0]?.createdAt ?? 0 };
       }),
     );
     setCircles(withCounts);
@@ -115,22 +114,22 @@ export default function CircleListScreen() {
    * circle doesn't show until something else triggers a read.
    */
   const completePendingJoins = useCallback(async () => {
-    const requests = await getAllPendingJoinRequests();
+    const requests = await listRequests();
     setPending(requests);
     const results = await Promise.all(
       requests.map((request) =>
-        checkPendingJoinRequest(request.id).catch((err) => {
+        checkPendingJoinRequest(request.circleId).catch((err: unknown) => {
           console.error('Failed to check a pending join request', err);
-          return { joined: false };
+          return { state: 'pending' as const };
         }),
       ),
     );
-    // Re-read rather than filtering locally: completing a join deletes the
-    // row, and a request that was denied or aged out is gone too.
-    if (results.some((result) => result.joined || 'gone' in result)) {
-      setPending(await getAllPendingJoinRequests());
+    // Re-read rather than filtering locally: an approved ask is dropped
+    // when its circle arrives, and a denied or aged-out one is gone too.
+    if (results.some((result) => result.state !== 'pending')) {
+      setPending(await listRequests());
     }
-    return results.some((result) => result.joined);
+    return results.some((result) => result.state === 'approved');
   }, []);
 
   // On mount as well as on focus. A screen underneath a modal never gains
@@ -173,7 +172,7 @@ export default function CircleListScreen() {
     }, [loadFromDatabase, completePendingJoins]),
   );
 
-  const handleCancelPending = useCallback((request: PendingJoinRequest) => {
+  const handleCancelPending = useCallback((request: PendingRequest) => {
     Alert.alert(t('circle.list.cancelPendingTitle', { name: request.circleName }), t('circle.list.cancelPendingMessage'), [
       { text: t('circle.list.keepWaiting'), style: 'cancel' },
       {
@@ -181,11 +180,11 @@ export default function CircleListScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await cancelPendingJoinRequest(request.id);
+            await cancelPendingJoinRequest(request.circleId);
           } catch (err) {
             console.error('Failed to withdraw join request', err);
           }
-          setPending(await getAllPendingJoinRequests());
+          setPending(await listRequests());
         },
       },
     ]);
@@ -201,7 +200,7 @@ export default function CircleListScreen() {
       // it used to be the one gesture that couldn't complete a join.
       await completePendingJoins().catch((err) => console.error('Failed to complete pending joins', err));
 
-      const failed = await syncAllCircles();
+      const failed = await syncCircles();
       nudgePhotoQueue();
       if (failed > 0) showError(t('circle.list.refreshFailed'));
     } finally {
@@ -235,11 +234,11 @@ export default function CircleListScreen() {
                   </ThemedText>
                   {pending.map((request) => (
                     <PendingCircleCard
-                      key={request.id}
+                      key={request.circleId}
                       circleName={request.circleName}
-                      createdByName={request.createdByName}
+                      createdByName={request.invitedByName}
                       submittedAt={request.submittedAt}
-                      onPress={() => router.push({ pathname: '/join/pending', params: { requestId: request.id } })}
+                      onPress={() => router.push({ pathname: '/join/pending', params: { circleId: request.circleId } })}
                       onCancel={() => handleCancelPending(request)}
                     />
                   ))}
@@ -298,9 +297,9 @@ export default function CircleListScreen() {
         code={joinCode}
         onClose={() => setJoinCode(null)}
         onRequested={() => {
-          getAllPendingJoinRequests()
+          listRequests()
             .then(setPending)
-            .catch((err) => console.error('Failed to reload pending requests', err));
+            .catch((err: unknown) => console.error('Failed to reload pending requests', err));
         }}
       />
 

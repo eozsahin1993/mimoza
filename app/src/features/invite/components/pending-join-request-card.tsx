@@ -8,12 +8,12 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius, Space } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
-import type { PendingRequest } from '@/features/invite/usecases/invite-to-circle';
+import type { JoinRequest } from '@/features/invite/services/invite-relay';
 import { formatAgo } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
 
 export type PendingJoinRequestCardProps = {
-  request: PendingRequest;
+  request: JoinRequest;
   /** Disables both buttons while this specific request (or another one in the same list) is being acted on. */
   busy: boolean;
   onApprove: () => void;
@@ -37,9 +37,9 @@ export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: Pen
   return (
     <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipIdleBorder }]}>
       <View style={styles.header}>
-        <Avatar size={44} uri={request.pictureUri} name={request.selfReportedName} colorSeed={request.identityPublicKey} />
+        <Avatar size={44} name={request.name ?? ''} colorSeed={request.accountId} />
         <View style={styles.text}>
-          <ThemedText type="titleMedium">{request.selfReportedName || t('invite.request.someone')}</ThemedText>
+          <ThemedText type="titleMedium">{request.name || t('invite.request.someone')}</ThemedText>
           <ThemedText type="labelSmall" themeColor="muted">
             {t('invite.request.tappedLink', { ago: formatAgo(request.createdAt, language) })}
           </ThemedText>

@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { PhotoAspect, Radius, Space, Spacing, Type } from '@/ui/theme/tokens';
-import { getCircleSummary, getCircleMembers } from '@/data/db';
+import { getCircle, listMembers } from '@/data/db';
 import { createPost } from '@/features/post/usecases/create-post';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
@@ -31,7 +31,7 @@ export default function NewPostScreen() {
 
   useEffect(() => {
     if (!circleId) return;
-    Promise.all([getCircleSummary(circleId), getCircleMembers(circleId)]).then(([circle, members]) => {
+    Promise.all([getCircle(circleId), listMembers(circleId)]).then(([circle, members]) => {
       setCircleName(circle?.name ?? '');
       setMemberCount(members.length);
     });
