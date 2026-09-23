@@ -54,8 +54,8 @@ rebuild, not a retry.
       `com.eozsahin.mimoza.staging`, App Group
       `group.com.eozsahin.mimoza.staging`, `google-services.staging.json`
       (Firebase project `mimoza-staging`). The App Group is the one that
-      matters — a shared group would mean staging reading prod's master
-      seed and circles.
+      matters — a shared group would mean staging reading prod's account
+      keypair and content keys.
 - [ ] iOS: `npm run ios:staging`. Android: `npm run android:staging`.
       Both load `.env.staging` through `dotenv`; a bundler started
       without it now fails the build instead of quietly inlining dev's
@@ -73,8 +73,10 @@ rebuild, not a retry.
       OAuth clients.
 - [ ] Fresh install all the way through: onboarding, profile, create a
       circle, post a photo.
-- [ ] Recovery, on a second device: phrase restore, and device transfer
-      by QR.
+- [ ] Recovery, on a second device: sign in, and confirm the account
+      keypair carried across via iCloud Keychain (or a fresh one is
+      published and another member's device reseals it — see
+      `RELAY_DESIGN.md`'s New device section).
 
 ## Two things that will bite
 
