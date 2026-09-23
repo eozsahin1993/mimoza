@@ -6,16 +6,16 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
-	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/notify"
 )
 
 // A real key, generated per run — the JWT path is genuinely exercised
@@ -43,51 +43,6 @@ func TestHostSelection(t *testing.T) {
 	}
 }
 
-func TestSendPostsAnAlertWithMutableContent(t *testing.T) {
-	var got map[string]any
-	var headers http.Header
-	apnsAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		headers = r.Header.Clone()
-		_ = json.NewDecoder(r.Body).Decode(&got)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer apnsAPI.Close()
-
-	sender := New(testKey(t), "com.eozsahin.mimoza", false)
-	sender.Client.Transport = redirectTo(apnsAPI.URL)
-
-	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("ciphertext")); err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.HasPrefix(headers.Get("Authorization"), "bearer ") {
-		t.Fatalf("expected a bearer provider token, got %q", headers.Get("Authorization"))
-	}
-	if headers.Get("Apns-Topic") != "com.eozsahin.mimoza" {
-		t.Fatalf("wrong topic: %q", headers.Get("Apns-Topic"))
-	}
-	if headers.Get("Apns-Push-Type") != "alert" {
-		t.Fatalf("expected an alert push, got %q", headers.Get("Apns-Push-Type"))
-	}
-
-	aps, ok := got["aps"].(map[string]any)
-	if !ok {
-		t.Fatalf("missing aps dictionary: %v", got)
-	}
-	if aps["alert"] != push.Placeholder {
-		t.Fatalf("expected the fixed placeholder, got %v", aps["alert"])
-	}
-	if aps["mutable-content"].(float64) != 1 {
-		t.Fatal("expected mutable-content so the extension can rewrite the alert")
-	}
-	if got["payload"] != base64.StdEncoding.EncodeToString([]byte("ciphertext")) {
-		t.Fatalf("payload did not survive: %v", got["payload"])
-	}
-	if got["pushRoutingId"] != "routing-1" {
-		t.Fatalf("the device needs the routing id to find its circle, got %v", got["pushRoutingId"])
-	}
-}
-
 func TestProviderTokenIsReusedAcrossSends(t *testing.T) {
 	var authHeaders []string
 	apnsAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +55,7 @@ func TestProviderTokenIsReusedAcrossSends(t *testing.T) {
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	for range 2 {
-		if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -123,11 +78,11 @@ func TestAnExpiredProviderTokenIsReminted(t *testing.T) {
 	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
-	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
 		t.Fatal(err)
 	}
 	sender.tokens.expiresAt = time.Now().Add(-time.Hour)
-	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,7 +100,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
-	err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
+	err := sender.Send(context.Background(), "device-token", testMessage())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -161,7 +116,7 @@ func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 		PrivateKey: "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 
-	err := New(key, "com.eozsahin.mimoza", false).Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
+	err := New(key, "com.eozsahin.mimoza", false).Send(context.Background(), "device-token", testMessage())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -187,27 +142,107 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
-// An invite address's line shows when the device can't write its own; the
-// kind rides along so it can pick its own.
-func TestSendAttachesTheKindsLine(t *testing.T) {
+// testMessage is an ordinary card: the loc keys and the args a device
+// renders them with.
+func testMessage() notify.Message {
+	return notify.Message{
+		TitleKey: "push.title_circle",
+		BodyKey:  "push.posted",
+		Args:     []string{"Sarah", "Family"},
+		Data:     map[string]string{"circleId": "circle-1", "entryId": "post-1"},
+	}
+}
+
+// The card is localization keys and arguments, never text: iOS renders
+// it against the app's own strings, which is why no extension ships.
+func TestSendPostsLocalizationKeys(t *testing.T) {
 	var got map[string]any
+	var headers http.Header
 	apnsAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers = r.Header.Clone()
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		w.WriteHeader(http.StatusOK)
 	}))
 	defer apnsAPI.Close()
 
 	sender := New(testKey(t), "com.eozsahin.mimoza", false)
-	sender.Client.Transport = redirectTo(apnsAPI.URL)
+	sender.Client = apnsAPI.Client()
+	sender.Production = false
+	transport := apnsAPI.Client().Transport
+	sender.Client = &http.Client{Transport: rewriteHost{to: apnsAPI.URL, inner: transport}}
 
-	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindInvite, 0, []byte("x")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
 		t.Fatal(err)
 	}
 
-	if got["aps"].(map[string]any)["alert"] != push.KindInvite.Alert() {
-		t.Fatalf("expected the invite line, got %v", got["aps"])
+	if headers.Get("apns-push-type") != "alert" || headers.Get("apns-priority") != "10" {
+		t.Errorf("headers = %v", headers)
 	}
-	if got["kind"] != string(push.KindInvite) {
-		t.Fatalf("expected the kind, got %v", got["kind"])
+	aps, _ := got["aps"].(map[string]any)
+	alert, _ := aps["alert"].(map[string]any)
+	if alert["loc-key"] != "push.posted" || alert["title-loc-key"] != "push.title_circle" {
+		t.Fatalf("alert = %v", alert)
 	}
+	args, _ := alert["loc-args"].([]any)
+	if len(args) != 2 || args[0] != "Sarah" {
+		t.Errorf("loc-args = %v", args)
+	}
+	if _, carries := aps["content-available"]; carries {
+		t.Error("an ordinary card must not also be a silent push")
+	}
+	// The body is never in the payload: the relay cannot read it.
+	body, _ := json.Marshal(got)
+	if strings.Contains(string(body), "ciphertext") || strings.Contains(string(body), "payload") {
+		t.Errorf("payload carries content: %s", body)
+	}
+	data, _ := got["data"].(map[string]any)
+	if data["circleId"] != "circle-1" {
+		t.Errorf("data = %v", data)
+	}
+}
+
+// A silent push carries no card. Apple throttles these and drops them
+// after a force quit, so nothing user-visible depends on one arriving.
+func TestSendPostsASilentPushWithNoAlert(t *testing.T) {
+	var got map[string]any
+	var headers http.Header
+	apnsAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers = r.Header.Clone()
+		_ = json.NewDecoder(r.Body).Decode(&got)
+	}))
+	defer apnsAPI.Close()
+
+	sender := New(testKey(t), "com.eozsahin.mimoza", false)
+	sender.Client = &http.Client{Transport: rewriteHost{to: apnsAPI.URL, inner: apnsAPI.Client().Transport}}
+
+	message := testMessage()
+	message.Silent = true
+	if err := sender.Send(context.Background(), "device-token", message); err != nil {
+		t.Fatal(err)
+	}
+
+	if headers.Get("apns-push-type") != "background" || headers.Get("apns-priority") != "5" {
+		t.Errorf("headers = %v", headers)
+	}
+	aps, _ := got["aps"].(map[string]any)
+	if _, carries := aps["alert"]; carries {
+		t.Error("a silent push must carry no alert")
+	}
+	if aps["content-available"] != float64(1) {
+		t.Errorf("aps = %v", aps)
+	}
+}
+
+// rewriteHost points the sender's fixed Apple host at the test server.
+type rewriteHost struct {
+	to    string
+	inner http.RoundTripper
+}
+
+func (r rewriteHost) RoundTrip(request *http.Request) (*http.Response, error) {
+	target, err := url.Parse(r.to)
+	if err != nil {
+		return nil, err
+	}
+	request.URL.Scheme, request.URL.Host = target.Scheme, target.Host
+	return r.inner.RoundTrip(request)
 }

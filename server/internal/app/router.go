@@ -24,21 +24,11 @@ import (
 	"mimoza-relay/internal/circles/reactions"
 	"mimoza-relay/internal/circles/requests"
 	"mimoza-relay/internal/invite"
-	"mimoza-relay/internal/push"
-	pushhttp "mimoza-relay/internal/push/http"
+	"mimoza-relay/internal/notify"
 	"mimoza-relay/internal/ratelimit"
 	"mimoza-relay/internal/synclog"
 	"mimoza-relay/internal/util/httputil"
 )
-
-// PushDeps groups the push slice's dependencies.
-type PushDeps struct {
-	Store          push.Store
-	RecipientLimit ratelimit.Store
-	// Nil until the platform credentials exist: fanout still resolves and
-	// reports, it just drops the deliveries.
-	Dispatch func(push.Delivery, int64, []byte)
-}
 
 // Deps is everything the router wires into its endpoints. Named fields
 // rather than positional: two ratelimit.Store and two *oidcverify.Verifier
@@ -70,7 +60,9 @@ type Deps struct {
 	// deletion both still work; deletion just cannot revoke the grant
 	// behind an Apple account (Guideline 5.1.1(v)).
 	AppleID *appleid.Client
-	Push    PushDeps
+	// Send delivers one notification to one device, or is nil where an
+	// environment has no push credentials.
+	Send notify.Sender
 }
 
 func NewRouter(deps Deps) *http.ServeMux {
@@ -92,6 +84,14 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// while the budget wraps each handler individually — reads and writes
 	// don't share one. Each endpoint still checks its own write token or
 	// authority signature beyond the session.
+	// One notifier for every slice that writes: it resolves who should
+	// hear about a change and tells their phones.
+	notifier := &notify.Notifier{
+		Circles:  members.NewStore(deps.Circles),
+		Accounts: deps.Accounts,
+		Send:     deps.Send,
+	}
+
 	circlesMux := http.NewServeMux()
 	circle.Register(circlesMux, &circle.Service{
 		Store:    circle.NewStore(deps.Circles),
@@ -102,13 +102,21 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		Store:    members.NewStore(deps.Circles),
 		Profiles: deps.Accounts,
 		Blobs:    deps.Blobs,
+		Notify:   notifier,
 	}, readLimit, writeLimit)
 	posts.Register(circlesMux, &posts.Service{
-		Store: posts.NewStore(deps.Circles),
-		Blobs: deps.Blobs,
+		Store:  posts.NewStore(deps.Circles),
+		Blobs:  deps.Blobs,
+		Notify: notifier,
 	}, readLimit, writeLimit)
-	comments.Register(circlesMux, &comments.Service{Store: comments.NewStore(deps.Circles)}, writeLimit)
-	reactions.Register(circlesMux, &reactions.Service{Store: reactions.NewStore(deps.Circles)}, writeLimit)
+	comments.Register(circlesMux, &comments.Service{
+		Store:  comments.NewStore(deps.Circles),
+		Notify: notifier,
+	}, writeLimit)
+	reactions.Register(circlesMux, &reactions.Service{
+		Store:  reactions.NewStore(deps.Circles),
+		Notify: notifier,
+	}, writeLimit)
 	circleinvites.Register(circlesMux, &circleinvites.Service{
 		Store:     circleinvites.NewStore(deps.Circles),
 		Retention: deps.InviteRetention,
@@ -117,6 +125,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		Store:     requests.NewStore(deps.Circles),
 		Profiles:  deps.Accounts,
 		Retention: deps.InviteRetention,
+		Notify:    notifier,
 	}, readLimit, writeLimit)
 	mux.Handle("/circles", auth.RequireSession(deps.Auth, httputil.LogRoutes(circlesMux)))
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, httputil.LogRoutes(circlesMux)))
@@ -138,24 +147,6 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	deletion.Register(mux, deleteAccountService, func(h http.Handler) http.Handler {
 		return auth.RequireSession(deps.Auth, h)
 	})
-
-	// Registration is session-gated; the send route is not, and mounts on
-	// the parent mux — see pushhttp.FanoutHandler. "POST /push/send" is more
-	// specific than "/push/" so it wins the match; changing either pattern
-	// risks silently authenticating the one route that must not be.
-	if deps.Push.Store != nil {
-		pushService := &push.Service{PushStore: deps.Push.Store, RecipientLimit: deps.Push.RecipientLimit}
-
-		pushMux := http.NewServeMux()
-		pushhttp.Register(pushMux, pushService)
-		mux.Handle("/push/", auth.RequireSession(deps.Auth, httputil.LogRoutes(pushMux)))
-
-		dispatch := deps.Push.Dispatch
-		if dispatch == nil {
-			dispatch = func(push.Delivery, int64, []byte) {}
-		}
-		pushhttp.RegisterFanout(mux, &pushhttp.FanoutHandler{Service: pushService, Dispatch: dispatch})
-	}
 
 	google.Register(mux, &google.Service{AuthStore: deps.Auth, Verifier: deps.Google, Accounts: deps.Accounts})
 	apple.Register(mux, &apple.Service{AuthStore: deps.Auth, Verifier: deps.Apple, AppleID: deps.AppleID, Accounts: deps.Accounts})

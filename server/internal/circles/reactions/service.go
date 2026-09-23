@@ -15,6 +15,8 @@ type store interface {
 
 type Service struct {
 	Store store
+	// Notify is nil in tests that do not care who hears about a write.
+	Notify circles.Notifier
 }
 
 // Set replaces this member's reaction. The tag is what the relay counts
@@ -32,7 +34,17 @@ func (s *Service) Set(ctx context.Context, circleID, accountID string, reaction 
 	}
 
 	reaction.AccountID = accountID
-	return s.Store.SetReaction(ctx, circleID, reaction)
+	post, err := s.Store.SetReaction(ctx, circleID, reaction)
+	if err != nil {
+		return circles.Entry{}, err
+	}
+	if s.Notify != nil {
+		s.Notify.Notify(ctx, circles.Notification{
+			Kind: circles.NotifyReaction, CircleID: circleID, ActorID: accountID,
+			ParentID: reaction.PostID, AuthorID: post.AuthorID,
+		})
+	}
+	return post, nil
 }
 
 func (s *Service) Clear(ctx context.Context, circleID, postID, accountID string) (circles.Entry, error) {

@@ -29,7 +29,6 @@ type Resources struct {
 	CirclesTableName   string
 	InviteTableName    string
 	RateLimitTableName string
-	PushTableName      string
 }
 
 // ResourcesFor derives every resource name from one prefix.
@@ -42,7 +41,6 @@ func ResourcesFor(prefix string) Resources {
 		CirclesTableName:   prefix + "-circles",
 		InviteTableName:    prefix + "-invites",
 		RateLimitTableName: prefix + "-rate-limit",
-		PushTableName:      prefix + "-push",
 	}
 }
 
@@ -77,11 +75,6 @@ type Config struct {
 	// real traffic without a redeploy.
 	RateLimitWriteMaxRequests int64
 	RateLimitReadMaxRequests  int64
-	// RateLimitPushMaxRequests budgets how many pushes one recipient
-	// routing id may receive per window. Generous on purpose: a lively
-	// circle legitimately generates a lot of received notifications, so
-	// this bounds the pathological case rather than the merely noisy one.
-	RateLimitPushMaxRequests int64
 	// RateLimitWindowMinutes is the fixed window both budgets reset on.
 	RateLimitWindowMinutes int64
 	// GoogleClientIDIOS/Android/Web are the accepted "aud" values for
@@ -170,7 +163,6 @@ func Load() Config {
 		APNSProduction:             envOr("APNS_PRODUCTION", "false") == "true",
 		RateLimitWriteMaxRequests:  intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
 		RateLimitReadMaxRequests:   intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
-		RateLimitPushMaxRequests:   intEnv("RATE_LIMIT_PUSH_MAX_REQUESTS", 500),
 		RateLimitWindowMinutes:     intEnv("RATE_LIMIT_WINDOW_MINUTES", 10),
 		GoogleClientIDIOS:          envOr("GOOGLE_CLIENT_ID_IOS", ""),
 		GoogleClientIDAndroid:      envOr("GOOGLE_CLIENT_ID_ANDROID", ""),

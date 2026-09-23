@@ -41,6 +41,8 @@ type bucket interface {
 
 type Service struct {
 	Store store
+	// Notify is nil in tests that do not care who hears about a change.
+	Notify circles.Notifier
 	// Blobs is nil in tests that do not care about bytes.
 	Blobs bucket
 	// Profiles fills in names, avatars and the public keys members seal
@@ -122,7 +124,11 @@ func (s *Service) SetRole(ctx context.Context, circleID, subjectID, role, actorI
 			return err
 		}
 	}
-	return s.Store.SetRole(ctx, circleID, subjectID, role, actorID, s.nameOf(ctx, subjectID))
+	if err := s.Store.SetRole(ctx, circleID, subjectID, role, actorID, s.nameOf(ctx, subjectID)); err != nil {
+		return err
+	}
+	s.wake(ctx, circleID, actorID)
+	return nil
 }
 
 func (s *Service) SetNotifyLevel(ctx context.Context, circleID, subjectID, level, actorID string) error {
@@ -209,6 +215,7 @@ func (s *Service) Remove(ctx context.Context, circleID, subjectID, actorID strin
 		return err
 	}
 	s.retireAvatar(ctx, circleID, subjectID, departing.AvatarID, "")
+	s.wake(ctx, circleID, actorID)
 	return nil
 }
 
@@ -226,6 +233,7 @@ func (s *Service) Leave(ctx context.Context, circleID, accountID string) error {
 		return err
 	}
 	s.retireAvatar(ctx, circleID, accountID, departing.AvatarID, "")
+	s.wake(ctx, circleID, accountID)
 	return nil
 }
 
@@ -252,7 +260,29 @@ func (s *Service) Rewrap(ctx context.Context, circleID, subjectID, actorID strin
 			return circles.ErrIncompleteKeys
 		}
 	}
-	return s.Store.ReplaceSealedKeys(ctx, circleID, subjectID, sealed)
+	if err := s.Store.ReplaceSealedKeys(ctx, circleID, subjectID, sealed); err != nil {
+		return err
+	}
+	// The member who was waiting to be let back in is the one who wants
+	// to hear about this.
+	if s.Notify != nil {
+		s.Notify.Notify(ctx, circles.Notification{
+			Kind: circles.NotifyRewrapped, CircleID: circleID,
+			ActorID: actorID, Only: []string{subjectID},
+		})
+	}
+	return nil
+}
+
+// wake is the silent push behind every roster change: a phone in a
+// pocket syncs and sees the new roster, whatever it has silenced.
+func (s *Service) wake(ctx context.Context, circleID, actorID string) {
+	if s.Notify == nil {
+		return
+	}
+	s.Notify.Notify(ctx, circles.Notification{
+		Kind: circles.NotifyRoster, CircleID: circleID, ActorID: actorID,
+	})
 }
 
 // nameOf is the name to stamp on the activity entry this change writes.

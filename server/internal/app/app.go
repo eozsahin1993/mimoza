@@ -22,7 +22,7 @@ import (
 	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/oidcverify"
 	"mimoza-relay/internal/config"
-	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/notify"
 	"mimoza-relay/internal/push/apns"
 	"mimoza-relay/internal/push/fcm"
 
@@ -31,7 +31,6 @@ import (
 	blobstore "mimoza-relay/internal/blobs/s3"
 	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
-	pushdynamodb "mimoza-relay/internal/push/dynamodb"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
 	"mimoza-relay/internal/synclog/cdn"
 	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
@@ -82,8 +81,16 @@ func AWSDeps(cfg config.Config, awsCfg aws.Config) Deps {
 		return ratelimitdynamodb.New(dynamo(), cfg.RateLimitTableName, kind, int(max), cfg.RateLimitWindow())
 	}
 
-	fcmDispatch := fcm.NewDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile)
-	apnsDispatch := apns.NewDispatcher(awsCfg, cfg.APNSAuthKeyParameter, cfg.APNSAuthKeyFile, cfg.APNSKeyID, cfg.APNSTeamID, cfg.APNSTopic, cfg.APNSProduction)
+	// Each sender gates on its own platform, so calling both is a no-op
+	// for whichever one a device is not on.
+	toAndroid := fcm.NewSender(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile)
+	toIOS := apns.NewSender(awsCfg, cfg.APNSAuthKeyParameter, cfg.APNSAuthKeyFile, cfg.APNSKeyID, cfg.APNSTeamID, cfg.APNSTopic, cfg.APNSProduction)
+	send := func(ctx context.Context, token, platform string, message notify.Message) error {
+		if err := toAndroid(ctx, token, platform, message); err != nil {
+			return err
+		}
+		return toIOS(ctx, token, platform, message)
+	}
 
 	// Whether downloads come from CloudFront is decided at runtime by
 	// whether its settings parameter exists — see internal/synclog/cdn.
@@ -117,17 +124,7 @@ func AWSDeps(cfg config.Config, awsCfg aws.Config) Deps {
 		Google:          oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb)),
 		Apple:           oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS)),
 		AppleID:         appleID,
-		Push: PushDeps{
-			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName, cfg.InviteRetentionDays),
-			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),
-			// Each dispatcher gates on its own platform internally (see
-			// fcm.NewDispatcher/apns.NewDispatcher), so calling both is a
-			// no-op for whichever one a delivery isn't for.
-			Dispatch: func(delivery push.Delivery, keyVersion int64, payload []byte) {
-				fcmDispatch(delivery, keyVersion, payload)
-				apnsDispatch(delivery, keyVersion, payload)
-			},
-		},
+		Send:            send,
 	}
 }
 

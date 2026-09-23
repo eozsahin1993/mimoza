@@ -17,6 +17,8 @@ type store interface {
 
 type Service struct {
 	Store store
+	// Notify is nil in tests that do not care who hears about a write.
+	Notify circles.Notifier
 }
 
 // Add writes a comment and hands back the post it changed, so the device
@@ -34,7 +36,17 @@ func (s *Service) Add(ctx context.Context, circleID, accountID string, comment c
 	}
 
 	comment.AuthorID = accountID
-	return s.Store.AddComment(ctx, circleID, comment)
+	post, err := s.Store.AddComment(ctx, circleID, comment)
+	if err != nil {
+		return circles.Entry{}, err
+	}
+	if s.Notify != nil {
+		s.Notify.Notify(ctx, circles.Notification{
+			Kind: circles.NotifyComment, CircleID: circleID, ActorID: accountID,
+			EntryID: comment.ID, ParentID: comment.PostID, AuthorID: post.AuthorID,
+		})
+	}
+	return post, nil
 }
 
 // Delete is the comment's author or an admin. The post's author has no

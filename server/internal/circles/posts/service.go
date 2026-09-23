@@ -30,6 +30,8 @@ type bucket interface {
 
 type Service struct {
 	Store store
+	// Notify is nil in tests that do not care who hears about a write.
+	Notify circles.Notifier
 	// Blobs is nil in tests that do not care about bytes; a post with no
 	// photo never reaches it either way.
 	Blobs bucket
@@ -78,7 +80,16 @@ func (s *Service) Put(ctx context.Context, circleID, accountID string, entry cir
 
 	entry.AuthorID = accountID
 	entry.Type = circles.TypePost
-	return s.Store.PutPost(ctx, circleID, entry)
+	written, err := s.Store.PutPost(ctx, circleID, entry)
+	if err != nil {
+		return circles.Entry{}, err
+	}
+	if s.Notify != nil {
+		s.Notify.Notify(ctx, circles.Notification{
+			Kind: circles.NotifyPost, CircleID: circleID, ActorID: accountID, EntryID: written.ID,
+		})
+	}
+	return written, nil
 }
 
 // Walk is one page of a stream. The cursor says which stream and where;

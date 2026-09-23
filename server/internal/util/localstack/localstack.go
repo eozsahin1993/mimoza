@@ -102,7 +102,6 @@ func RelayConfig(names config.Resources) config.Config {
 		Resources:                 names,
 		RateLimitWriteMaxRequests: 500,
 		RateLimitReadMaxRequests:  2000,
-		RateLimitPushMaxRequests:  500,
 		RateLimitWindowMinutes:    10,
 		InviteRetentionDays:       config.DefaultInviteRetentionDays,
 		// LocalStack doesn't resolve virtual-hosted-style bucket
@@ -131,7 +130,6 @@ func tables(n config.Resources) []struct {
 	}{
 		{n.TableName, WithSortKey},
 		{n.InviteTableName, WithSortKey},
-		{n.PushTableName, WithSortKey},
 		{n.AccountsTableName, WithSortKey},
 		{n.CirclesTableName, WithSortKey},
 		{n.SessionsTableName, HashOnly},

@@ -45,8 +45,6 @@ import (
 	"mimoza-relay/internal/config"
 	"mimoza-relay/internal/invite"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
-	"mimoza-relay/internal/push"
-	pushdynamodb "mimoza-relay/internal/push/dynamodb"
 	"mimoza-relay/internal/ratelimit"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
 	"mimoza-relay/internal/synclog"
@@ -66,7 +64,6 @@ var (
 	sessionsTableName  = shared.SessionsTableName
 	inviteTableName    = shared.InviteTableName
 	rateLimitTableName = shared.RateLimitTableName
-	pushTableName      = shared.PushTableName
 )
 
 var (
@@ -435,36 +432,6 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 	return client, inviteTableName
 }
 
-// NewPushStore returns a real dynamodb-backed push.Store against
-// LocalStack, creating the push table once per test binary run (see
-// server/provision/modules/storage/push_table.tf).
-func NewPushStore(t testing.TB) push.Store {
-	t.Helper()
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-
-	pushTableOnce.Do(func() {
-		pushTableErr = localstack.CreateTable(context.Background(), client, pushTableName, localstack.WithSortKey)
-	})
-	if pushTableErr != nil {
-		unreachable(t, "DynamoDB", pushTableErr)
-	}
-
-	return pushdynamodb.New(client, pushTableName, config.DefaultInviteRetentionDays)
-}
-
-// NewPushStoreWithRetention is NewPushStore with a chosen invite retention
-// — negative to write temporary rows that have already expired.
-func NewPushStoreWithRetention(t testing.TB, retentionDays int64) push.Store {
-	t.Helper()
-	NewPushStore(t)
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-	return pushdynamodb.New(client, pushTableName, retentionDays)
-}
-
 // NewRateLimitStore returns a real dynamodb-backed ratelimit.Store
 // against LocalStack, creating the rate-limit table once per test binary
 // run (see server/provision/modules/storage/rate_limit_table.tf). Unlike the other New*
@@ -559,27 +526,6 @@ func RawItem(t testing.TB, pk, sk string) (map[string]ddbtypes.AttributeValue, e
 	})
 	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
 		TableName: aws.String(tableName),
-		Key: map[string]ddbtypes.AttributeValue{
-			"pk": &ddbtypes.AttributeValueMemberS{Value: pk},
-			"sk": &ddbtypes.AttributeValueMemberS{Value: sk},
-		},
-		ConsistentRead: aws.Bool(true),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return out.Item, nil
-}
-
-// RawPushItem is RawItem against the push table, for the expiresAt the
-// push Store sets but never returns.
-func RawPushItem(t testing.TB, pk, sk string) (map[string]ddbtypes.AttributeValue, error) {
-	t.Helper()
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
-		TableName: aws.String(pushTableName),
 		Key: map[string]ddbtypes.AttributeValue{
 			"pk": &ddbtypes.AttributeValueMemberS{Value: pk},
 			"sk": &ddbtypes.AttributeValueMemberS{Value: sk},

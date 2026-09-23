@@ -2,25 +2,22 @@ package fcm
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
-	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/accounts"
+	"mimoza-relay/internal/notify"
 )
 
-// NewDispatcher builds a push.Deps.Dispatch backed by FCM. Lived in
-// internal/app before this — app.Deps builds every store from config, but
-// this is push delivery logic, not dependency wiring, and belongs beside
-// the rest of what this package already owns (Loader, Sender).
+// NewSender builds the Android half of notify.Sender.
 //
 // The credential is fetched on the first send rather than at boot, so a
-// relay without one still serves every other route — push is the only
-// thing that needs it. Fire-and-forget by design: a push is best-effort,
-// and a failed one must not fail the append that triggered it.
-func NewDispatcher(awsCfg aws.Config, parameterName, filePath string) func(push.Delivery, int64, []byte) {
+// relay without one still serves every other route: push is the only
+// thing that needs it.
+func NewSender(awsCfg aws.Config, parameterName, filePath string) notify.Sender {
 	loader := &Loader{
 		Client:        ssm.NewFromConfig(awsCfg),
 		ParameterName: parameterName,
@@ -31,27 +28,22 @@ func NewDispatcher(awsCfg aws.Config, parameterName, filePath string) func(push.
 		sender *Sender
 	)
 
-	return func(delivery push.Delivery, keyVersion int64, payload []byte) {
-		// iOS goes direct to APNs, which isn't built yet.
-		if delivery.Platform != "android" {
-			return
+	return func(ctx context.Context, token, platform string, message notify.Message) error {
+		if platform != accounts.PlatformAndroid {
+			return nil
 		}
-
-		ctx := context.Background()
 		once.Do(func() {
 			account, err := loader.Load(ctx)
 			if err != nil {
-				log.Printf("push disabled: %v", err)
+				slog.WarnContext(ctx, "android push is off: no credential",
+					"reason", "fcm_credential_missing", "error", err)
 				return
 			}
 			sender = New(account)
 		})
 		if sender == nil {
-			return
+			return nil
 		}
-
-		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, delivery.Kind, keyVersion, payload); err != nil {
-			log.Printf("failed to deliver a push: %v", err)
-		}
+		return sender.Send(ctx, token, message)
 	}
 }

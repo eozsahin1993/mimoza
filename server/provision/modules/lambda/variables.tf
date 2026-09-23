@@ -29,7 +29,6 @@ variable "storage" {
     accounts_table_arn   = string
     circles_table_arn    = string
     rate_limit_table_arn = string
-    push_table_arn       = string
   })
 }
 

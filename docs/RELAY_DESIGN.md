@@ -269,8 +269,15 @@ both  data { circleId, entryId, type, parentEntryId }
 ```
 
 The device localizes the text from names and the action. Comment text is
-encrypted and never on a lock screen. Roster changes send a silent push
-so members' devices sync.
+encrypted and never on a lock screen, and a reaction's emoji is a keyed
+tag the relay cannot read back, so a card says someone reacted and not
+what with. Roster changes send a silent push so members' devices sync,
+whatever level they have set: a level governs cards, not syncing.
+
+Because the card arrives finished, nothing decrypts on receipt and no
+notification extension ships. The cost is that the wording lives in the
+app's native string tables, so a new kind of notification needs an app
+release rather than a relay deploy.
 
 ## New device
 

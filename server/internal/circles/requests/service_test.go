@@ -34,6 +34,14 @@ func (f *fakeStore) GetMember(_ context.Context, _, accountID string) (circles.M
 	return member, nil
 }
 
+func (f *fakeStore) ListMembers(context.Context, string) ([]circles.Member, error) {
+	roster := make([]circles.Member, 0, len(f.members))
+	for _, member := range f.members {
+		roster = append(roster, member)
+	}
+	return roster, nil
+}
+
 func (f *fakeStore) GetInvite(context.Context, string) (circles.Invite, error) {
 	return f.invite, nil
 }

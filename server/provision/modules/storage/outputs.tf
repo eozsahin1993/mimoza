@@ -58,14 +58,6 @@ output "rate_limit_table_arn" {
   value = aws_dynamodb_table.rate_limit.arn
 }
 
-output "push_table_name" {
-  value = aws_dynamodb_table.push.name
-}
-
-output "push_table_arn" {
-  value = aws_dynamodb_table.push.arn
-}
-
 output "table_names" {
   description = "Every table, for alarms that watch the lot."
   value = [
@@ -75,6 +67,5 @@ output "table_names" {
     aws_dynamodb_table.accounts.name,
     aws_dynamodb_table.circles.name,
     aws_dynamodb_table.rate_limit.name,
-    aws_dynamodb_table.push.name,
   ]
 }

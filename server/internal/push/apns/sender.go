@@ -1,15 +1,16 @@
+// Package apns delivers one notification to one iPhone through Apple's
+// HTTP/2 provider API.
 package apns
 
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
-	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/notify"
 )
 
 const (
@@ -17,8 +18,8 @@ const (
 	sandboxHost    = "https://api.sandbox.push.apple.com"
 )
 
-// Sender posts to Apple's HTTP/2 provider API. net/http negotiates HTTP/2
-// over TLS on its own; nothing here has to ask for it.
+// Sender posts to Apple's provider API. net/http negotiates HTTP/2 over
+// TLS on its own; nothing here has to ask for it.
 type Sender struct {
 	Topic      string // apns-topic: the app's bundle id
 	Production bool
@@ -28,22 +29,27 @@ type Sender struct {
 
 type sendRequest struct {
 	APS aps `json:"aps"`
-	// See fcm.Sender.Send for why these three are safe to name.
-	PushRoutingID string `json:"pushRoutingId"`
-	// Lets the extension pick its own line without decrypting.
-	Kind       push.PushKind `json:"kind"`
-	KeyVersion int64         `json:"keyVersion"`
-	Payload    string        `json:"payload"`
+	// Data rides beside the alert so a tap can open the right screen
+	// without unpacking the card.
+	Data map[string]string `json:"data,omitempty"`
 }
 
 type aps struct {
-	Alert string `json:"alert"`
-	// int, not bool: APNs' own field is 1/0, and Apple's docs give it as
-	// a number.
-	MutableContent int `json:"mutable-content"`
+	Alert *alert `json:"alert,omitempty"`
+	// A silent push carries no card: it wakes the app to sync.
+	ContentAvailable int `json:"content-available,omitempty"`
 }
 
-// New builds a Sender from a loaded auth key.
+// alert is localization keys, not text. iOS resolves them against the
+// app's own Localizable.strings, which is why no extension is needed to
+// make a card readable.
+type alert struct {
+	TitleLocKey  string   `json:"title-loc-key,omitempty"`
+	TitleLocArgs []string `json:"title-loc-args,omitempty"`
+	LocKey       string   `json:"loc-key,omitempty"`
+	LocArgs      []string `json:"loc-args,omitempty"`
+}
+
 func New(key *AuthKey, topic string, production bool) *Sender {
 	return &Sender{
 		Topic:      topic,
@@ -60,26 +66,30 @@ func (s *Sender) host() string {
 	return sandboxHost
 }
 
-// Send delivers one alert push to one device token.
-//
-// mutable-content, never content-available: a silent push is budgeted,
-// deprioritized in Low Power Mode, and dropped after a force-quit. The
-// alert is the kind's fixed line — the
-// Notification Service Extension rewrites it after decrypting, since the
-// relay cannot compose real text from ciphertext it can't read.
-func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, kind push.PushKind, keyVersion int64, payload []byte) error {
+// Send delivers one message to one device token.
+func (s *Sender) Send(ctx context.Context, deviceToken string, message notify.Message) error {
 	token, err := s.tokens.providerToken()
 	if err != nil {
 		return err
 	}
 
-	body, err := json.Marshal(sendRequest{
-		APS:           aps{Alert: kind.Alert(), MutableContent: 1},
-		PushRoutingID: pushRoutingID,
-		Kind:          kind,
-		KeyVersion:    keyVersion,
-		Payload:       base64.StdEncoding.EncodeToString(payload),
-	})
+	request := sendRequest{Data: message.Data}
+	pushType, priority := "alert", "10"
+	if message.Silent {
+		request.APS.ContentAvailable = 1
+		// Apple throttles these and drops them after a force quit, which
+		// is why nothing user-visible depends on one arriving.
+		pushType, priority = "background", "5"
+	} else {
+		request.APS.Alert = &alert{
+			TitleLocKey:  message.TitleKey,
+			TitleLocArgs: message.Args,
+			LocKey:       message.BodyKey,
+			LocArgs:      message.Args,
+		}
+	}
+
+	body, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
@@ -91,8 +101,8 @@ func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, ki
 	}
 	req.Header.Set("authorization", "bearer "+token)
 	req.Header.Set("apns-topic", s.Topic)
-	req.Header.Set("apns-push-type", "alert")
-	req.Header.Set("apns-priority", "10")
+	req.Header.Set("apns-push-type", pushType)
+	req.Header.Set("apns-priority", priority)
 
 	resp, err := s.Client.Do(req)
 	if err != nil {
@@ -100,9 +110,9 @@ func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, ki
 	}
 	defer resp.Body.Close()
 
-	// The body can name the device token, so only the status is reported.
-	// A 400/410 here usually means the token is stale; nothing prunes them
-	// yet, same as fcm.Sender.
+	// The body can name the device token, so only the status is
+	// reported. A 400 or 410 usually means a stale token; nothing prunes
+	// them yet, same as fcm.
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("send push: %s", resp.Status)
 	}

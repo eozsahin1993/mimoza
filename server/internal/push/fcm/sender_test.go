@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
@@ -14,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/notify"
 )
 
 // A real key, generated per run — the assertion is genuinely signed, so
@@ -52,59 +51,6 @@ func tokenServer(t *testing.T, expiresIn int64, calls *int) *httptest.Server {
 	}))
 }
 
-func TestSendPostsADataOnlyMessage(t *testing.T) {
-	calls := 0
-	tokens := tokenServer(t, 3600, &calls)
-	defer tokens.Close()
-
-	var got map[string]any
-	var auth string
-	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth = r.Header.Get("Authorization")
-		_ = json.NewDecoder(r.Body).Decode(&got)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer fcmAPI.Close()
-
-	sender := New(testAccount(t, tokens.URL))
-	sender.Client.Transport = redirectTo(fcmAPI.URL)
-
-	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("ciphertext")); err != nil {
-		t.Fatal(err)
-	}
-
-	if auth != "Bearer at-1" {
-		t.Fatalf("expected the minted token on the request, got %q", auth)
-	}
-
-	message := got["message"].(map[string]any)
-	if message["token"] != "device-token" {
-		t.Fatalf("wrong target: %v", message["token"])
-	}
-	// data, never notification: a notification block would have the
-	// platform render text the relay cannot read.
-	if _, hasNotification := message["notification"]; hasNotification {
-		t.Fatal("a notification block would bypass the device's own decryption")
-	}
-	data := message["data"].(map[string]any)
-	if data["payload"] != base64.StdEncoding.EncodeToString([]byte("ciphertext")) {
-		t.Fatalf("payload did not survive: %v", data["payload"])
-	}
-	if data["pushRoutingId"] != "routing-1" {
-		t.Fatalf("the device needs the routing id to find its circle, got %v", data["pushRoutingId"])
-	}
-	if data["keyVersion"] != "3" {
-		t.Fatalf("the device needs the key version, got %v", data["keyVersion"])
-	}
-	if data["placeholder"] != push.Placeholder {
-		t.Fatalf("expected the fixed placeholder, got %v", data["placeholder"])
-	}
-	// Or Doze defers a data-only message indefinitely.
-	if message["android"].(map[string]any)["priority"] != "high" {
-		t.Fatal("expected high priority")
-	}
-}
-
 /** A token lasts an hour and a cold start serves many sends. */
 func TestAccessTokenIsReusedAcrossSends(t *testing.T) {
 	calls := 0
@@ -120,7 +66,7 @@ func TestAccessTokenIsReusedAcrossSends(t *testing.T) {
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
 	for range 3 {
-		if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -146,7 +92,7 @@ func TestAnAlmostExpiredTokenIsRefreshed(t *testing.T) {
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
 	for range 2 {
-		if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -169,7 +115,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 	sender := New(testAccount(t, tokens.URL))
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
-	err := sender.Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
+	err := sender.Send(context.Background(), "device-token", testMessage())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -186,7 +132,7 @@ func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 
-	err := New(account).Send(context.Background(), "device-token", "routing-1", push.KindCircle, 3, []byte("x"))
+	err := New(account).Send(context.Background(), "device-token", testMessage())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -214,29 +160,75 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { re
 
 var _ = time.Second
 
-func TestSendAttachesTheKindsLine(t *testing.T) {
-	calls := 0
-	tokens := tokenServer(t, 3600, &calls)
+// testMessage is an ordinary card: the loc keys and the args a device
+// renders them with.
+func testMessage() notify.Message {
+	return notify.Message{
+		TitleKey: "push.title_circle",
+		BodyKey:  "push.posted",
+		Args:     []string{"Sarah", "Family"},
+		Data:     map[string]string{"circleId": "circle-1", "entryId": "post-1"},
+	}
+}
+
+// The card is localization keys, which Android renders against the app's
+// own strings.xml, and the data rides alongside for the tap.
+func TestSendPostsLocalizationKeys(t *testing.T) {
+	tokens := tokenServer(t, 3600, new(int))
 	defer tokens.Close()
+
 	var got map[string]any
 	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		w.WriteHeader(http.StatusOK)
 	}))
 	defer fcmAPI.Close()
 
 	sender := New(testAccount(t, tokens.URL))
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
-	if err := sender.Send(context.Background(), "device-token", "routing-1", push.KindPendingRequest, 0, []byte("x")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
 		t.Fatal(err)
 	}
 
-	data := got["message"].(map[string]any)["data"].(map[string]any)
-	if data["placeholder"] != push.KindPendingRequest.Alert() {
-		t.Fatalf("expected the pending request line, got %v", data["placeholder"])
+	message, _ := got["message"].(map[string]any)
+	android, _ := message["android"].(map[string]any)
+	notification, _ := android["notification"].(map[string]any)
+	if notification["body_loc_key"] != "push.posted" || notification["title_loc_key"] != "push.title_circle" {
+		t.Fatalf("notification = %v", notification)
 	}
-	if data["kind"] != string(push.KindPendingRequest) {
-		t.Fatalf("expected the kind, got %v", data["kind"])
+	if android["priority"] != "high" {
+		t.Errorf("a data message at normal priority is deferred by Doze: %v", android)
+	}
+	data, _ := message["data"].(map[string]any)
+	if data["circleId"] != "circle-1" || data["entryId"] != "post-1" {
+		t.Errorf("data = %v", data)
+	}
+}
+
+// A silent push is data only: no notification block, so the platform
+// renders nothing and the app wakes to sync.
+func TestSendPostsASilentMessageWithNoNotification(t *testing.T) {
+	tokens := tokenServer(t, 3600, new(int))
+	defer tokens.Close()
+
+	var got map[string]any
+	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+	}))
+	defer fcmAPI.Close()
+
+	sender := New(testAccount(t, tokens.URL))
+	sender.Client.Transport = redirectTo(fcmAPI.URL)
+
+	message := testMessage()
+	message.Silent = true
+	if err := sender.Send(context.Background(), "device-token", message); err != nil {
+		t.Fatal(err)
+	}
+
+	envelope, _ := got["message"].(map[string]any)
+	android, _ := envelope["android"].(map[string]any)
+	if _, carries := android["notification"]; carries {
+		t.Error("a silent push must carry no notification block")
 	}
 }

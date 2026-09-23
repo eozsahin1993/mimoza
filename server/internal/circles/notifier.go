@@ -1,0 +1,38 @@
+package circles
+
+import "context"
+
+// Notifier is what a write slice calls once its write has landed. It is
+// declared here because every slice wants the same one, and satisfied by
+// internal/notify.
+//
+// Nothing returns an error: the write already happened, and a push that
+// did not land is not something to make the caller repeat.
+type Notifier interface {
+	Notify(ctx context.Context, event Notification)
+}
+
+// Notification is what happened, in the terms the relay can describe it:
+// who, where, and what kind. Never what was said.
+type Notification struct {
+	Kind     string
+	CircleID string
+	ActorID  string
+	EntryID  string
+	ParentID string
+	AuthorID string
+	// Only is who this reaches when it is not the circle at large.
+	Only []string
+}
+
+// Kinds of notification. These name the strings the app ships.
+const (
+	NotifyPost        = "post"
+	NotifyComment     = "comment"
+	NotifyReaction    = "reaction"
+	NotifyJoinRequest = "join_request"
+	NotifyApproved    = "approved"
+	NotifyRewrapped   = "rewrapped"
+	// NotifyRoster is silent: a nudge to re-sync, not a card.
+	NotifyRoster = "roster"
+)

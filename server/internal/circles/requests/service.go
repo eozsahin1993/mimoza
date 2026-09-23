@@ -14,6 +14,7 @@ import (
 type store interface {
 	GetCircle(ctx context.Context, circleID string) (circles.Circle, error)
 	GetMember(ctx context.Context, circleID, accountID string) (circles.Member, error)
+	ListMembers(ctx context.Context, circleID string) ([]circles.Member, error)
 	GetInvite(ctx context.Context, code string) (circles.Invite, error)
 	CreateRequest(ctx context.Context, request circles.Request) error
 	ListRequests(ctx context.Context, circleID string) ([]circles.Request, error)
@@ -40,6 +41,8 @@ type Pending struct {
 
 type Service struct {
 	Store store
+	// Notify is nil in tests that do not care who hears about a write.
+	Notify circles.Notifier
 	// Profiles names the requester, and holds the public key their copy
 	// of the content keys is sealed to.
 	Profiles profiles
@@ -92,7 +95,28 @@ func (s *Service) Create(ctx context.Context, code, accountID string) (circles.R
 	if err := s.Store.CreateRequest(ctx, request); err != nil {
 		return circles.Request{}, err
 	}
+	// Only the admins: they are the ones who can answer it.
+	if s.Notify != nil {
+		roster, err := s.Store.ListMembers(ctx, invite.CircleID)
+		if err == nil {
+			s.Notify.Notify(ctx, circles.Notification{
+				Kind: circles.NotifyJoinRequest, CircleID: invite.CircleID,
+				ActorID: accountID, Only: adminsOf(roster),
+			})
+		}
+	}
 	return request, nil
+}
+
+// adminsOf is who answers a join request.
+func adminsOf(roster []circles.Member) []string {
+	var admins []string
+	for _, member := range roster {
+		if member.IsAdmin() {
+			admins = append(admins, member.AccountID)
+		}
+	}
+	return admins
 }
 
 // List is any admin's, not only the code's author: an admin who did not
@@ -155,7 +179,16 @@ func (s *Service) Approve(ctx context.Context, circleID, requestID, accountID st
 		if profile, err := s.Profiles.GetProfile(ctx, request.AccountID); err == nil {
 			name = profile.Name
 		}
-		return s.Store.ApproveRequest(ctx, circleID, requestID, accountID, member, sealed, name)
+		if err := s.Store.ApproveRequest(ctx, circleID, requestID, accountID, member, sealed, name); err != nil {
+			return err
+		}
+		if s.Notify != nil {
+			s.Notify.Notify(ctx, circles.Notification{
+				Kind: circles.NotifyApproved, CircleID: circleID,
+				ActorID: accountID, Only: []string{request.AccountID},
+			})
+		}
+		return nil
 	}
 	return circles.ErrRequestNotFound
 }
