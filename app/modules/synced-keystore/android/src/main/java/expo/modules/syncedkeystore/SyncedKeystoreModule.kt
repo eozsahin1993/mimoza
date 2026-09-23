@@ -38,7 +38,7 @@ class SyncedKeystoreModule : Module() {
       val e2e = client.isEndToEndEncryptionAvailable().awaitResult()
       val data = StoreBytesData.Builder()
         .setBytes(value.toByteArray(Charsets.UTF_8))
-        .setKeys(listOf(key))
+        .setKey(key)
         .setShouldBackupToCloud(e2e)
         .build()
       client.storeBytes(data).awaitResult()
