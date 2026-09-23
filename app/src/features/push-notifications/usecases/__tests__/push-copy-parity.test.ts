@@ -10,47 +10,53 @@ import tr from '@/core/i18n/locales/tr.json';
 
 /**
  * The notification copy exists twice — the `push` section of the locale
- * JSON, which handle-push.ts composes from on Android, and the iOS
- * extension's string catalog, which `npm run i18n:ios` writes from it.
- * Nothing but this test fails when the two drift. Swift never runs under
- * jest, so this reads the catalog and the extension's source as text.
+ * JSON, and the per-locale ios.Localizable.strings/android blocks
+ * app.json's `locales` field points Expo at, which `npm run i18n:push`
+ * writes from it. Nothing but this test fails when the two drift.
  */
 
-const extension = join(__dirname, '..', '..', '..', '..', '..', 'targets', 'MimozaNotificationService');
-const catalog = JSON.parse(readFileSync(join(extension, 'Localizable.xcstrings'), 'utf8')) as {
-  strings: Record<string, { localizations: Record<string, { stringUnit: { value: string } }> }>;
-};
-const swift = readFileSync(join(extension, 'NotificationService.swift'), 'utf8');
+type LocaleConfig = { ios?: { 'Localizable.strings'?: Record<string, string> }; android?: Record<string, string> };
 
-/** Android names its notification channels and their group; iOS has neither. Mirrors the script. */
-const ANDROID_ONLY = new Set(['channelGroup', 'invitesChannel']);
+const configs: Record<string, LocaleConfig> = Object.fromEntries(
+  Languages.map(({ code }) => [code, JSON.parse(readFileSync(join(__dirname, '..', '..', '..', '..', '..', 'locales', `${code}.json`), 'utf8'))]),
+);
+
+/** Channel names, read by i18next at JS runtime (services/channels.ts) — never through a native loc-key lookup. Mirrors the script. */
+const NOT_NATIVE = new Set(['channelGroup', 'invitesChannel']);
 
 const translations = { en, tr, es, fr, de };
 
-/** i18next's named placeholders, as the positional ones Swift's String(format:) takes. */
-function asFormat(text: string): string {
-  return text.replace('{{name}}', '%1$@').replace('{{text}}', '%2$@').replace('{{emoji}}', '%2$@');
+/** i18next's named placeholders, as each platform's own positional format specifier. Mirrors the script. */
+function asIOSFormat(text: string): string {
+  return text.replace('{{actor}}', '%1$@').replace('{{circle}}', '%2$@');
+}
+function asAndroidFormat(text: string): string {
+  return text.replace('{{actor}}', '%1$s').replace('{{circle}}', '%2$s');
 }
 
-test('the catalog has exactly the push keys the JSON has', () => {
-  const keys = Object.keys(en.push).filter((key) => !ANDROID_ONLY.has(key));
+/** aapt2 rejects a "." in a resource name. Mirrors the script and internal/push/fcm/sender.go's androidResourceName. */
+function androidKey(key: string): string {
+  return key.replace(/\./g, '_');
+}
 
-  expect(Object.keys(catalog.strings).sort()).toEqual(keys.map((key) => `push.${key}`).sort());
-});
-
-test.each(Languages.map((language) => [language.code]))('every %s string matches the JSON (run npm run i18n:ios if not)', (code) => {
+test.each(Languages.map((language) => [language.code]))('%s: ios and android carry exactly the JSON push keys', (code) => {
   const push = translations[code as keyof typeof translations].push as Record<string, string>;
-  for (const key of Object.keys(push).filter((candidate) => !ANDROID_ONLY.has(candidate))) {
-    expect([key, catalog.strings[`push.${key}`]?.localizations[code]?.stringUnit.value]).toEqual([
-      key,
-      asFormat(push[key]),
-    ]);
-  }
+  const keys = Object.keys(push).filter((key) => !NOT_NATIVE.has(key));
+
+  const ios = configs[code].ios?.['Localizable.strings'] ?? {};
+  const android = configs[code].android ?? {};
+
+  expect(Object.keys(ios).sort()).toEqual(keys.map((key) => `push.${key}`).sort());
+  expect(Object.keys(android).sort()).toEqual(keys.map((key) => androidKey(`push.${key}`)).sort());
 });
 
-test('every key the extension looks up is in the catalog', () => {
-  const used = [...swift.matchAll(/strings\("(push\.\w+)"/g)].map((match) => match[1]);
+test.each(Languages.map((language) => [language.code]))('%s: every string matches the JSON (run npm run i18n:push if not)', (code) => {
+  const push = translations[code as keyof typeof translations].push as Record<string, string>;
+  const ios = configs[code].ios?.['Localizable.strings'] ?? {};
+  const android = configs[code].android ?? {};
 
-  expect(used.length).toBeGreaterThan(0);
-  for (const key of used) expect(catalog.strings).toHaveProperty([key]);
+  for (const key of Object.keys(push).filter((candidate) => !NOT_NATIVE.has(candidate))) {
+    expect([key, ios[`push.${key}`]]).toEqual([key, asIOSFormat(push[key])]);
+    expect([key, android[androidKey(`push.${key}`)]]).toEqual([key, asAndroidFormat(push[key])]);
+  }
 });

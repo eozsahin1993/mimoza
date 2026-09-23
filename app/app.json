@@ -40,7 +40,6 @@
       "versionCode": 1
     },
     "plugins": [
-      "@bacons/apple-targets",
       "expo-router",
       "./plugins/with-splash-wordmark",
       [
@@ -70,6 +69,7 @@
       "reactCompiler": true
     },
     "locales": {
+      "en": "./locales/en.json",
       "tr": "./locales/tr.json",
       "es": "./locales/es.json",
       "fr": "./locales/fr.json",

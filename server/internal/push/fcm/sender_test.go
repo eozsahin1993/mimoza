@@ -193,7 +193,10 @@ func TestSendPostsLocalizationKeys(t *testing.T) {
 	message, _ := got["message"].(map[string]any)
 	android, _ := message["android"].(map[string]any)
 	notification, _ := android["notification"].(map[string]any)
-	if notification["body_loc_key"] != "push.posted" || notification["title_loc_key"] != "push.title_circle" {
+	// Dotted as compose.go names them, matching iOS's own Localizable.strings
+	// convention — but aapt2 rejects a "." in a resource name, so Android's
+	// own copy has to lose it. See TestSendUnderscoresLocKeysForAndroid.
+	if notification["body_loc_key"] != "push_posted" || notification["title_loc_key"] != "push_title_circle" {
 		t.Fatalf("notification = %v", notification)
 	}
 	if android["priority"] != "high" {
@@ -202,6 +205,38 @@ func TestSendPostsLocalizationKeys(t *testing.T) {
 	data, _ := message["data"].(map[string]any)
 	if data["circleId"] != "circle-1" || data["entryId"] != "post-1" {
 		t.Errorf("data = %v", data)
+	}
+}
+
+// Android's resource compiler refuses a "." in a string resource's name.
+// compose.go's keys are dotted to match iOS's Localizable.strings
+// convention, so the copy Android looks title_loc_key/body_loc_key up
+// against has to be the underscored one, not what iOS gets sent.
+func TestSendUnderscoresLocKeysForAndroid(t *testing.T) {
+	tokens := tokenServer(t, 3600, new(int))
+	defer tokens.Close()
+
+	var got map[string]any
+	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+	}))
+	defer fcmAPI.Close()
+
+	sender := New(testAccount(t, tokens.URL))
+	sender.Client.Transport = redirectTo(fcmAPI.URL)
+
+	message := testMessage()
+	message.TitleKey = "push.title_account"
+	message.BodyKey = "push.rewrap_needed"
+	if err := sender.Send(context.Background(), "device-token", message); err != nil {
+		t.Fatal(err)
+	}
+
+	envelope, _ := got["message"].(map[string]any)
+	android, _ := envelope["android"].(map[string]any)
+	notification, _ := android["notification"].(map[string]any)
+	if notification["title_loc_key"] != "push_title_account" || notification["body_loc_key"] != "push_rewrap_needed" {
+		t.Fatalf("notification = %v", notification)
 	}
 }
 

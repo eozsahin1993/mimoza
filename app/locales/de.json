@@ -1,6 +1,32 @@
 {
   "ios": {
     "NSCameraUsageDescription": "Mimoza nutzt deine Kamera, um einen Geräteübertragungscode zu scannen.",
-    "NSPhotoLibraryUsageDescription": "Mimoza greift auf deine Fotos zu, damit du auswählen kannst, was du in deinen Kreisen teilst."
+    "NSPhotoLibraryUsageDescription": "Mimoza greift auf deine Fotos zu, damit du auswählen kannst, was du in deinen Kreisen teilst.",
+    "Localizable.strings": {
+      "push.approved": "%1$@ hat deine Anfrage angenommen",
+      "push.commented_other": "%1$@ hat kommentiert",
+      "push.commented_yours": "%1$@ hat dein Foto kommentiert",
+      "push.join_request": "%1$@ möchte beitreten",
+      "push.posted": "%1$@ hat ein Foto hinzugefügt",
+      "push.reacted_other": "%1$@ hat auf ein Foto reagiert",
+      "push.reacted_yours": "%1$@ hat auf dein Foto reagiert",
+      "push.rewrap_needed": "%1$@ braucht Zugriff auf %2$@",
+      "push.rewrapped": "%1$@ hat dir wieder Zugriff auf %2$@ gegeben",
+      "push.title_account": "%2$@",
+      "push.title_circle": "%2$@"
+    }
+  },
+  "android": {
+    "push_approved": "%1$s hat deine Anfrage angenommen",
+    "push_commented_other": "%1$s hat kommentiert",
+    "push_commented_yours": "%1$s hat dein Foto kommentiert",
+    "push_join_request": "%1$s möchte beitreten",
+    "push_posted": "%1$s hat ein Foto hinzugefügt",
+    "push_reacted_other": "%1$s hat auf ein Foto reagiert",
+    "push_reacted_yours": "%1$s hat auf dein Foto reagiert",
+    "push_rewrap_needed": "%1$s braucht Zugriff auf %2$s",
+    "push_rewrapped": "%1$s hat dir wieder Zugriff auf %2$s gegeben",
+    "push_title_account": "%2$s",
+    "push_title_circle": "%2$s"
   }
 }

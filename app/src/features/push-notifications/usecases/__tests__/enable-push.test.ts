@@ -1,53 +1,30 @@
-jest.mock('@/features/circle/usecases/sync-circle');
-jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/services/log-relay');
-jest.mock('@/core/services/push-relay');
-jest.mock('@/core/photo/image');
+jest.mock('@/features/push-notifications/services/register-device');
 jest.mock('@/features/push-notifications/services/tokens');
 jest.mock('@/core/services/settings');
 jest.mock('expo-notifications', () => ({ getPermissionsAsync: jest.fn() }));
 
 import { getPermissionsAsync } from 'expo-notifications';
 
-import { initDatabase, setCirclePushSilenced } from '@/data/db';
-import { createCircle } from '@/features/circle/usecases/create-circle';
-import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 import {
   answerNotificationPrompt,
-  ensurePushForCircle,
   shouldOfferNotifications,
 } from '@/features/push-notifications/usecases/enable-push';
-import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { saveAuthToken } from '@/core/services/keystore/auth-token';
-import { putPushDevice, putPushPrefs } from '@/core/services/push-relay';
-import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
+import { registerThisDevice } from '@/features/push-notifications/services/register-device';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 import { getAppSettings, updateAppSettings } from '@/core/services/settings';
 
 const device = { pushToken: 'fcm-registration-token', platform: 'android' as const };
-const SETTINGS = { defaultPushLevel: 'comments', themePreference: 'system' as const, language: 'system' as const };
+const SETTINGS = { notificationPromptAnswered: false };
 
 function permission(granted: boolean, canAskAgain = true) {
   (getPermissionsAsync as jest.Mock).mockResolvedValue({ granted, canAskAgain });
 }
 
-beforeAll(async () => {
-  await initDatabase();
-});
-
-beforeEach(async () => {
+beforeEach(() => {
   jest.clearAllMocks();
-  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
-  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
-  (drainOutbox as jest.Mock).mockResolvedValue(undefined);
-  (putPushPrefs as jest.Mock).mockResolvedValue(undefined);
-  (putPushDevice as jest.Mock).mockResolvedValue(undefined);
-  (getAppSettings as jest.Mock).mockResolvedValue({ ...SETTINGS, notificationPromptAnswered: false });
+  (getAppSettings as jest.Mock).mockResolvedValue(SETTINGS);
   (updateAppSettings as jest.Mock).mockResolvedValue(undefined);
-  await resetLocalDataForTesting();
-  await saveMasterSeed(new Uint8Array(16).fill(9));
-  await saveAuthToken('session-token');
+  (registerThisDevice as jest.Mock).mockResolvedValue(undefined);
 });
 
 describe('the home screen ask', () => {
@@ -57,11 +34,11 @@ describe('the home screen ask', () => {
   });
 
   test('is not offered once answered, granted, or refused for good', async () => {
-    (getAppSettings as jest.Mock).mockResolvedValue({ ...SETTINGS, notificationPromptAnswered: true });
+    (getAppSettings as jest.Mock).mockResolvedValue({ notificationPromptAnswered: true });
     permission(false);
     expect(await shouldOfferNotifications()).toBe(false);
 
-    (getAppSettings as jest.Mock).mockResolvedValue({ ...SETTINGS, notificationPromptAnswered: false });
+    (getAppSettings as jest.Mock).mockResolvedValue(SETTINGS);
     permission(true);
     expect(await shouldOfferNotifications()).toBe(false);
 
@@ -77,49 +54,20 @@ describe('the home screen ask', () => {
     expect(getDevicePushToken).not.toHaveBeenCalled();
   });
 
-  test('"Turn on" asks the OS and registers every circle right away', async () => {
-    await createCircle({ name: 'Family Circle' });
+  test('"Turn on" asks the OS and registers this device right away', async () => {
     (getDevicePushToken as jest.Mock).mockResolvedValue(device);
-    permission(true);
 
     await answerNotificationPrompt(true);
 
     expect(getDevicePushToken).toHaveBeenCalledWith({ ask: true });
-    expect(putPushPrefs).toHaveBeenCalledTimes(1);
-    expect(putPushDevice).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('opening a feed', () => {
-  /** A circle created or joined since launch; launch never saw it. */
-  test('registers a circle this phone never has, once', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    (getDevicePushToken as jest.Mock).mockResolvedValue(device);
-
-    await ensurePushForCircle(circleId);
-    await ensurePushForCircle(circleId);
-
-    expect(putPushPrefs).toHaveBeenCalledTimes(1);
-    expect(putPushDevice).toHaveBeenCalledTimes(1);
+    expect(registerThisDevice).toHaveBeenCalledTimes(1);
   });
 
-  test('never prompts, and does nothing without permission', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  test('a refusal never registers', async () => {
     (getDevicePushToken as jest.Mock).mockResolvedValue(null);
 
-    await ensurePushForCircle(circleId);
+    await answerNotificationPrompt(true);
 
-    expect(getDevicePushToken).toHaveBeenCalledWith();
-    expect(putPushPrefs).not.toHaveBeenCalled();
-  });
-
-  test('leaves a silenced circle alone', async () => {
-    const { id: circleId } = await createCircle({ name: 'Family Circle' });
-    await setCirclePushSilenced(circleId, true);
-    (getDevicePushToken as jest.Mock).mockResolvedValue(device);
-
-    await ensurePushForCircle(circleId);
-
-    expect(putPushPrefs).not.toHaveBeenCalled();
+    expect(registerThisDevice).not.toHaveBeenCalled();
   });
 });
