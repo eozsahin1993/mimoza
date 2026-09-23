@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"mimoza-relay/internal/accounts/avatar"
 	"mimoza-relay/internal/accounts/deletion"
 	"mimoza-relay/internal/accounts/devices"
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
@@ -102,6 +101,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	members.Register(circlesMux, &members.Service{
 		Store:    members.NewStore(deps.Circles),
 		Profiles: deps.Accounts,
+		Blobs:    deps.Blobs,
 	}, readLimit, writeLimit)
 	posts.Register(circlesMux, &posts.Service{
 		Store: posts.NewStore(deps.Circles),
@@ -126,15 +126,10 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	profile.Register(accountMux, &profile.Service{
 		Store:   profile.NewStore(deps.Accounts),
 		Circles: members.NewStore(deps.Circles),
-		Blobs:   deps.Blobs,
 	}, readLimit, writeLimit)
 	devices.Register(accountMux, &devices.Service{Store: devices.NewStore(deps.Accounts)}, writeLimit)
-	avatar.Register(accountMux, &avatar.Service{Bucket: deps.Blobs}, readLimit, writeLimit)
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
-	// Anyone's avatar, not only the caller's: a roster names people you
-	// share a circle with, and their pictures are what it is for.
-	mux.Handle("/avatars/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 
 	deleteAccountService := &deletion.Service{AuthStore: deps.Auth, Store: deletion.NewStore(deps.Accounts)}
 	if deps.AppleID != nil {

@@ -8,19 +8,6 @@ import (
 	"mimoza-relay/internal/accounts"
 )
 
-type fakeBucket struct {
-	deleted []string
-	err     error
-}
-
-func (f *fakeBucket) Delete(_ context.Context, key string) error {
-	if f.err != nil {
-		return f.err
-	}
-	f.deleted = append(f.deleted, key)
-	return nil
-}
-
 type fakeStore struct {
 	profile   accounts.Profile
 	publicKey []byte
@@ -32,11 +19,11 @@ func (f *fakeStore) GetProfile(context.Context, string) (accounts.Profile, error
 	return f.profile, nil
 }
 
-func (f *fakeStore) SetProfile(_ context.Context, accountID, name, avatarID string) error {
+func (f *fakeStore) SetProfile(_ context.Context, accountID, name string) error {
 	if f.setErr != nil {
 		return f.setErr
 	}
-	f.profile = accounts.Profile{AccountID: accountID, Name: name, AvatarID: avatarID}
+	f.profile = accounts.Profile{AccountID: accountID, Name: name}
 	return nil
 }
 
@@ -65,11 +52,11 @@ func TestSetAnswersWithTheStoredProfile(t *testing.T) {
 	store := &fakeStore{}
 	service := &Service{Store: store}
 
-	got, err := service.Set(context.Background(), "account-1", "Sarah", "hash-1")
+	got, err := service.Set(context.Background(), "account-1", "Sarah")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Name != "Sarah" || got.AvatarID != "hash-1" || got.AccountID != "account-1" {
+	if got.Name != "Sarah" || got.AccountID != "account-1" {
 		t.Fatalf("expected the stored profile back, got %+v", got)
 	}
 }
@@ -166,46 +153,11 @@ func TestAFailedProfileWriteIsNotAnsweredWithTheOldOne(t *testing.T) {
 		setErr:  accounts.ErrNotFound,
 	}}
 
-	got, err := service.Set(context.Background(), "account-1", "Sarah", "")
+	got, err := service.Set(context.Background(), "account-1", "Sarah")
 	if !errors.Is(err, accounts.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 	if got.Name != "" {
 		t.Errorf("expected an empty profile on failure, got %+v", got)
-	}
-}
-
-// The picture a new one replaces has nothing left pointing at it, so it
-// is deleted rather than left in the bucket forever.
-func TestSetRetiresThePictureItReplaced(t *testing.T) {
-	bucket := &fakeBucket{}
-	store := &fakeStore{profile: accounts.Profile{AccountID: "account-1", AvatarID: "old"}}
-	service := &Service{Store: store, Blobs: bucket}
-
-	if _, err := service.Set(context.Background(), "account-1", "Sarah", "new"); err != nil {
-		t.Fatal(err)
-	}
-	if len(bucket.deleted) != 1 || bucket.deleted[0] != "avatars/account-1/old" {
-		t.Fatalf("deleted %v, want the old picture", bucket.deleted)
-	}
-}
-
-// Writing the same picture again, or a name with no picture at all,
-// must not delete what the profile still points at.
-func TestSetKeepsTheCurrentPicture(t *testing.T) {
-	for name, incoming := range map[string]string{
-		"the same id again": "same",
-		"no key at all":     "",
-	} {
-		bucket := &fakeBucket{}
-		store := &fakeStore{profile: accounts.Profile{AccountID: "account-1", AvatarID: "same"}}
-		service := &Service{Store: store, Blobs: bucket}
-
-		if _, err := service.Set(context.Background(), "account-1", "Sarah", incoming); err != nil {
-			t.Fatal(err)
-		}
-		if name == "the same id again" && len(bucket.deleted) != 0 {
-			t.Errorf("%s: deleted %v, want nothing", name, bucket.deleted)
-		}
 	}
 }

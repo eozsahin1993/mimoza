@@ -38,7 +38,7 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 	relay := harness.Start(t)
 	admin := relay.SignIn()
 	member := relay.SignIn()
-	admin.Put(api("/account/profile"), harness.Body{"name": "Sarah", "avatarId": "hash-1"}).Expect(http.StatusOK)
+	admin.Put(api("/account/profile"), harness.Body{"name": "Sarah"}).Expect(http.StatusOK)
 	member.Put(api("/account/profile"), harness.Body{"name": "Ali"}).Expect(http.StatusOK)
 
 	circleID := createCircle(t, admin, "Family")
@@ -48,7 +48,6 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 		Members []struct {
 			AccountID string `json:"accountId"`
 			Name      string `json:"name"`
-			AvatarID  string `json:"avatarId"`
 			PublicKey string `json:"publicKey"`
 			Role      string `json:"role"`
 		} `json:"members"`
@@ -66,8 +65,7 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 
 	for _, entry := range roster.Members {
 		if entry.AccountID == admin.AccountID() {
-			harness.AssertEqual(t, entry.AvatarID, "hash-1", "the avatar comes with the name")
-			harness.AssertEqual(t, entry.Role, "admin", "and the membership survives the join")
+			harness.AssertEqual(t, entry.Role, "admin", "the membership survives the join")
 		}
 	}
 
@@ -87,7 +85,7 @@ func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
 	relay := harness.Start(t)
 	admin := relay.SignIn()
 	joiner := relay.SignIn()
-	joiner.Put(api("/account/profile"), harness.Body{"name": "Ali", "avatarId": "hash-1"}).Expect(http.StatusOK)
+	joiner.Put(api("/account/profile"), harness.Body{"name": "Ali"}).Expect(http.StatusOK)
 
 	circleID := createCircle(t, admin, "Family")
 	var invite struct {
@@ -106,7 +104,8 @@ func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
 	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
 	harness.AssertEqual(t, len(pending.Requests), 1, "one ask")
 	harness.AssertEqual(t, pending.Requests[0].Name, "Ali", "named")
-	harness.AssertEqual(t, pending.Requests[0].AvatarID, "hash-1", "with a face")
+	// A name and no face: the asker holds no key to seal one with yet.
+	harness.AssertEqual(t, pending.Requests[0].AvatarID, "", "and no picture, since they hold no key")
 	harness.AssertEqual(t, pending.Requests[0].AccountID, joiner.AccountID(), "and the account behind it")
 }
 

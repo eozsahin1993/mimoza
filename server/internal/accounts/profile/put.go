@@ -7,12 +7,10 @@ import (
 	"mimoza-relay/internal/accounts"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/util/httputil"
-	"mimoza-relay/internal/util/ids"
 )
 
 type putRequest struct {
-	Name     string `json:"name"`
-	AvatarID string `json:"avatarId"`
+	Name string `json:"name"`
 }
 
 type PutHandler struct{ Service *Service }
@@ -27,12 +25,8 @@ func (h *PutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
-	if body.AvatarID != "" && !ids.Valid(body.AvatarID) {
-		httputil.WriteError(w, http.StatusBadRequest, "avatarId must be a short id, letters, digits, dot, dash or underscore")
-		return
-	}
 
-	profile, err := h.Service.Set(r.Context(), auth.AccountID(r.Context()), body.Name, body.AvatarID)
+	profile, err := h.Service.Set(r.Context(), auth.AccountID(r.Context()), body.Name)
 	if err != nil {
 		status, message := accounts.Status(err)
 		httputil.WriteError(w, status, message)

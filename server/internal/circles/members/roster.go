@@ -13,7 +13,10 @@ import (
 type memberResponse struct {
 	AccountID string `json:"accountId"`
 	Name      string `json:"name,omitempty"`
-	AvatarID  string `json:"avatarId,omitempty"`
+	// AvatarID is this member's picture in this circle, sealed under
+	// AvatarKeyVersion.
+	AvatarID         string `json:"avatarId,omitempty"`
+	AvatarKeyVersion int64  `json:"avatarKeyVersion,omitempty"`
 	// PublicKey is what a member seals this member's content keys to.
 	PublicKey   string `json:"publicKey,omitempty"`
 	Role        string `json:"role"`
@@ -49,14 +52,15 @@ func (h *RosterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, member := range roster {
 		body.Members = append(body.Members, memberResponse{
-			AccountID:   member.AccountID,
-			Name:        member.Name,
-			AvatarID:    member.AvatarID,
-			PublicKey:   base64.StdEncoding.EncodeToString(member.PublicKey),
-			Role:        member.Role,
-			NotifyLevel: member.NotifyLevel,
-			NeedsRewrap: member.NeedsRewrap,
-			JoinedAt:    member.JoinedAt.UnixMilli(),
+			AccountID:        member.AccountID,
+			Name:             member.Name,
+			AvatarID:         member.AvatarID,
+			AvatarKeyVersion: member.AvatarKeyVersion,
+			PublicKey:        base64.StdEncoding.EncodeToString(member.PublicKey),
+			Role:             member.Role,
+			NotifyLevel:      member.NotifyLevel,
+			NeedsRewrap:      member.NeedsRewrap,
+			JoinedAt:         member.JoinedAt.UnixMilli(),
 		})
 	}
 	// Keyed by version as a string: JSON object keys are strings, and the

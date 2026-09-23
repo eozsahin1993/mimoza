@@ -31,7 +31,7 @@ func TestStore_DeleteLeavesNothingBehind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := profile.NewStore(table).SetProfile(ctx, accountID, "Sarah", "avatars/sarah"); err != nil {
+	if err := profile.NewStore(table).SetProfile(ctx, accountID, "Sarah"); err != nil {
 		t.Fatal(err)
 	}
 	if err := devices.NewStore(table).PutDevice(ctx, accountID, accounts.Device{
@@ -89,7 +89,7 @@ func TestStore_DeleteKeepsAnUnrevokedGrant(t *testing.T) {
 	if err := table.SaveRefreshToken(ctx, accountID, auth.AppleProvider, subject, "r-123"); err != nil {
 		t.Fatal(err)
 	}
-	if err := profile.NewStore(table).SetProfile(ctx, accountID, "Sarah", ""); err != nil {
+	if err := profile.NewStore(table).SetProfile(ctx, accountID, "Sarah"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -203,7 +203,7 @@ func TestStore_DeleteTouchesOnlyThatAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := profile.NewStore(table).SetProfile(ctx, theirs, "Ali", ""); err != nil {
+	if err := profile.NewStore(table).SetProfile(ctx, theirs, "Ali"); err != nil {
 		t.Fatal(err)
 	}
 

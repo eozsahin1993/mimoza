@@ -2,8 +2,10 @@ package members
 
 import (
 	"context"
+	"log/slog"
 
 	"mimoza-relay/internal/accounts"
+	"mimoza-relay/internal/blobs"
 	"mimoza-relay/internal/circles"
 )
 
@@ -14,6 +16,7 @@ type store interface {
 	GetSealedKeys(ctx context.Context, circleID, accountID string) (circles.SealedKeys, error)
 	SetRole(ctx context.Context, circleID, accountID, role, actorID, subjectName string) error
 	SetNotifyLevel(ctx context.Context, circleID, accountID, level string) error
+	SetAvatar(ctx context.Context, circleID, accountID, avatarID string, keyVersion int64) error
 	RemoveMember(ctx context.Context, circleID, accountID, actorID, subjectName string, expectedVersion int64, sealed map[string][]byte) error
 	LeaveCircle(ctx context.Context, circleID, accountID, subjectName string) error
 	ReplaceSealedKeys(ctx context.Context, circleID, accountID string, sealed circles.SealedKeys) error
@@ -27,20 +30,30 @@ type profiles interface {
 	GetProfiles(ctx context.Context, accountIDs []string) (map[string]accounts.Profile, error)
 }
 
+// bucket holds the pictures. A member's own is circle content like a
+// photo, sealed under the content key, so the relay stores bytes it
+// cannot read.
+type bucket interface {
+	UploadTarget(ctx context.Context, key string, maxBytes int64) (blobs.UploadTarget, error)
+	DownloadURL(ctx context.Context, key string) (string, error)
+	Delete(ctx context.Context, key string) error
+}
+
 type Service struct {
 	Store store
+	// Blobs is nil in tests that do not care about bytes.
+	Blobs bucket
 	// Profiles fills in names, avatars and the public keys members seal
 	// content keys to. A roster without them is a list of opaque ids.
 	Profiles profiles
 }
 
 // RosterMember is one member with the person behind them: the
-// membership from the circles column, the identity from the accounts
-// column.
+// membership and the picture from the circles column, the name and the
+// public key from the accounts column.
 type RosterMember struct {
 	circles.Member
-	Name     string
-	AvatarID string
+	Name string
 	// PublicKey is what this member's copy of a content key is sealed
 	// to. It is on the roster because resealing after a kick or a reset
 	// happens on another member's device, which needs every key here.
@@ -86,7 +99,6 @@ func (s *Service) Roster(ctx context.Context, circleID, accountID string) (circl
 		members = append(members, RosterMember{
 			Member:    member,
 			Name:      identity.Name,
-			AvatarID:  identity.AvatarID,
 			PublicKey: identity.PublicKey,
 		})
 	}
@@ -120,6 +132,62 @@ func (s *Service) SetNotifyLevel(ctx context.Context, circleID, subjectID, level
 	return s.Store.SetNotifyLevel(ctx, circleID, subjectID, level)
 }
 
+// SetAvatar records the picture this member put in this circle. Only
+// your own: a face is not something an admin sets for you. The version
+// has to be the circle's current one, since that is what the bytes were
+// sealed under.
+func (s *Service) SetAvatar(ctx context.Context, circleID, subjectID, actorID, avatarID string, keyVersion int64) error {
+	if subjectID != actorID {
+		return circles.ErrNotTheAuthor
+	}
+	current, err := s.Store.GetMember(ctx, circleID, actorID)
+	if err != nil {
+		return err
+	}
+	circle, err := s.Store.GetCircle(ctx, circleID)
+	if err != nil {
+		return err
+	}
+	if keyVersion != circle.KeyVersion {
+		return circles.ErrStaleKeyVersion
+	}
+	if err := s.Store.SetAvatar(ctx, circleID, actorID, avatarID, keyVersion); err != nil {
+		return err
+	}
+	s.retireAvatar(ctx, circleID, actorID, current.AvatarID, avatarID)
+	return nil
+}
+
+// AvatarUploadTarget is where a member sends their own picture for this
+// circle, sealed under its content key like any other content.
+func (s *Service) AvatarUploadTarget(ctx context.Context, circleID, accountID, avatarID string) (blobs.UploadTarget, error) {
+	if err := s.requireMember(ctx, circleID, accountID); err != nil {
+		return blobs.UploadTarget{}, err
+	}
+	return s.Blobs.UploadTarget(ctx, avatarKey(circleID, accountID, avatarID), maxAvatarSize)
+}
+
+// AvatarURL is any member's to ask for: the bytes are sealed to the
+// circle, so what comes back is only useful to someone holding the key.
+func (s *Service) AvatarURL(ctx context.Context, circleID, subjectID, avatarID, accountID string) (string, error) {
+	if err := s.requireMember(ctx, circleID, accountID); err != nil {
+		return "", err
+	}
+	return s.Blobs.DownloadURL(ctx, avatarKey(circleID, subjectID, avatarID))
+}
+
+// retireAvatar deletes the picture a new one replaced. It runs after the
+// row is written, so a failure leaves bytes nothing points at.
+func (s *Service) retireAvatar(ctx context.Context, circleID, accountID, previous, current string) {
+	if s.Blobs == nil || previous == "" || previous == current {
+		return
+	}
+	if err := s.Blobs.Delete(ctx, avatarKey(circleID, accountID, previous)); err != nil {
+		slog.ErrorContext(ctx, "replaced an avatar but did not delete the old one",
+			"reason", "avatar_not_deleted", "error", err, "circleId", circleID, "avatarId", previous)
+	}
+}
+
 // Remove takes a member out and rotates the content key. The caller
 // supplies the new key sealed to everyone who stays; the store refuses
 // anything that does not cover them all.
@@ -131,7 +199,17 @@ func (s *Service) Remove(ctx context.Context, circleID, subjectID, actorID strin
 		// Removing yourself is leaving, which does not rotate.
 		return circles.ErrNotTheAuthor
 	}
-	return s.Store.RemoveMember(ctx, circleID, subjectID, actorID, s.nameOf(ctx, subjectID), expectedVersion, sealed)
+	// The picture they put here goes with them: it was sealed to this
+	// circle, and nothing will name it again.
+	departing, err := s.Store.GetMember(ctx, circleID, subjectID)
+	if err != nil {
+		return err
+	}
+	if err := s.Store.RemoveMember(ctx, circleID, subjectID, actorID, s.nameOf(ctx, subjectID), expectedVersion, sealed); err != nil {
+		return err
+	}
+	s.retireAvatar(ctx, circleID, subjectID, departing.AvatarID, "")
+	return nil
 }
 
 // Leave is never refused for long: the last admin has to hand the role
@@ -140,7 +218,15 @@ func (s *Service) Leave(ctx context.Context, circleID, accountID string) error {
 	if err := s.wouldStrandCircle(ctx, circleID, accountID); err != nil {
 		return err
 	}
-	return s.Store.LeaveCircle(ctx, circleID, accountID, s.nameOf(ctx, accountID))
+	departing, err := s.Store.GetMember(ctx, circleID, accountID)
+	if err != nil {
+		return err
+	}
+	if err := s.Store.LeaveCircle(ctx, circleID, accountID, s.nameOf(ctx, accountID)); err != nil {
+		return err
+	}
+	s.retireAvatar(ctx, circleID, accountID, departing.AvatarID, "")
+	return nil
 }
 
 // Rewrap is one member resealing the content keys to another member's

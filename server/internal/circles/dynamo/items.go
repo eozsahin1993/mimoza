@@ -231,11 +231,13 @@ func MemberItem(circleID string, member circles.Member, joinedAt time.Time) map[
 
 func MemberFrom(item map[string]types.AttributeValue) circles.Member {
 	return circles.Member{
-		AccountID:   dynamoutil.StringAt(item, AttrAccountID),
-		Role:        dynamoutil.StringAt(item, AttrRole),
-		NotifyLevel: dynamoutil.StringAt(item, AttrNotifyLevel),
-		NeedsRewrap: dynamoutil.BoolAt(item, AttrNeedsRewrap),
-		JoinedAt:    dynamoutil.TimeAt(item, AttrJoinedAt),
+		AccountID:        dynamoutil.StringAt(item, AttrAccountID),
+		Role:             dynamoutil.StringAt(item, AttrRole),
+		NotifyLevel:      dynamoutil.StringAt(item, AttrNotifyLevel),
+		NeedsRewrap:      dynamoutil.BoolAt(item, AttrNeedsRewrap),
+		AvatarID:         dynamoutil.StringAt(item, AttrAvatarID),
+		AvatarKeyVersion: dynamoutil.IntAt(item, AttrAvatarVersion),
+		JoinedAt:         dynamoutil.TimeAt(item, AttrJoinedAt),
 	}
 }
 

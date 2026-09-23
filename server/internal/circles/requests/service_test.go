@@ -93,7 +93,6 @@ func person(accountID, name string) accounts.Profile {
 	return accounts.Profile{
 		AccountID: accountID,
 		Name:      name,
-		AvatarID:  "hash-" + accountID,
 		PublicKey: []byte(accountID + "-key"),
 	}
 }
@@ -177,7 +176,7 @@ func TestList_NamesWhoIsAsking(t *testing.T) {
 	if len(pending) != 2 {
 		t.Fatalf("expected both asks, got %d", len(pending))
 	}
-	if pending[0].Name != "Sarah" || pending[0].AvatarID != "hash-asker-1" {
+	if pending[0].Name != "Sarah" {
 		t.Errorf("expected the asker named, got %+v", pending[0])
 	}
 	// An account deleted between the two reads leaves the ask standing

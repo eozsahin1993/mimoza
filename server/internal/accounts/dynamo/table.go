@@ -66,7 +66,6 @@ func (t *Table) Key(pk, sk string) map[string]types.AttributeValue {
 const (
 	AttrAccountID    = "accountId"
 	AttrName         = "name"
-	AttrAvatarID     = "avatarId"
 	AttrPublicKey    = "publicKey"
 	AttrPublicKeyAt  = "publicKeySetAt"
 	AttrCreatedAt    = "createdAt"

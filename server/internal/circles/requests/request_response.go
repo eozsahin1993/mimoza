@@ -15,10 +15,9 @@ type requestResponse struct {
 	RequestID string `json:"requestId"`
 	CircleID  string `json:"circleId"`
 	AccountID string `json:"accountId"`
-	// Name and AvatarID are who is asking. An admin answers a person,
-	// not an account id, so the list carries both.
+	// Name is who is asking: an admin answers a person, not an account
+	// id. No picture — see Pending.
 	Name      string `json:"name,omitempty"`
-	AvatarID  string `json:"avatarId,omitempty"`
 	Status    string `json:"status"`
 	CreatedAt int64  `json:"createdAt"`
 }
@@ -45,7 +44,6 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, request := range requests {
 		row := asResponse(request.Request)
 		row.Name = request.Name
-		row.AvatarID = request.AvatarID
 		body.Requests = append(body.Requests, row)
 	}
 	httputil.WriteJSON(w, http.StatusOK, body)

@@ -7,13 +7,17 @@ import (
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/circles"
 	"mimoza-relay/internal/util/httputil"
+	"mimoza-relay/internal/util/ids"
 )
 
 // patchRequest carries whichever field is being set. Role is an admin's
-// to change; notifyLevel is only ever your own — see Service.
+// to change; notifyLevel and the picture are only ever your own — see
+// Service.
 type patchRequest struct {
 	Role        string `json:"role"`
 	NotifyLevel string `json:"notifyLevel"`
+	AvatarID    string `json:"avatarId"`
+	KeyVersion  int64  `json:"keyVersion"`
 }
 
 type PatchHandler struct {
@@ -52,8 +56,19 @@ func (h *PatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, status, message)
 			return
 		}
+	case body.AvatarID != "":
+		if !ids.Valid(body.AvatarID) {
+			httputil.WriteError(w, http.StatusBadRequest, "avatarId must be a short id, letters, digits, dot, dash or underscore")
+			return
+		}
+		err := h.Service.SetAvatar(r.Context(), circleID, subjectID, accountID, body.AvatarID, body.KeyVersion)
+		if err != nil {
+			status, message := circles.Status(err)
+			httputil.WriteError(w, status, message)
+			return
+		}
 	default:
-		httputil.WriteError(w, http.StatusBadRequest, "role or notifyLevel is required")
+		httputil.WriteError(w, http.StatusBadRequest, "role, notifyLevel or avatarId is required")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -16,6 +16,8 @@ func Register(mux *http.ServeMux, service *Service, read, write func(http.Handle
 		{"POST /circles/{circleId}/members/{accountId}/remove", &RemoveHandler{Service: service}, write},
 		{"POST /circles/{circleId}/leave", &LeaveHandler{Service: service}, write},
 		{"POST /circles/{circleId}/keys", &RewrapHandler{Service: service}, write},
+		{"POST /circles/{circleId}/blobs/avatar/{avatarId}/upload-target", &AvatarUploadHandler{Service: service}, write},
+		{"GET /circles/{circleId}/blobs/avatar/{accountId}/{avatarId}", &AvatarHandler{Service: service}, read},
 	}
 	for _, route := range routes {
 		handler := route.handler

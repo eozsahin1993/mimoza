@@ -10,19 +10,22 @@ import (
 )
 
 type fakeStore struct {
-	members     map[string]circles.Member
-	roster      []circles.Member
-	removed     string
-	left        string
-	rewrapped   circles.SealedKeys
-	setRole     func(ctx context.Context, circleID, accountID, role, actorID string) error
-	setNotify   func(ctx context.Context, circleID, accountID, level string) error
-	removeErr   error
-	leaveErr    error
-	replaceErr  error
-	stampedName string
-	getCircle   func(ctx context.Context, circleID string) (circles.Circle, error)
-	sealedKeys  func(ctx context.Context, circleID, accountID string) (circles.SealedKeys, error)
+	members       map[string]circles.Member
+	roster        []circles.Member
+	removed       string
+	left          string
+	rewrapped     circles.SealedKeys
+	setRole       func(ctx context.Context, circleID, accountID, role, actorID string) error
+	setNotify     func(ctx context.Context, circleID, accountID, level string) error
+	removeErr     error
+	leaveErr      error
+	replaceErr    error
+	stampedName   string
+	avatarID      string
+	avatarVersion int64
+	avatarErr     error
+	getCircle     func(ctx context.Context, circleID string) (circles.Circle, error)
+	sealedKeys    func(ctx context.Context, circleID, accountID string) (circles.SealedKeys, error)
 }
 
 func (f *fakeStore) GetCircle(ctx context.Context, circleID string) (circles.Circle, error) {
@@ -57,6 +60,11 @@ func (f *fakeStore) SetRole(ctx context.Context, circleID, accountID, role, acto
 		return nil
 	}
 	return f.setRole(ctx, circleID, accountID, role, actorID)
+}
+
+func (f *fakeStore) SetAvatar(_ context.Context, _, _, avatarID string, keyVersion int64) error {
+	f.avatarID, f.avatarVersion = avatarID, keyVersion
+	return f.avatarErr
 }
 
 func (f *fakeStore) SetNotifyLevel(ctx context.Context, circleID, accountID, level string) error {

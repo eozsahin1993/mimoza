@@ -40,21 +40,21 @@ func TestStore_AProfileIsWrittenAndReadBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fresh.Name != "" || fresh.AvatarID != "" || len(fresh.PublicKey) != 0 {
+	if fresh.Name != "" || len(fresh.PublicKey) != 0 {
 		t.Fatalf("expected an empty profile, got %+v", fresh)
 	}
 	if fresh.CreatedAt.IsZero() {
 		t.Error("expected a creation stamp")
 	}
 
-	if err := store.SetProfile(ctx, accountID, "Sarah", "hash-1"); err != nil {
+	if err := store.SetProfile(ctx, accountID, "Sarah"); err != nil {
 		t.Fatal(err)
 	}
 	got, err := store.GetProfile(ctx, accountID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Name != "Sarah" || got.AvatarID != "hash-1" {
+	if got.Name != "Sarah" {
 		t.Fatalf("expected the written profile back, got %+v", got)
 	}
 	if !got.CreatedAt.Equal(fresh.CreatedAt) {
@@ -70,7 +70,7 @@ func TestStore_WritingToAnAccountThatIsGone(t *testing.T) {
 	store := profile.NewStore(testsupport.NewAccountTable(t))
 	missing := testsupport.UniqueAccountID(t)
 
-	if err := store.SetProfile(ctx, missing, "Sarah", ""); !errors.Is(err, accounts.ErrNotFound) {
+	if err := store.SetProfile(ctx, missing, "Sarah"); !errors.Is(err, accounts.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 	if err := store.SetPublicKey(ctx, missing, []byte("key")); !errors.Is(err, accounts.ErrNotFound) {
@@ -115,7 +115,7 @@ func TestStore_ThePublicKeyIsReplacedWholesale(t *testing.T) {
 	}
 	// The name is on the same row as the key and must survive a reset —
 	// a recovering device is still the same person.
-	if err := store.SetProfile(ctx, accountID, "Sarah", ""); err != nil {
+	if err := store.SetProfile(ctx, accountID, "Sarah"); err != nil {
 		t.Fatal(err)
 	}
 	after, err := store.GetProfile(ctx, accountID)

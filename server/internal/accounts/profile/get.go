@@ -12,9 +12,6 @@ import (
 type profileResponse struct {
 	AccountID string `json:"accountId"`
 	Name      string `json:"name"`
-	// AvatarID is read back with the account it belongs to: together
-	// they are where the picture is.
-	AvatarID string `json:"avatarId,omitempty"`
 	// PublicKey is what other members seal this account's content keys
 	// to. Empty until a device publishes one.
 	PublicKey string `json:"publicKey,omitempty"`
@@ -40,7 +37,6 @@ func asResponse(profile accounts.Profile) profileResponse {
 	return profileResponse{
 		AccountID: profile.AccountID,
 		Name:      profile.Name,
-		AvatarID:  profile.AvatarID,
 		PublicKey: base64.StdEncoding.EncodeToString(profile.PublicKey),
 		CreatedAt: profile.CreatedAt.UnixMilli(),
 	}

@@ -19,19 +19,17 @@ func TestAccounts_ProfileBelongsToTheSession(t *testing.T) {
 	var profile struct {
 		AccountID string `json:"accountId"`
 		Name      string `json:"name"`
-		AvatarID  string `json:"avatarId"`
 		PublicKey string `json:"publicKey"`
 	}
 	device.Get(api("/account")).Expect(http.StatusOK).Decode(&profile)
 	harness.AssertEqual(t, profile.AccountID, device.AccountID(), "the profile is the caller's own")
 	harness.AssertEqual(t, profile.Name, "", "and starts without a name")
 
-	device.Put(api("/account/profile"), harness.Body{
-		"name":     "Sarah",
-		"avatarId": "hash-1",
-	}).Expect(http.StatusOK).Decode(&profile)
+	// No picture here: a face is circle content, kept on the membership
+	// rather than the account — see TestCircleAvatars.
+	device.Put(api("/account/profile"), harness.Body{"name": "Sarah"}).
+		Expect(http.StatusOK).Decode(&profile)
 	harness.AssertEqual(t, profile.Name, "Sarah", "the name took")
-	harness.AssertEqual(t, profile.AvatarID, "hash-1", "and the avatar with it")
 
 	// Another account sees its own, not this one's.
 	var theirs struct {

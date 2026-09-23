@@ -133,6 +133,22 @@ func uploadTarget(t *testing.T, device *harness.Device, circleID, postID string)
 	return target
 }
 
+// fetchStatus follows a signed URL and reports what storage said, for
+// the tests that mean to find nothing there.
+func fetchStatus(t *testing.T, url string) int {
+	t.Helper()
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	return response.StatusCode
+}
+
 // fetch follows a signed URL the way a device does, with no session and
 // no relay in the path.
 func fetch(t *testing.T, url string) []byte {

@@ -30,12 +30,12 @@ type profiles interface {
 	GetProfiles(ctx context.Context, accountIDs []string) (map[string]accounts.Profile, error)
 }
 
-// Pending is one request with the person behind it, which is what an
-// admin actually answers.
+// Pending is one request with the person behind it. A name and no
+// picture: the asker holds no content key yet, so there is nothing they
+// could have sealed a face to.
 type Pending struct {
 	circles.Request
-	Name     string
-	AvatarID string
+	Name string
 }
 
 type Service struct {
@@ -117,11 +117,9 @@ func (s *Service) List(ctx context.Context, circleID, accountID string) ([]Pendi
 
 	pending := make([]Pending, 0, len(requests))
 	for _, request := range requests {
-		identity := identities[request.AccountID]
 		pending = append(pending, Pending{
-			Request:  request,
-			Name:     identity.Name,
-			AvatarID: identity.AvatarID,
+			Request: request,
+			Name:    identities[request.AccountID].Name,
 		})
 	}
 	return pending, nil

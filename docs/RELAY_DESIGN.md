@@ -31,10 +31,10 @@ relay (Lambda)
 
 | | who can read it |
 |---|---|
-| account name, avatar, circle name | relay and members |
+| account name, circle name | relay and members |
 | membership, roles, who invited whom, activity events | relay and members |
 | entry kind, author, timestamps, counts | relay and members |
-| post caption, photo, comment text, reaction payload, cover photo | members only |
+| post caption, photo, comment text, reaction payload, cover photo, member picture | members only |
 | content keys | members only; the relay stores copies sealed to each member |
 
 ## Keys
@@ -54,7 +54,7 @@ reaction tag      HMAC-SHA256(HKDF(K_v, "reaction-tag"), emoji), hex
 
 | pk | sk | attributes |
 |---|---|---|
-| `account#<id>` | `profile` | name, avatarId, pubkey, pubkeyUpdatedAt, createdAt |
+| `account#<id>` | `profile` | name, pubkey, pubkeyUpdatedAt, createdAt |
 | `account#<id>` | `device#<deviceId>` | pushToken, platform, locale, updatedAt |
 | `account#<id>` | `provider#<provider>:<sub>` | linkedAt, refreshToken (Apple only, for revoking on deletion) |
 | `provider#<provider>:<sub>` | `lookup` | accountId |
@@ -67,7 +67,7 @@ through the `lookup` row.
 | pk | sk | attributes |
 |---|---|---|
 | `circle#<id>` | `meta` | name, coverId, keyVersion, rosterVersion, memberCount, lastEntryAt, createdBy, createdAt |
-| `circle#<id>` | `member#<accountId>` | accountId, role `admin\|member`, notifyLevel, needsRewrap, joinedAt |
+| `circle#<id>` | `member#<accountId>` | accountId, role `admin\|member`, notifyLevel, needsRewrap, avatarId, avatarKeyVersion, joinedAt |
 | `circle#<id>` | `key#<accountId>` | keys `{ "<v>": sealedKey }`, updatedAt |
 | `circle#<id>` | `invite#<code>` | createdBy, createdAt, expiresAt |
 | `circle#<id>` | `request#<requestId>` | accountId, publicKey, status `pending\|approved\|denied`, createdAt, expiresAt. Indexed by account like a membership, since the asker has no membership to read: the query that answers "which circles am I in" filters on the `member#` prefix, so an ask can never be mistaken for one |
@@ -99,8 +99,8 @@ through the `lookup` row.
 | `by-account` | `accountId` | `sk` | every circle an account is in |
 
 Blobs live in S3 at `<circleId>/<postId>`, `<circleId>/cover/<coverId>`
-and `avatars/<accountId>/<avatarId>`, delivered as CloudFront URLs signed
-for an hour. The bytes never pass through the relay in either direction:
+and `<circleId>/avatar/<accountId>/<avatarId>`, delivered as CloudFront
+URLs signed for an hour. The bytes never pass through the relay in either direction:
 an upload is a presigned form the device posts straight to the bucket,
 and a download is a signed URL it fetches from the edge.
 
@@ -111,19 +111,14 @@ indefinitely, and re-uploading something unchanged is refused because
 those exact bytes are already there. Ids that become keys are checked
 for shape before they get near one (`internal/util/ids`).
 
-An avatar belongs to an account, not a circle, so it is unencrypted and
-is the one blob any signed-in caller may read. What is stored and shared
-is the id, never a URL or a key: an avatar id means nothing without the
-account it hangs off, exactly as a cover id means nothing without its
-circle. Both are unguessable and travel only where the reader was
-already allowed to look. Replacing a picture deletes the one it
-replaced.
-
-Nothing keeps a URL. A device holds ids, compares them to what it has
-cached, and asks for a signed URL only for bytes it is missing — which
-is also why ids rather than URLs are what the relay hands out: a URL
-expires within the hour, while an id is what says whether a picture has
-changed at all.
+A member's picture is circle content like everything else: sealed under
+the circle's content key, stored under that circle's prefix, and recorded
+on the membership row as an id and the key version that opens it. The
+same face is therefore stored once per circle rather than once per
+account, put there by its owner after they are admitted and deleted when
+they leave. A pending join request carries a name and no picture: the
+asker holds no key yet, so there is nothing they could have sealed one
+to.
 
 A blob is uploaded before the entry that references it, so a crash in
 between leaves an orphaned object rather than a post pointing at bytes
@@ -194,8 +189,8 @@ GET /account
     what says whose it is, and it is the only one they may read
 
 GET /circles/{id}/roster
-  → rosterVersion, members [accountId, name, avatarId, pubkey, role,
-    joinedAt, needsRewrap], the caller's sealed keys
+  → rosterVersion, members [accountId, name, avatarId, avatarKeyVersion,
+    pubkey, role, joinedAt, needsRewrap], the caller's sealed keys
 
 GET /circles/{id}/entries?type=post|activity&cursor=<opaque>&limit=200
   → entries, next, prev, more
@@ -205,12 +200,12 @@ GET /circles/{id}/entries/{postId}/children
 
 POST /circles/{id}/blobs/{postId}/upload-target
 POST /circles/{id}/blobs/cover/{coverId}/upload-target
-POST /account/avatar/{avatarId}/upload-target
+POST /circles/{id}/blobs/avatar/{avatarId}/upload-target
   → a presigned form, refused where bytes already sit at that key
 
 GET /circles/{id}/blobs/{postId}
 GET /circles/{id}/blobs/cover/{coverId}
-GET /avatars/{accountId}/{avatarId}
+GET /circles/{id}/blobs/avatar/{accountId}/{avatarId}
   → a URL signed for an hour, refused for a post that is deleted or
     never had a photo
 ```

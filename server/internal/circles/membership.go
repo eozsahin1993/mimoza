@@ -29,7 +29,13 @@ type Member struct {
 	// NeedsRewrap means this account replaced its keypair, so its sealed
 	// keys are unreadable until another member reseals them.
 	NeedsRewrap bool
-	JoinedAt    time.Time
+	// AvatarID is this member's picture in this circle, and AvatarKeyVersion
+	// the content key it was sealed under. A picture is circle content
+	// like a photo, so the same face is stored once per circle rather
+	// than once per account.
+	AvatarID         string
+	AvatarKeyVersion int64
+	JoinedAt         time.Time
 }
 
 func (m Member) IsAdmin() bool { return m.Role == RoleAdmin }
