@@ -1,6 +1,14 @@
 import { initDatabase } from '@/data/db';
-import { applyMembership } from '@/data/db/circles';
-import { applyRoster, getMember, listEveryMemberSeen, listMembers, rememberDepartedMember, setMemberAvatar } from '@/data/db/members';
+import { applyCircle } from '@/data/db/circles';
+import {
+  applyRoster,
+  getMember,
+  listEveryMemberSeen,
+  listMembers,
+  rememberDepartedMember,
+  setMemberAvatar,
+  setMemberRole,
+} from '@/data/db/members';
 
 const NOW = 1_700_000_000_000;
 
@@ -11,7 +19,7 @@ function circleId(): string {
 }
 
 async function seedCircle(id: string) {
-  await applyMembership(
+  await applyCircle(
     { circleId: id, name: 'Family', role: 'admin', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );
@@ -94,4 +102,27 @@ test('a picture belongs to a membership', async () => {
   const row = await getMember(circle, 'acc-1');
   expect(row?.avatarId).toBe('hash-1');
   expect(row?.avatarKeyVersion).toBe(2);
+});
+
+// applyRoster takes its argument as the whole roster, so promoting
+// through it with one entry would mark everybody else as having left.
+test('changing one role leaves the rest of the roster alone', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyRoster(
+    circle,
+    [
+      { circleId: circle, accountId: 'a', name: 'Ada', publicKey: 'aa', role: 'admin', joinedAt: NOW },
+      { circleId: circle, accountId: 'b', name: 'Bo', publicKey: 'bb', role: 'member', joinedAt: NOW },
+      { circleId: circle, accountId: 'c', name: 'Cy', publicKey: 'cc', role: 'member', joinedAt: NOW },
+    ],
+    NOW
+  );
+
+  await setMemberRole(circle, 'b', 'admin');
+
+  expect(await listMembers(circle)).toHaveLength(3);
+  expect((await getMember(circle, 'b'))?.role).toBe('admin');
+  expect((await getMember(circle, 'a'))?.leftAt).toBeNull();
+  expect((await getMember(circle, 'c'))?.leftAt).toBeNull();
 });

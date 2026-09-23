@@ -1,5 +1,5 @@
 import {
-  applyMembership,
+  applyCircle,
   childrenAreStale,
   getPost,
   initDatabase,
@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 
 async function seedPost(circleId: string, postId: string) {
-  await applyMembership(
+  await applyCircle(
     { circleId, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );

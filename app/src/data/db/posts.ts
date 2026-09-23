@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
 import { posts } from '@/data/db/schema';
@@ -37,16 +37,32 @@ export async function getPost(postId: string): Promise<Post | null> {
   return row ?? null;
 }
 
+/** Where a page of the wall resumes. Compound because createdAt is not unique. */
+export type FeedCursor = { createdAt: number; id: string };
+
 /**
  * One page of the wall, newest first by the author's own clock so two
  * devices that have caught up agree on the order.
+ *
+ * The cursor carries the id as well as the time, and the id is the
+ * second sort key. Two posts can share a millisecond — two photos queued
+ * back to back, or two devices colliding — and a cursor of time alone
+ * would resume strictly below the whole millisecond, dropping every
+ * other post in it from the feed for good.
  */
-export async function getFeed(circleId: string, limit = 20, before?: number): Promise<Post[]> {
+export async function getFeed(circleId: string, limit = 20, before?: FeedCursor): Promise<Post[]> {
+  const page = and(eq(posts.circleId, circleId), isNull(posts.deletedAt));
   const where = before
-    ? and(eq(posts.circleId, circleId), isNull(posts.deletedAt), lt(posts.createdAt, before))
-    : and(eq(posts.circleId, circleId), isNull(posts.deletedAt));
+    ? and(
+        page,
+        or(
+          lt(posts.createdAt, before.createdAt),
+          and(eq(posts.createdAt, before.createdAt), lt(posts.id, before.id))
+        )
+      )
+    : page;
 
-  return db.select().from(posts).where(where).orderBy(desc(posts.createdAt)).limit(limit);
+  return db.select().from(posts).where(where).orderBy(desc(posts.createdAt), desc(posts.id)).limit(limit);
 }
 
 /** The album is every post its author kept in it. */

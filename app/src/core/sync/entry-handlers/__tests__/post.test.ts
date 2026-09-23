@@ -1,4 +1,4 @@
-import { applyMembership, getAttachment, getPost, initDatabase, listComments } from '@/data/db';
+import { applyCircle, getAttachment, getPost, initDatabase, listComments } from '@/data/db';
 import { sealContent } from '@/core/crypto/content';
 import { reactionTag, reactionTagKey, reactionTagTable } from '@/core/crypto/reaction-tags';
 import { applyPostEntry } from '@/core/sync/entry-handlers/post';
@@ -40,7 +40,7 @@ beforeAll(async () => {
 });
 
 async function seed(circleId: string) {
-  await applyMembership(
+  await applyCircle(
     { circleId, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );

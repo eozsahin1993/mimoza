@@ -54,7 +54,7 @@ export async function listComments(postId: string): Promise<CommentWithAuthor[]>
   return rows.map((row) => ({ ...row.comment, authorName: row.name ?? '' }));
 }
 
-/** The preview on a card: the comments the relay named on the post row. */
+/** The preview on a card: the comments the relay named on the post row, minus any since deleted. */
 export async function getComments(commentIds: string[]): Promise<CommentWithAuthor[]> {
   if (commentIds.length === 0) return [];
   const rows = await db
@@ -67,7 +67,7 @@ export async function getComments(commentIds: string[]): Promise<CommentWithAuth
         eq(circleMembers.accountId, postComments.authorId)
       )
     )
-    .where(inArray(postComments.id, commentIds))
+    .where(and(inArray(postComments.id, commentIds), isNull(postComments.deletedAt)))
     .orderBy(asc(postComments.createdAt));
 
   return rows.map((row) => ({ ...row.comment, authorName: row.name ?? '' }));

@@ -1,4 +1,4 @@
-import { and, desc, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gte } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
 import { activity } from '@/data/db/schema';
@@ -20,11 +20,17 @@ export async function listActivity(circleId: string, limit = 100): Promise<Activ
     .limit(limit);
 }
 
-/** What the wall interleaves with posts since it was last opened. */
+/**
+ * What the wall interleaves with posts, from `since` onward.
+ *
+ * Inclusive: the feed passes its oldest post's time as the floor, and an
+ * event landing in exactly that millisecond belongs to the page that
+ * floor bounds, not the one after it.
+ */
 export async function listActivitySince(circleId: string, since: number): Promise<Activity[]> {
   return db
     .select()
     .from(activity)
-    .where(and(eq(activity.circleId, circleId), gt(activity.receivedAt, since)))
+    .where(and(eq(activity.circleId, circleId), gte(activity.receivedAt, since)))
     .orderBy(desc(activity.receivedAt));
 }

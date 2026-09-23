@@ -77,7 +77,7 @@ func TestCreate_MakesTheFounderAnAdmin(t *testing.T) {
 	store := &fakeStore{}
 	service := &Service{Store: store}
 
-	circle, err := service.Create(context.Background(), "account-1", "Family", []byte("sealed"))
+	circle, founder, err := service.Create(context.Background(), "account-1", "Family", []byte("sealed"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,6 +90,11 @@ func TestCreate_MakesTheFounderAnAdmin(t *testing.T) {
 	if circle.ID == "" || circle.KeyVersion != 1 {
 		t.Errorf("expected a circle with an id at key version 1, got %+v", circle)
 	}
+	// Returned as well as stored: the founder's device applies this
+	// membership rather than assuming what the relay chose for it.
+	if founder.Role != circles.RoleAdmin || founder.NotifyLevel != circles.NotifyAll {
+		t.Errorf("founder = %+v, want admin on every notification", founder)
+	}
 }
 
 // Two circles made in the same breath must not share an id.
@@ -97,11 +102,11 @@ func TestCreate_MintsADistinctIDEachTime(t *testing.T) {
 	store := &fakeStore{}
 	service := &Service{Store: store}
 
-	first, err := service.Create(context.Background(), "account-1", "Family", []byte("sealed"))
+	first, _, err := service.Create(context.Background(), "account-1", "Family", []byte("sealed"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.Create(context.Background(), "account-1", "Friends", []byte("sealed"))
+	second, _, err := service.Create(context.Background(), "account-1", "Friends", []byte("sealed"))
 	if err != nil {
 		t.Fatal(err)
 	}

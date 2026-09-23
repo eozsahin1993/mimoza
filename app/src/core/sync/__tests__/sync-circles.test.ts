@@ -10,7 +10,7 @@ import {
   upsertRequest,
 } from '@/data/db';
 import { syncCircles } from '@/core/sync/sync-circles';
-import type { Membership, Roster } from '@/features/circle/services/circle-relay';
+import type { Circle, Roster } from '@/features/circle/services/circle-relay';
 
 jest.mock('@/features/circle/services/circle-relay', () => ({
   listCircles: jest.fn(),
@@ -48,7 +48,7 @@ function circleId(): string {
   return `circle-${next}`;
 }
 
-function membership(id: string, overrides: Partial<Membership> = {}): Membership {
+function circleOf(id: string, overrides: Partial<Circle> = {}): Circle {
   return {
     circleId: id,
     name: 'Family',
@@ -83,7 +83,7 @@ beforeEach(() => {
 describe('a sync pass', () => {
   test('takes the roster and keys for a circle it has not seen', async () => {
     const id = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(id)], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
 
     expect(await syncCircles()).toBe(0);
 
@@ -95,7 +95,7 @@ describe('a sync pass', () => {
   // The whole point of the versions: nothing changed means one call.
   test('skips the roster when neither version moved', async () => {
     const id = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(id)], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
     await syncCircles();
     relay.getRoster.mockClear();
 
@@ -106,11 +106,11 @@ describe('a sync pass', () => {
 
   test('refetches when the roster version moves', async () => {
     const id = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(id)], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
     await syncCircles();
     relay.getRoster.mockClear();
 
-    relay.listCircles.mockResolvedValue({ circles: [membership(id, { rosterVersion: 2 })], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
     await syncCircles();
 
     expect(relay.getRoster).toHaveBeenCalledTimes(1);
@@ -120,7 +120,7 @@ describe('a sync pass', () => {
   // has gone still resolves to a name.
   test('a member who left the roster is kept, marked as gone', async () => {
     const id = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(id)], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
     relay.getRoster.mockResolvedValue(
       roster({
         members: [
@@ -131,7 +131,7 @@ describe('a sync pass', () => {
     );
     await syncCircles();
 
-    relay.listCircles.mockResolvedValue({ circles: [membership(id, { rosterVersion: 2 })], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
     relay.getRoster.mockResolvedValue(roster({ rosterVersion: 2 }));
     await syncCircles();
 
@@ -142,7 +142,7 @@ describe('a sync pass', () => {
   // Left, not gone: what was already synced stays readable offline.
   test('a circle the relay stops listing becomes a local archive', async () => {
     const id = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(id)], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
     await syncCircles();
 
     relay.listCircles.mockResolvedValue({ circles: [], requests: [] });
@@ -154,7 +154,7 @@ describe('a sync pass', () => {
 
   test('reseals for a member who replaced their keypair', async () => {
     const id = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(id)], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
     relay.getRoster.mockResolvedValue(
       roster({
         members: [
@@ -174,7 +174,7 @@ describe('a sync pass', () => {
   // to seal from.
   test('does not try to reseal when this account is the one waiting', async () => {
     const id = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(id, { needsRewrap: true })], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { needsRewrap: true })], requests: [] });
     relay.getRoster.mockResolvedValue(
       roster({
         members: [{ accountId: 'me', name: 'Me', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW, needsRewrap: true }],
@@ -189,7 +189,7 @@ describe('a sync pass', () => {
   test('one broken circle does not stop the rest', async () => {
     const good = circleId();
     const bad = circleId();
-    relay.listCircles.mockResolvedValue({ circles: [membership(bad), membership(good)], requests: [] });
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(bad), circleOf(good)], requests: [] });
     relay.getRoster.mockImplementation(async (id: string) => {
       if (id === bad) throw new Error('refused');
       return roster();

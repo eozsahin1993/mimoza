@@ -6,8 +6,13 @@ import { activity, circles, posts } from '@/data/db/schema';
 export type Circle = typeof circles.$inferSelect;
 export type NewCircle = typeof circles.$inferInsert;
 
-/** What a sync hands back for one circle, before anything else is fetched. */
-export type Membership = {
+/**
+ * A circle as the relay describes it. Spelled out here rather than
+ * imported from the relay client, because this layer does not depend on
+ * features/ — and not exported, because `applyCircle` is the only thing
+ * that ever holds one.
+ */
+type RelayCircle = {
   circleId: string;
   name: string;
   coverId?: string | null;
@@ -19,45 +24,41 @@ export type Membership = {
   needsRewrap?: boolean;
 };
 
-export async function upsertCircle(circle: NewCircle): Promise<void> {
-  await db
-    .insert(circles)
-    .values(circle)
-    .onConflictDoUpdate({ target: circles.id, set: { name: circle.name } });
-}
-
 /**
- * Applies what a sync said about a circle. Only the relay's own fields
- * are written: cursors and local state belong to this device and are
- * left alone.
+ * Writes what the relay said about a circle — from the circle list, or
+ * from the response to creating one.
+ *
+ * Only the relay's own fields are touched. The cursors, the last-viewed
+ * mark and `leftAt` belong to this device and are left exactly as they
+ * were, which is what makes this safe to call on every sync pass.
  */
-export async function applyMembership(membership: Membership, now: number): Promise<void> {
+export async function applyCircle(circle: RelayCircle, now: number): Promise<void> {
   await db
     .insert(circles)
     .values({
-      id: membership.circleId,
-      name: membership.name,
-      coverId: membership.coverId ?? null,
-      role: membership.role,
-      notifyLevel: membership.notifyLevel,
-      keyVersion: membership.keyVersion,
-      rosterVersion: membership.rosterVersion,
-      lastEntryAt: membership.lastEntryAt ?? 0,
-      needsRewrap: membership.needsRewrap ?? false,
+      id: circle.circleId,
+      name: circle.name,
+      coverId: circle.coverId ?? null,
+      role: circle.role,
+      notifyLevel: circle.notifyLevel,
+      keyVersion: circle.keyVersion,
+      rosterVersion: circle.rosterVersion,
+      lastEntryAt: circle.lastEntryAt ?? 0,
+      needsRewrap: circle.needsRewrap ?? false,
       createdAt: now,
       lastViewedAt: now,
     })
     .onConflictDoUpdate({
       target: circles.id,
       set: {
-        name: membership.name,
-        coverId: membership.coverId ?? null,
-        role: membership.role,
-        notifyLevel: membership.notifyLevel,
-        keyVersion: membership.keyVersion,
-        rosterVersion: membership.rosterVersion,
-        lastEntryAt: membership.lastEntryAt ?? 0,
-        needsRewrap: membership.needsRewrap ?? false,
+        name: circle.name,
+        coverId: circle.coverId ?? null,
+        role: circle.role,
+        notifyLevel: circle.notifyLevel,
+        keyVersion: circle.keyVersion,
+        rosterVersion: circle.rosterVersion,
+        lastEntryAt: circle.lastEntryAt ?? 0,
+        needsRewrap: circle.needsRewrap ?? false,
         leftAt: null,
       },
     });

@@ -17,7 +17,12 @@ type requestResponse struct {
 	AccountID string `json:"accountId"`
 	// Name is who is asking: an admin answers a person, not an account
 	// id. No picture — see Pending.
-	Name      string `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
+	// PublicKey is what an approving admin seals every content key
+	// version to. Without it there is nothing to approve against: the
+	// requester is not on the roster yet, so this is the only place
+	// their key is published.
+	PublicKey string `json:"publicKey,omitempty"`
 	Status    string `json:"status"`
 	CreatedAt int64  `json:"createdAt"`
 }
@@ -97,6 +102,7 @@ func asResponse(request circles.Request) requestResponse {
 		RequestID: request.ID,
 		CircleID:  request.CircleID,
 		AccountID: request.AccountID,
+		PublicKey: base64.StdEncoding.EncodeToString(request.PublicKey),
 		Status:    request.Status,
 		CreatedAt: request.CreatedAt.UnixMilli(),
 	}

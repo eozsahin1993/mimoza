@@ -1,5 +1,5 @@
 import {
-  applyMembership,
+  applyCircle,
   applyPost,
   due,
   getAttachment,
@@ -36,7 +36,7 @@ let next = 0;
 async function makeCircle(): Promise<string> {
   next += 1;
   const circleId = `circle-${next}`;
-  await applyMembership(
+  await applyCircle(
     { circleId, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );

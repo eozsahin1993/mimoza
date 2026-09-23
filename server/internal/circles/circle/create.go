@@ -18,12 +18,6 @@ type createRequest struct {
 	SealedKey string `json:"sealedKey"`
 }
 
-type createResponse struct {
-	CircleID      string `json:"circleId"`
-	KeyVersion    int64  `json:"keyVersion"`
-	RosterVersion int64  `json:"rosterVersion"`
-}
-
 type CreateHandler struct {
 	Service *Service
 }
@@ -44,15 +38,18 @@ func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	circle, err := h.Service.Create(r.Context(), auth.AccountID(r.Context()), body.Name, sealed)
+	circle, founder, err := h.Service.Create(r.Context(), auth.AccountID(r.Context()), body.Name, sealed)
 	if err != nil {
 		status, message := circles.Status(err)
 		httputil.WriteError(w, status, message)
 		return
 	}
-	httputil.WriteJSON(w, http.StatusCreated, createResponse{
-		CircleID:      circle.ID,
-		KeyVersion:    circle.KeyVersion,
-		RosterVersion: circle.RosterVersion,
-	})
+	// The same shape the circle list returns, so the device that made it
+	// applies the membership through the path a sync uses rather than
+	// guessing at the role and notify level the relay chose.
+	httputil.WriteJSON(w, http.StatusCreated, asMembership(circles.Membership{
+		Circle:      circle,
+		Role:        founder.Role,
+		NotifyLevel: founder.NotifyLevel,
+	}))
 }

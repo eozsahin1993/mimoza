@@ -6,7 +6,7 @@ jest.mock('@/core/services/keystore/circle-keys', () => ({
 import {
   AttachmentKinds,
   AttachmentStatuses,
-  applyMembership,
+  applyCircle,
   applyPost,
   getAttachment,
   getFetchableAttachments,
@@ -25,7 +25,7 @@ let next = 0;
 async function makeCircle(): Promise<string> {
   next += 1;
   const circleId = `circle-${next}`;
-  await applyMembership(
+  await applyCircle(
     { circleId, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );

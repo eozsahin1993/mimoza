@@ -1,5 +1,5 @@
 import { initDatabase } from '@/data/db';
-import { applyMembership } from '@/data/db/circles';
+import { applyCircle } from '@/data/db/circles';
 import { applyPost } from '@/data/db/posts';
 import { applyReactions, listReactors, queueReaction, settleReaction, summarise } from '@/data/db/reactions';
 
@@ -30,7 +30,7 @@ async function seedPost(id: string, relay: { counts?: Record<string, number>; un
 beforeEach(async () => {
   await initDatabase();
   // A post belongs to a circle, and the row is a foreign key.
-  await applyMembership(
+  await applyCircle(
     {
       circleId: 'circle-1',
       name: 'Family',

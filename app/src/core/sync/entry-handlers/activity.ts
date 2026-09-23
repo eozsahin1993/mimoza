@@ -1,4 +1,4 @@
-import { insertActivity, rememberDepartedMember } from '@/data/db';
+import { getMember, insertActivity, rememberDepartedMember } from '@/data/db';
 import type { EntryContext } from '@/core/sync/entry-handlers/types';
 import type { Entry } from '@/features/post/services/post-relay';
 
@@ -22,8 +22,9 @@ const DEPARTURES = new Set<string>([
 ]);
 
 /**
- * Applies one activity entry. The roster itself comes from `/me` and the
- * roster fetch; this is the history the wall shows beside posts.
+ * Applies one activity entry. Current membership comes from the circle
+ * list and the roster fetch; this is the history the wall shows beside
+ * posts.
  *
  * A departure is also written to `circle_members`, because the roster it
  * will next fetch no longer names that person — and a post or reaction
@@ -41,7 +42,14 @@ export async function applyActivityEntry(ctx: EntryContext, entry: Entry): Promi
     receivedAt: entry.receivedAt,
   });
 
-  if (entry.event && DEPARTURES.has(entry.event) && entry.subjectId) {
-    await rememberDepartedMember(ctx.circleId, entry.subjectId, entry.subjectName ?? '', entry.receivedAt);
-  }
+  if (!entry.event || !DEPARTURES.has(entry.event) || !entry.subjectId) return;
+
+  // A first sync walks the whole history *after* applying the current
+  // roster, so replaying an old departure would hide a member who left
+  // and rejoined. Their current joinedAt is newer than the departure
+  // that preceded it, which is what tells the two apart.
+  const member = await getMember(ctx.circleId, entry.subjectId);
+  if (member && entry.receivedAt <= member.joinedAt) return;
+
+  await rememberDepartedMember(ctx.circleId, entry.subjectId, entry.subjectName ?? '', entry.receivedAt);
 }

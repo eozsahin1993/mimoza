@@ -68,6 +68,18 @@ export async function countMembers(circleId: string): Promise<number> {
   return (await listMembers(circleId)).length;
 }
 
+/**
+ * One member's role. Not applyRoster with a single entry — that takes
+ * its argument as the complete roster and marks everyone missing from it
+ * as departed.
+ */
+export async function setMemberRole(circleId: string, accountId: string, role: string): Promise<void> {
+  await db
+    .update(circleMembers)
+    .set({ role })
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.accountId, accountId)));
+}
+
 /** Someone who left, or whose account is gone, kept by name alone. */
 export async function rememberDepartedMember(
   circleId: string,

@@ -11,7 +11,7 @@ import { decrypt, encryptJSON } from '@/core/crypto/primitives';
  * verify-then-trust chokepoint.
  */
 export function sealContent(value: unknown, key: Uint8Array): string {
-  return Buffer.from(encryptJSON(value, key)).toString('base64');
+  return toWire(encryptJSON(value, key));
 }
 
 /**
@@ -21,9 +21,28 @@ export function sealContent(value: unknown, key: Uint8Array): string {
  */
 export function openContent<T>(ciphertext: string, key: Uint8Array): T | null {
   try {
-    const bytes = new Uint8Array(Buffer.from(ciphertext, 'base64'));
-    return JSON.parse(new TextDecoder().decode(decrypt(bytes, key))) as T;
+    return JSON.parse(new TextDecoder().decode(decrypt(fromWire(ciphertext), key))) as T;
   } catch {
     return null;
   }
+}
+
+/**
+ * Key material as the relay carries it: base64, the same as ciphertext.
+ *
+ * Here rather than at each call site because the encoding is a property
+ * of the boundary, not of whoever happens to be crossing it — and the
+ * one time a call site chose for itself it chose hex, sealed every key
+ * to a public key nobody held, and nothing noticed until a member simply
+ * could not read.
+ *
+ * Reaction tags are the deliberate exception: they are path segments, and
+ * base64 is not URL-safe, so those stay hex.
+ */
+export function toWire(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('base64');
+}
+
+export function fromWire(value: string): Uint8Array {
+  return new Uint8Array(Buffer.from(value, 'base64'));
 }

@@ -54,17 +54,7 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	body := listResponse{Circles: make([]membershipResponse, 0, len(memberships))}
 	for _, membership := range memberships {
-		body.Circles = append(body.Circles, membershipResponse{
-			CircleID:      membership.Circle.ID,
-			Name:          membership.Circle.Name,
-			CoverID:       membership.Circle.CoverID,
-			Role:          membership.Role,
-			NotifyLevel:   membership.NotifyLevel,
-			KeyVersion:    membership.Circle.KeyVersion,
-			RosterVersion: membership.Circle.RosterVersion,
-			LastEntryAt:   millis(membership.Circle.LastEntryAt),
-			NeedsRewrap:   membership.NeedsRewrap,
-		})
+		body.Circles = append(body.Circles, asMembership(membership))
 	}
 	waiting, err := h.Service.Waiting(r.Context(), auth.AccountID(r.Context()))
 	if err != nil {
@@ -83,6 +73,33 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, body)
 }
 
-func millis(at interface{ UnixMilli() int64 }) int64 {
+// millis leaves an absent time absent rather than sending the epoch. A
+// circle that has just been created has no last entry, and UnixMilli on
+// a zero time is -62135596800000, which sorts a brand-new circle below
+// every other one on the client's home list.
+func millis(at interface {
+	UnixMilli() int64
+	IsZero() bool
+}) int64 {
+	if at.IsZero() {
+		return 0
+	}
 	return at.UnixMilli()
+}
+
+// asMembership is how a circle looks to one of its members. Shared by
+// the list and by create, so a device applies the same shape through the
+// same path whether it just made the circle or is catching up on it.
+func asMembership(membership circles.Membership) membershipResponse {
+	return membershipResponse{
+		CircleID:      membership.Circle.ID,
+		Name:          membership.Circle.Name,
+		CoverID:       membership.Circle.CoverID,
+		Role:          membership.Role,
+		NotifyLevel:   membership.NotifyLevel,
+		KeyVersion:    membership.Circle.KeyVersion,
+		RosterVersion: membership.Circle.RosterVersion,
+		LastEntryAt:   millis(membership.Circle.LastEntryAt),
+		NeedsRewrap:   membership.NeedsRewrap,
+	}
 }

@@ -1,38 +1,18 @@
-import { getMemberByPublicKey, MemberRoles, type MemberRole } from '@/data/db';
-import { addAuthority, removeAuthority } from '@/features/circle/usecases/authority';
-import { requireAdminPublicKey } from '@/features/invite/usecases/invite-to-circle';
+import { setMemberRole as setRoleLocally } from '@/data/db';
+import { patchMembership } from '@/features/circle/services/circle-relay';
+
+export const MemberRoles = { ADMIN: 'admin', MEMBER: 'member' } as const;
+export type MemberRole = (typeof MemberRoles)[keyof typeof MemberRoles];
 
 /**
- * Promotes a member to admin or demotes an admin to member — admin only,
- * and never against yourself: demoting yourself could leave a circle with
- * zero admins if you were the last one, and promoting yourself is
- * meaningless.
+ * Promotes or demotes someone. No keys move: the member already holds
+ * every version, so a role is a bit on the relay and nothing else.
  *
- * A promotion registers the promotee's authority key with the relay in
- * the same call that appends the `role_change`. Without that they'd be an
- * admin every client honours and the relay has never heard of — able to
- * approve joins and rename, but not to remove a member, set a cover
- * photo, or delete anyone else's photo. Demotion is the same call in
- * reverse, and has to be: a role stripped on the roster while the key
- * stayed in the set leaves a demoted admin holding every relay power the
- * demotion was meant to take away.
- *
- * Both queue through the outbox, so this works offline. Nothing changes
- * locally until the entry replays back, so the roster can never show an
- * admin the relay refused.
+ * The relay refuses demoting the last admin, which is the case worth
+ * getting wrong — a circle with members and no admin can never be
+ * administered again.
  */
-export async function setMemberRole(circleId: string, identityPublicKey: string, role: MemberRole): Promise<void> {
-  const ownPublicKey = await requireAdminPublicKey(circleId, "Only an admin can change a member's role.");
-  if (identityPublicKey === ownPublicKey) {
-    throw new Error("You can't change your own role.");
-  }
-  const subject = await getMemberByPublicKey(circleId, identityPublicKey);
-  if (!subject || subject.removedAt !== null) throw new Error('That person is no longer in this circle.');
-  if (subject.role === role) return;
-
-  if (role === MemberRoles.admin) {
-    await addAuthority(circleId, subject);
-  } else {
-    await removeAuthority(circleId, subject);
-  }
+export async function setMemberRole(circleId: string, accountId: string, role: MemberRole): Promise<void> {
+  await patchMembership(circleId, accountId, { role });
+  await setRoleLocally(circleId, accountId, role);
 }

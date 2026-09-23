@@ -1,7 +1,7 @@
 import { initDatabase } from '@/data/db';
-import { insertActivity } from '@/data/db/activity';
+import { insertActivity, listActivitySince } from '@/data/db/activity';
 import {
-  applyMembership,
+  applyCircle,
   deleteCircle,
   getCircle,
   getUnreadCount,
@@ -23,7 +23,7 @@ function circleId(): string {
   return `circle-${next}`;
 }
 
-function membership(circleId: string, overrides: Partial<Parameters<typeof applyMembership>[0]> = {}) {
+function membership(circleId: string, overrides: Partial<Parameters<typeof applyCircle>[0]> = {}) {
   return {
     circleId,
     name: 'Family',
@@ -44,11 +44,11 @@ beforeEach(async () => {
 // unread floor belong to this device.
 test('applying a membership leaves local state alone', async () => {
   const circle = circleId();
-  await applyMembership(membership(circle), NOW);
+  await applyCircle(membership(circle), NOW);
   await saveCursors(circle, { postsForward: 'cursor-1', activity: 'cursor-a' });
   await markCircleViewed(circle, NOW + 500);
 
-  await applyMembership(membership(circle, { name: 'Renamed', rosterVersion: 3 }), NOW + 1000);
+  await applyCircle(membership(circle, { name: 'Renamed', rosterVersion: 3 }), NOW + 1000);
 
   const row = await getCircle(circle);
   expect(row?.name).toBe('Renamed');
@@ -62,7 +62,7 @@ test('applying a membership leaves local state alone', async () => {
 // filed under departures.
 test('a membership that comes back is no longer left', async () => {
   const circle = circleId();
-  await applyMembership(membership(circle), NOW);
+  await applyCircle(membership(circle), NOW);
   await markCircleLeft(circle, NOW + 10);
   const inList = async (list: () => Promise<{ id: string }[]>) =>
     (await list()).some((row) => row.id === circle);
@@ -70,7 +70,7 @@ test('a membership that comes back is no longer left', async () => {
   expect(await inList(listCircles)).toBe(false);
   expect(await inList(listLeftCircles)).toBe(true);
 
-  await applyMembership(membership(circle), NOW + 20);
+  await applyCircle(membership(circle), NOW + 20);
   expect(await inList(listCircles)).toBe(true);
   expect(await inList(listLeftCircles)).toBe(false);
 });
@@ -79,7 +79,7 @@ test('a membership that comes back is no longer left', async () => {
 // both appear on the wall.
 test('unread counts posts and activity since the last look', async () => {
   const circle = circleId();
-  await applyMembership(membership(circle), NOW);
+  await applyCircle(membership(circle), NOW);
   await markCircleViewed(circle, NOW);
 
   await applyPost({
@@ -115,7 +115,7 @@ test('unread counts posts and activity since the last look', async () => {
 // A deleted post is still a row, so it must not be counted as news.
 test('a deleted post does not count as unread', async () => {
   const circle = circleId();
-  await applyMembership(membership(circle), NOW);
+  await applyCircle(membership(circle), NOW);
   await markCircleViewed(circle, NOW);
   await applyPost({
     id: 'post-1',
@@ -132,7 +132,7 @@ test('a deleted post does not count as unread', async () => {
 
 test('deleting a circle takes its rows with it', async () => {
   const circle = circleId();
-  await applyMembership(membership(circle), NOW);
+  await applyCircle(membership(circle), NOW);
   await applyPost({
     id: 'post-1',
     circleId: circle,
@@ -144,4 +144,19 @@ test('deleting a circle takes its rows with it', async () => {
 
   await deleteCircle(circle);
   expect(await getCircle(circle)).toBeNull();
+});
+
+// The feed's activity floor is its oldest post's time, so an event
+// landing in exactly that millisecond belongs to the page that floor
+// bounds — not the next one, where it would show up only after scrolling.
+test('an event exactly at the floor belongs to the page it bounds', async () => {
+  const circle = circleId();
+  await applyCircle(membership(circle), NOW);
+  const floor = NOW + 500;
+  await insertActivity({ id: `at-${circle}`, circleId: circle, event: 'joined', actorId: 'a', receivedAt: floor });
+  await insertActivity({ id: `below-${circle}`, circleId: circle, event: 'joined', actorId: 'b', receivedAt: floor - 1 });
+
+  const page = await listActivitySince(circle, floor);
+
+  expect(page.map((row) => row.id)).toEqual([`at-${circle}`]);
 });

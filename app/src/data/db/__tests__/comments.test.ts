@@ -1,5 +1,5 @@
 import { initDatabase } from '@/data/db';
-import { applyMembership } from '@/data/db/circles';
+import { applyCircle } from '@/data/db/circles';
 import { applyChildren, applyComment, dropPendingComment, getComments, insertPendingComment, listComments, markCommentDeleted } from '@/data/db/comments';
 import { applyRoster } from '@/data/db/members';
 import { applyPost } from '@/data/db/posts';
@@ -15,7 +15,7 @@ function ids() {
 }
 
 async function seed(circle: string, post: string) {
-  await applyMembership(
+  await applyCircle(
     { circleId: circle, name: 'Family', role: 'admin', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );

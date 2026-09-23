@@ -234,7 +234,7 @@ export const postReactions = sqliteTable(
   (t) => [primaryKey({ columns: [t.postId, t.accountId, t.tag] })]
 );
 
-/** What a queued write is. Membership changes are direct calls, not these. */
+/** What a queued write is. Roster changes are direct calls, not these. */
 export type OutboxOp =
   | 'post'
   | 'comment'
@@ -245,9 +245,9 @@ export type OutboxOp =
   | 'set_visibility';
 
 /**
- * Content writes queue here and drain in order. Membership operations do
- * not: they need the current roster anyway, so they are direct calls
- * that fail in front of the person who made them.
+ * Content writes queue here and drain in order. Roster changes do not:
+ * they need the current roster anyway, so they are direct calls that
+ * fail in front of the person who made them.
  */
 export const outbox = sqliteTable(
   'outbox',

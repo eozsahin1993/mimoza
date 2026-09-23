@@ -1,5 +1,5 @@
 import { initDatabase } from '@/data/db';
-import { applyMembership } from '@/data/db/circles';
+import { applyCircle } from '@/data/db/circles';
 import {
   applyPost,
   childrenAreStale,
@@ -26,7 +26,7 @@ function postId(name: string): string {
 }
 
 async function seedCircle(id: string) {
-  await applyMembership(
+  await applyCircle(
     { circleId: id, name: 'Family', role: 'admin', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );
@@ -113,4 +113,24 @@ test('children are stale only when never fetched or older than the post', async 
 
   await applyPost(post(circle, id, { updatedAt: NOW + 20 }));
   expect(childrenAreStale((await getPost(id))!)).toBe(true);
+});
+
+// createdAt is the author's own clock and is not unique: two photos
+// queued back to back share a millisecond. A cursor of time alone
+// resumes strictly below the whole millisecond, so everything else in it
+// is dropped from the feed for good.
+test('two posts sharing a millisecond both survive paging', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  const same = NOW + 500;
+  await applyPost(post(circle, postId('a'), { createdAt: NOW + 900 }));
+  await applyPost(post(circle, postId('b'), { createdAt: same }));
+  await applyPost(post(circle, postId('c'), { createdAt: same }));
+
+  const first = await getFeed(circle, 2);
+  const last = first[first.length - 1];
+  const second = await getFeed(circle, 2, { createdAt: last.createdAt, id: last.id });
+
+  const seen = [...first, ...second].map((row) => row.id).sort();
+  expect(seen).toEqual([postId('a'), postId('b'), postId('c')].sort());
 });

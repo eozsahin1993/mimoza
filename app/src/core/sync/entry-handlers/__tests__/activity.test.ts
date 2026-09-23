@@ -1,4 +1,4 @@
-import { applyMembership, applyRoster, initDatabase, listActivity, listEveryMemberSeen, listMembers } from '@/data/db';
+import { applyCircle, applyRoster, initDatabase, listActivity, listEveryMemberSeen, listMembers } from '@/data/db';
 import { ActivityEvents, applyActivityEntry } from '@/core/sync/entry-handlers/activity';
 import type { EntryContext } from '@/core/sync/entry-handlers/types';
 import type { Entry } from '@/features/post/services/post-relay';
@@ -24,7 +24,7 @@ beforeAll(async () => {
 });
 
 async function seed(id: string) {
-  await applyMembership(
+  await applyCircle(
     { circleId: id, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
     NOW
   );
@@ -76,6 +76,43 @@ describe('applying an activity entry', () => {
       expect(await listMembers(id)).toEqual([]);
     }
   );
+
+  // A first sync applies the current roster, then walks the whole
+  // history. Replaying an old departure must not hide someone who left
+  // and came back.
+  test('an old departure does not hide a member who rejoined', async () => {
+    const id = circleId();
+    await seed(id);
+    await applyRoster(
+      id,
+      [{ circleId: id, accountId: 'ali', name: 'Ali', publicKey: 'aa', role: 'member', joinedAt: NOW }],
+      NOW
+    );
+
+    await applyActivityEntry(
+      context(id),
+      entry({ event: ActivityEvents.LEFT, subjectId: 'ali', subjectName: 'Ali', receivedAt: NOW - 5_000 })
+    );
+
+    expect(await listMembers(id)).toHaveLength(1);
+  });
+
+  test('a departure after the current join still marks them gone', async () => {
+    const id = circleId();
+    await seed(id);
+    await applyRoster(
+      id,
+      [{ circleId: id, accountId: 'ali', name: 'Ali', publicKey: 'aa', role: 'member', joinedAt: NOW }],
+      NOW
+    );
+
+    await applyActivityEntry(
+      context(id),
+      entry({ event: ActivityEvents.LEFT, subjectId: 'ali', subjectName: 'Ali', receivedAt: NOW + 5_000 })
+    );
+
+    expect(await listMembers(id)).toEqual([]);
+  });
 
   test('a departure does not resurrect someone the roster still has', async () => {
     const id = circleId();

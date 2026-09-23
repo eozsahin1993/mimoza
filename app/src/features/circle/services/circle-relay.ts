@@ -6,7 +6,16 @@ import { authorizedFetch, describeError } from '@/core/services/relay';
  * post-relay's.
  */
 
-export type Membership = {
+/**
+ * How one circle looks to one member. Not a thing the relay stores: the
+ * circle's shared half (name, cover, key and roster versions) joined
+ * with this account's own member row (role, notify level, rewrap).
+ *
+ * So two members hold the same circle differently, and none of this is
+ * state to compare against another member's. The row in data/db is this
+ * plus the cursors and view state that never leave the device.
+ */
+export type Circle = {
   circleId: string;
   name: string;
   coverId?: string;
@@ -46,21 +55,29 @@ export type Roster = {
 };
 
 /** Where a sync starts: every circle this account is in, and every ask it is waiting on. */
-export async function listCircles(): Promise<{ circles: Membership[]; requests: PendingRequest[] }> {
+export async function listCircles(): Promise<{ circles: Circle[]; requests: PendingRequest[] }> {
   const response = await authorizedFetch('/v1/circles');
   if (!response.ok) throw new Error(await describeError(response, 'listing circles'));
-  const body = (await response.json()) as { circles?: Membership[]; requests?: PendingRequest[] };
+  const body = (await response.json()) as { circles?: Circle[]; requests?: PendingRequest[] };
   return { circles: body.circles ?? [], requests: body.requests ?? [] };
 }
 
-export async function createCircle(name: string, sealedKey: string): Promise<{ circleId: string }> {
+/**
+ * The founder seals the first content key to their own account key, or
+ * they make a circle they cannot read.
+ *
+ * Answers with the same shape the circle list returns, so the
+ * device that made it applies relay state through the path a sync uses
+ * rather than guessing at the role and notify level it was given.
+ */
+export async function createCircle(name: string, sealedKey: string): Promise<Circle> {
   const response = await authorizedFetch('/v1/circles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, sealed: sealedKey }),
+    body: JSON.stringify({ name, sealedKey }),
   });
   if (!response.ok) throw new Error(await describeError(response, 'creating a circle'));
-  return (await response.json()) as { circleId: string };
+  return (await response.json()) as Circle;
 }
 
 /**
@@ -91,11 +108,14 @@ export async function setCover(circleId: string, coverId: string): Promise<void>
   if (!response.ok) throw new Error(await describeError(response, 'changing the cover'));
 }
 
-/** Your own notification level, or your own picture for this circle. Never anyone else's. */
+/**
+ * Field-level rules, enforced by the relay: notifyLevel and avatarId only
+ * on your own row, role only by an admin and never on your own.
+ */
 export async function patchMembership(
   circleId: string,
   accountId: string,
-  change: { notifyLevel?: string; avatarId?: string; keyVersion?: number }
+  change: { role?: string; notifyLevel?: string; avatarId?: string; keyVersion?: number }
 ): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${circleId}/members/${accountId}`, {
     method: 'PATCH',
@@ -105,6 +125,7 @@ export async function patchMembership(
   if (!response.ok) throw new Error(await describeError(response, 'changing a membership'));
 }
 
+/** Leaving rotates too, so `sealed` is the new key per remaining account id. */
 export async function leaveCircle(circleId: string, keyVersion: number, sealed: Record<string, string>): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${circleId}/leave`, {
     method: 'POST',
@@ -114,7 +135,11 @@ export async function leaveCircle(circleId: string, keyVersion: number, sealed: 
   if (!response.ok) throw new Error(await describeError(response, 'leaving the circle'));
 }
 
-/** Removing a member rotates the key, so the caller seals the new one to everyone staying. */
+/**
+ * Removing a member rotates the key, so the caller seals the new one to
+ * everyone staying. `sealed` is keyed by account id here; on `rewrapKeys`
+ * the same field is keyed by version.
+ */
 export async function removeMember(
   circleId: string,
   accountId: string,
@@ -129,7 +154,12 @@ export async function removeMember(
   if (!response.ok) throw new Error(await describeError(response, 'removing a member'));
 }
 
-/** Resealing every version to a member who replaced their keypair. */
+export async function deleteCircle(circleId: string): Promise<void> {
+  const response = await authorizedFetch(`/v1/circles/${circleId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(await describeError(response, 'deleting the circle'));
+}
+
+/** Resealing every version to a member who replaced their keypair: `sealed` keyed by version. */
 export async function rewrapKeys(
   circleId: string,
   accountId: string,

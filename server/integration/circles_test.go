@@ -54,12 +54,18 @@ func TestCircles_JoinAndPost(t *testing.T) {
 	var pending struct {
 		Requests []struct {
 			RequestID string `json:"requestId"`
+			PublicKey string `json:"publicKey"`
 			Status    string `json:"status"`
 		} `json:"requests"`
 	}
 	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
 	harness.AssertEqual(t, len(pending.Requests), 1, "the admin sees one ask")
 	harness.AssertEqual(t, pending.Requests[0].Status, "pending", "and it is unanswered")
+	// The joiner is not on the roster yet, so the ask is the only place
+	// their key is published — without it there is nothing to seal to.
+	harness.AssertEqual(t, pending.Requests[0].PublicKey,
+		base64.StdEncoding.EncodeToString([]byte(joiner.AccountID()+"-public-key")),
+		"the ask carries the key an approver seals to")
 
 	// Approval carries every content key version, sealed to that key.
 	admin.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/approve"), harness.Body{

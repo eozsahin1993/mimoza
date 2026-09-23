@@ -1,5 +1,5 @@
 import {
-  applyMembership,
+  applyCircle,
   applyRoster,
   getCircle,
   dropRequest,
@@ -13,7 +13,7 @@ import { timed } from '@/core/utils/timing';
 import { drainOutbox } from '@/core/sync/drain-outbox';
 import { pullNewEntries } from '@/core/sync/pull-entries';
 import { entryContext } from '@/core/sync/entry-handlers';
-import { getRoster, listCircles, type Membership } from '@/features/circle/services/circle-relay';
+import { getRoster, listCircles, type Circle } from '@/features/circle/services/circle-relay';
 import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-exchange';
 
 /**
@@ -21,7 +21,7 @@ import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-excha
  * roster and keys for anything that moved, push what is queued, then
  * walk each circle's entries forward.
  *
- * The relay owns membership, so there is no log to replay and nothing to
+ * The relay owns circle, so there is no log to replay and nothing to
  * verify — a pass is a handful of reads whose results are written
  * straight down.
  */
@@ -55,11 +55,11 @@ export async function syncCircles(): Promise<number> {
   }
 
   let failed = 0;
-  for (const membership of circles) {
+  for (const circle of circles) {
     try {
-      await syncCircle(membership, now);
+      await syncCircle(circle, now);
     } catch (err) {
-      console.error(`Failed to sync circle ${membership.circleId}`, err);
+      console.error(`Failed to sync circle ${circle.circleId}`, err);
       failed += 1;
     }
   }
@@ -76,21 +76,21 @@ export async function syncCircles(): Promise<number> {
  * a page encrypted under a version this device has not been given yet
  * would be skipped and never revisited — cursors do not rewind.
  */
-async function syncCircle(membership: Membership, now: number): Promise<void> {
-  const before = await getCircle(membership.circleId);
-  await applyMembership(membership, now);
+async function syncCircle(circle: Circle, now: number): Promise<void> {
+  const before = await getCircle(circle.circleId);
+  await applyCircle(circle, now);
 
   const rosterMoved =
     !before ||
-    before.rosterVersion !== membership.rosterVersion ||
-    before.keyVersion !== membership.keyVersion;
+    before.rosterVersion !== circle.rosterVersion ||
+    before.keyVersion !== circle.keyVersion;
   if (rosterMoved) {
-    const roster = await timed('sync.roster', () => getRoster(membership.circleId));
-    await storeSealedKeys(membership.circleId, roster.keys);
+    const roster = await timed('sync.roster', () => getRoster(circle.circleId));
+    await storeSealedKeys(circle.circleId, roster.keys);
     await applyRoster(
-      membership.circleId,
+      circle.circleId,
       roster.members.map((member) => ({
-        circleId: membership.circleId,
+        circleId: circle.circleId,
         accountId: member.accountId,
         name: member.name ?? '',
         avatarId: member.avatarId ?? null,
@@ -107,18 +107,18 @@ async function syncCircle(membership: Membership, now: number): Promise<void> {
     // who holds the keys seals them again. Whoever syncs first does it,
     // and a repeat is harmless. Never this account: its own flag is
     // cleared by somebody else, and it has nothing to seal from.
-    if (!membership.needsRewrap) {
+    if (!circle.needsRewrap) {
       for (const member of roster.members.filter((member) => member.needsRewrap)) {
-        await resealFor(membership.circleId, member).catch((err) =>
-          console.error(`Failed to reseal keys for ${member.accountId} in ${membership.circleId}`, err)
+        await resealFor(circle.circleId, member).catch((err) =>
+          console.error(`Failed to reseal keys for ${member.accountId} in ${circle.circleId}`, err)
         );
       }
     }
   }
 
-  await timed('sync.push', () => drainOutbox(membership.circleId));
+  await timed('sync.push', () => drainOutbox(circle.circleId));
 
-  const ctx = await entryContext(membership.circleId);
+  const ctx = await entryContext(circle.circleId);
   if (!ctx) return;
   await timed('sync.posts', () => pullNewEntries(ctx, 'post'));
   await timed('sync.activity', () => pullNewEntries(ctx, 'activity'));

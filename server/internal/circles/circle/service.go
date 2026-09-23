@@ -58,7 +58,7 @@ type Service struct {
 // Create mints the circle id rather than taking one: it is the relay's
 // key space, and a client-chosen id could collide with a circle the
 // caller is not in.
-func (s *Service) Create(ctx context.Context, accountID, name string, sealed []byte) (circles.Circle, error) {
+func (s *Service) Create(ctx context.Context, accountID, name string, sealed []byte) (circles.Circle, circles.Member, error) {
 	circle := circles.Circle{
 		ID:            newID(),
 		Name:          name,
@@ -73,9 +73,11 @@ func (s *Service) Create(ctx context.Context, accountID, name string, sealed []b
 		NotifyLevel: circles.NotifyAll,
 	}
 	if err := s.Store.CreateCircle(ctx, circle, founder, sealed); err != nil {
-		return circles.Circle{}, err
+		return circles.Circle{}, circles.Member{}, err
 	}
-	return circle, nil
+	// The founder goes back too: the device that just made this circle
+	// applies the membership rather than assuming what the relay chose.
+	return circle, founder, nil
 }
 
 func newID() string {
