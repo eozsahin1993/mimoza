@@ -24,20 +24,6 @@
       "de": "German"
     },
     "notifyMeAbout": "Notify me about",
-    "pushLevels": {
-      "posts": "New photos only",
-      "comments": "Photos and comments",
-      "reactions": "Photos, comments and reactions"
-    },
-    "devices": "Devices",
-    "devicesFootnote": "A device you add holds the same keys as this one. There is no way to take them back.",
-    "addDevice": "Add another device",
-    "addDeviceDescription": "Scan the code on your other phone",
-    "bringOver": "Bring over an existing account",
-    "bringOverDescription": "Show a code for your old phone to scan",
-    "recovery": "Account recovery",
-    "recoveryPhrase": "Recovery phrase",
-    "recoveryPhraseDescription": "12 words that restore your circles on a new phone",
     "privacy": "How the privacy works",
     "privacyDescription": "What end-to-end encrypted means here",
     "about": "About",
@@ -56,15 +42,6 @@
     "deleting": "Deleting your account…",
     "deletingDetail": "This can take a moment. Don't close the app.",
     "notifications": "Notifications",
-    "newCirclesRow": "New circles",
-    "invitesRow": "Invites",
-    "notificationsFootnote": "These are just for this phone. Notifications arrive encrypted and are put together right here, so no push server ever sees a name or a message.",
-    "invitePushLevels": {
-      "all": "Requests to join and answers",
-      "requests": "Requests to join only",
-      "answers": "Answers to your requests only",
-      "off": "Off"
-    },
     "notifyLevels": {
       "photos": "New photos only",
       "comments": "Photos and comments",
@@ -203,8 +180,7 @@
       "namePlaceholder": "e.g. Marcus Adeyemi",
       "continue": "Continue",
       "addNameToContinue": "Add your name to continue",
-      "saveFailed": "Couldn't save your profile. Try again.",
-      "alreadyHaveAccount": "I already have an account"
+      "saveFailed": "Couldn't save your profile. Try again."
     }
   },
   "circle": {

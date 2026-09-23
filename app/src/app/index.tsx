@@ -14,8 +14,8 @@ import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Colors, Space, Spacing } from '@/ui/theme/tokens';
-import { getProfile } from '@/data/db';
-import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/features/account/usecases/account-manifest';
+import { getProfile, saveProfile } from '@/data/db';
+import { generateUUID } from '@/core/crypto/primitives';
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
@@ -60,9 +60,6 @@ export default function WelcomeScreen() {
       const result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
       if (result.outcome !== 'success') return;
 
-      // Best-effort — silently a no-op on a brand-new install's very
-      // first sign-in (no master seed yet), picked up on the next one.
-      recordSignInProviderBestEffort(provider);
       // Launch skipped this while signed out, and signing out removed it.
       enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
 
@@ -73,24 +70,30 @@ export default function WelcomeScreen() {
         return;
       }
 
-      // Asked here and nowhere else. Every path below mints a seed, and a
-      // seed is what makes the old identity unreachable — so this is the
-      // last moment the answer can change anything. Best-effort: offline,
-      // it asks anyway rather than minting silently, since a seed made
-      // without the question is the same irreversible loss.
-      const prior = await hasUnreadableAccountManifest().then(
-        (found) => (found ? 'yes' : 'no'),
-        () => 'unknown' as const,
-      );
-      if (prior !== 'no') {
-        router.push({ pathname: '/account/returning', params: { certain: prior === 'yes' ? '1' : '' } });
+      // No local profile, but the relay may already have a name for this
+      // account — signing in on a new device for an account that has
+      // completed setup elsewhere. The relay is what decides that now,
+      // not a guess about whether this is "the same person": sign-in
+      // always resolves to the same account for the same provider
+      // identity, so there is nothing to ask.
+      if (result.relayProfile?.name) {
+        const now = Date.now();
+        await saveProfile({
+          accountId: result.relayProfile.accountId,
+          name: result.relayProfile.name,
+          picture: null,
+          deviceId: generateUUID(),
+          createdAt: now,
+          updatedAt: now,
+        });
+        await goPostAuth(router);
         return;
       }
 
-      // Always through the form, pre-filled with whatever the provider
-      // gave us — profile-setup downloads the suggested picture itself.
-      // Nobody gets a name and avatar committed to their circles without
-      // having seen them first.
+      // Brand new account. Always through the form, pre-filled with
+      // whatever the provider gave us — profile-setup downloads the
+      // suggested picture itself. Nobody gets a name and avatar committed
+      // to their circles without having seen them first.
       router.push({
         pathname: '/profile-setup',
         params: {

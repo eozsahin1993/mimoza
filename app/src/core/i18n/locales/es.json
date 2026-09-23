@@ -24,20 +24,6 @@
       "de": "Alemán"
     },
     "notifyMeAbout": "Notificaciones",
-    "pushLevels": {
-      "posts": "Solo fotos nuevas",
-      "comments": "Fotos y comentarios",
-      "reactions": "Fotos, comentarios y reacciones"
-    },
-    "devices": "Dispositivos",
-    "devicesFootnote": "Un dispositivo que añadas tiene las mismas claves que este. No hay forma de quitárselas.",
-    "addDevice": "Añadir otro dispositivo",
-    "addDeviceDescription": "Escanea el código de tu otro teléfono",
-    "bringOver": "Transferir una cuenta existente",
-    "bringOverDescription": "Muestra un código para que lo escanee tu teléfono antiguo",
-    "recovery": "Recuperación de la cuenta",
-    "recoveryPhrase": "Palabras de recuperación",
-    "recoveryPhraseDescription": "12 palabras que recuperan tus círculos en un teléfono nuevo",
     "privacy": "Cómo funciona la privacidad",
     "privacyDescription": "Qué significa aquí el cifrado de extremo a extremo",
     "about": "Acerca de",
@@ -56,15 +42,6 @@
     "deleting": "Eliminando tu cuenta…",
     "deletingDetail": "Puede tardar un momento. No cierres la app.",
     "notifications": "Notificaciones",
-    "newCirclesRow": "Círculos nuevos",
-    "invitesRow": "Invitaciones",
-    "notificationsFootnote": "Estos ajustes son solo para este teléfono. Las notificaciones llegan cifradas y se preparan aquí mismo, así que ningún servidor de notificaciones ve nunca un nombre ni un mensaje.",
-    "invitePushLevels": {
-      "all": "Solicitudes para unirse y respuestas",
-      "requests": "Solo solicitudes para unirse",
-      "answers": "Solo respuestas a tus solicitudes",
-      "off": "Desactivadas"
-    },
     "notifyLevels": {
       "photos": "Solo fotos nuevas",
       "comments": "Fotos y comentarios",
@@ -203,8 +180,7 @@
       "namePlaceholder": "p. ej., Lucía Fernández",
       "continue": "Continuar",
       "addNameToContinue": "Añade tu nombre para continuar",
-      "saveFailed": "No se ha podido guardar tu perfil. Inténtalo de nuevo.",
-      "alreadyHaveAccount": "Ya tengo una cuenta"
+      "saveFailed": "No se ha podido guardar tu perfil. Inténtalo de nuevo."
     }
   },
   "circle": {

@@ -24,20 +24,6 @@
       "de": "Allemand"
     },
     "notifyMeAbout": "Notifications",
-    "pushLevels": {
-      "posts": "Nouvelles photos uniquement",
-      "comments": "Photos et commentaires",
-      "reactions": "Photos, commentaires et réactions"
-    },
-    "devices": "Appareils",
-    "devicesFootnote": "Un appareil que tu ajoutes détient les mêmes clés que celui-ci. Il est impossible de les lui retirer.",
-    "addDevice": "Ajouter un autre appareil",
-    "addDeviceDescription": "Scanne le code affiché sur ton autre téléphone",
-    "bringOver": "Transférer un compte existant",
-    "bringOverDescription": "Affiche un code à scanner avec ton ancien téléphone",
-    "recovery": "Récupération du compte",
-    "recoveryPhrase": "Mots de récupération",
-    "recoveryPhraseDescription": "12 mots qui restaurent tes cercles sur un nouveau téléphone",
     "privacy": "Comment fonctionne la confidentialité",
     "privacyDescription": "Ce que « chiffré de bout en bout » veut dire ici",
     "about": "À propos",
@@ -56,15 +42,6 @@
     "deleting": "Suppression de ton compte…",
     "deletingDetail": "Cela peut prendre un moment. Ne ferme pas l’app.",
     "notifications": "Notifications",
-    "newCirclesRow": "Nouveaux cercles",
-    "invitesRow": "Invitations",
-    "notificationsFootnote": "Ces réglages ne valent que pour ce téléphone. Les notifications arrivent chiffrées et sont préparées ici même : aucun serveur de notifications ne voit jamais de nom ni de message.",
-    "invitePushLevels": {
-      "all": "Demandes pour rejoindre et réponses",
-      "requests": "Demandes pour rejoindre uniquement",
-      "answers": "Réponses à tes demandes uniquement",
-      "off": "Désactivées"
-    },
     "notifyLevels": {
       "photos": "Nouvelles photos uniquement",
       "comments": "Photos et commentaires",
@@ -203,8 +180,7 @@
       "namePlaceholder": "ex. : Camille Martin",
       "continue": "Continuer",
       "addNameToContinue": "Ajoute ton nom pour continuer",
-      "saveFailed": "Impossible d’enregistrer ton profil. Réessaie.",
-      "alreadyHaveAccount": "J’ai déjà un compte"
+      "saveFailed": "Impossible d’enregistrer ton profil. Réessaie."
     }
   },
   "circle": {

@@ -1,70 +1,59 @@
-jest.mock('@/core/services/log-relay');
-jest.mock('@/features/circle/usecases/sync-circle');
-jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/photo/image');
+jest.mock('@/features/account/services/account-relay');
 
-import { getCircleMembers, getPendingOutboxEntries, initDatabase } from '@/data/db';
-import { getProfile } from '@/data/db/profile';
-import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
-import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
+import { initDatabase } from '@/data/db';
+import { forgetProfile, getProfile } from '@/data/db/profile';
 import { completeProfileSetup } from '@/features/account/usecases/onboarding';
-import { createCircle } from '@/features/circle/usecases/create-circle';
-import { EntryTypes } from '@/core/sync/log-entry';
-import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { compressToThumbnail } from '@/core/photo/image';
-import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
-import { bytesToHex } from '@noble/curves/utils.js';
+import { setName } from '@/features/account/services/account-relay';
 
-// Pictures here are plain byte arrays rather than real images, so the
-// thumbnailer echoes them back instead of crashing on a decode.
 beforeAll(() => initDatabase());
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
-  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
-  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
-  (drainOutbox as jest.Mock).mockResolvedValue(undefined);
-  (compressToThumbnail as jest.Mock).mockImplementation((bytes: Uint8Array) => Promise.resolve(bytes));
+  // One row per accountId, so a fresh test must not inherit the previous
+  // test's row — completeProfileSetup's "keep the device id" behavior
+  // would otherwise pass for the wrong reason.
+  await forgetProfile('acc-1');
+  (setName as jest.Mock).mockResolvedValue({ accountId: 'acc-1', name: 'Ali', createdAt: 0 });
 });
 
 describe('completeProfileSetup', () => {
-  test('saves the profile and generates a seed on first run', async () => {
-    await completeProfileSetup({ name: 'Emre', picture: null });
+  test('saves the local profile and publishes the name to the relay', async () => {
+    const picture = new Uint8Array([1, 2, 3]);
 
-    await expect(getProfile()).resolves.toMatchObject({ name: 'Emre' });
-    await expect(getMasterSeed()).resolves.not.toBeNull();
+    await completeProfileSetup({ name: 'Ali', picture });
+
+    expect(setName).toHaveBeenCalledWith('Ali');
+    const profile = await getProfile();
+    expect(profile?.accountId).toBe('acc-1');
+    expect(profile?.name).toBe('Ali');
+    expect(profile?.picture).toEqual(picture);
   });
 
-  test('running again does not overwrite the existing seed', async () => {
-    await completeProfileSetup({ name: 'Emre', picture: null });
-    const firstSeed = await getMasterSeed();
+  test('mints a device id the first time', async () => {
+    await completeProfileSetup({ name: 'Ali', picture: null });
 
-    await completeProfileSetup({ name: 'Emre (edited)', picture: null });
-    const secondSeed = await getMasterSeed();
-
-    expect(secondSeed).toEqual(firstSeed);
-    await expect(getProfile()).resolves.toMatchObject({ name: 'Emre (edited)' });
+    expect((await getProfile())?.deviceId).toBeTruthy();
   });
 
-  // Editing a profile goes through this same function, and `member_added`
-  // only ever carried the name and picture a member joined with — so
-  // without this entry the change reaches nobody, which is exactly what
-  // shipped.
-  test('tells the circles this device is in about an edited picture', async () => {
-    await saveMasterSeed(new Uint8Array(16));
-    const { id: circleId } = await createCircle({ name: 'Family' });
+  // A fresh id on every edit would silently orphan this device's push
+  // registration under the old one.
+  test('editing a profile keeps the same device id', async () => {
+    await completeProfileSetup({ name: 'Ali', picture: null });
+    const deviceId = (await getProfile())?.deviceId;
 
-    await completeProfileSetup({ name: 'Emre', picture: new Uint8Array([7, 7, 7]) });
+    (setName as jest.Mock).mockResolvedValue({ accountId: 'acc-1', name: 'Ali Osman', createdAt: 0 });
+    await completeProfileSetup({ name: 'Ali Osman', picture: null });
 
-    const queued = await getPendingOutboxEntries(circleId);
-    expect(queued.some((entry) => entry.entryType === EntryTypes.PROFILE_UPDATE)).toBe(true);
+    expect((await getProfile())?.deviceId).toBe(deviceId);
+    expect((await getProfile())?.name).toBe('Ali Osman');
+  });
 
-    // And on this device too: its own roster row still held the picture it
-    // joined with otherwise.
-    const identity = (await getCircleIdentity(circleId))!;
-    const self = (await getCircleMembers(circleId)).find(
-      (member) => member.identityPublicKey === bytesToHex(identity.publicKey),
-    );
-    expect(self?.picture).toEqual(new Uint8Array([7, 7, 7]));
+  test('editing a profile keeps the original createdAt', async () => {
+    await completeProfileSetup({ name: 'Ali', picture: null });
+    const createdAt = (await getProfile())?.createdAt;
+
+    await completeProfileSetup({ name: 'Ali Osman', picture: null });
+
+    expect((await getProfile())?.createdAt).toBe(createdAt);
   });
 });

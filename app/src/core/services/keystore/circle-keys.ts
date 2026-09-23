@@ -1,20 +1,6 @@
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { deleteSecret, getSecret, setSecret } from '@/core/services/keystore/store';
-import type { Keypair } from '@/core/crypto/primitives';
-
-/**
- * A device's full local identity for one circle: the Ed25519 keypair, plus
- * the self-generated `memberId` it uses to reference itself in posts (see
- * `generateUUID()` in crypto.ts). Bundled together so signing and
- * posting need exactly one fast local read — no SQLite round-trip to find
- * "which roster row is me" every time you post.
- */
-export type CircleIdentity = Keypair & { memberId: string };
-
-function identityStorageKey(circleId: string) {
-  return `circle_identity_${circleId}`;
-}
 
 function keyMapStorageKey(circleId: string) {
   return `circle_keys_${circleId}`;
@@ -22,28 +8,6 @@ function keyMapStorageKey(circleId: string) {
 
 /** One circle's full `{version -> content key}` map — every version this member has ever held, since old content stays encrypted under whichever key was current when it was posted. */
 export type ContentKeyMap = Record<number, Uint8Array>;
-
-/** Persists this circle's identity (keypair + own member ID) in the device Keychain/Keystore. */
-export async function saveCircleIdentity(circleId: string, identity: CircleIdentity): Promise<void> {
-  const value = JSON.stringify({
-    publicKey: bytesToHex(identity.publicKey),
-    secretKey: bytesToHex(identity.secretKey),
-    memberId: identity.memberId,
-  });
-  await setSecret(identityStorageKey(circleId), value);
-}
-
-/** Reads this circle's identity back, or null if none is stored. */
-export async function getCircleIdentity(circleId: string): Promise<CircleIdentity | null> {
-  const raw = await getSecret(identityStorageKey(circleId));
-  if (!raw) return null;
-  const parsed = JSON.parse(raw) as { publicKey: string; secretKey: string; memberId: string };
-  return {
-    publicKey: hexToBytes(parsed.publicKey),
-    secretKey: hexToBytes(parsed.secretKey),
-    memberId: parsed.memberId,
-  };
-}
 
 /** Persists this circle's full content-key map, replacing whatever was stored before. */
 export async function saveCircleKeyMap(circleId: string, keyMap: ContentKeyMap): Promise<void> {
@@ -84,8 +48,7 @@ export async function addCircleKeyVersion(circleId: string, version: number, key
   await saveCircleKeyMap(circleId, { ...existing, [version]: key });
 }
 
-/** Removes both the identity keypair and the content-key map for a circle (e.g. on leave). */
+/** Removes the content-key map for a circle (e.g. on leave). */
 export async function deleteCircleKeys(circleId: string): Promise<void> {
-  await deleteSecret(identityStorageKey(circleId));
   await deleteSecret(keyMapStorageKey(circleId));
 }

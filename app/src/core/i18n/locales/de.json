@@ -24,20 +24,6 @@
       "de": "Deutsch"
     },
     "notifyMeAbout": "Benachrichtigungen",
-    "pushLevels": {
-      "posts": "Nur neue Fotos",
-      "comments": "Fotos und Kommentare",
-      "reactions": "Fotos, Kommentare und Reaktionen"
-    },
-    "devices": "Geräte",
-    "devicesFootnote": "Ein Gerät, das du hinzufügst, hat dieselben Schlüssel wie dieses. Du kannst sie ihm später nicht wieder entziehen.",
-    "addDevice": "Weiteres Gerät hinzufügen",
-    "addDeviceDescription": "Scanne den Code auf deinem anderen Handy",
-    "bringOver": "Bestehendes Konto übertragen",
-    "bringOverDescription": "Zeige einen Code, den dein altes Handy scannt",
-    "recovery": "Kontowiederherstellung",
-    "recoveryPhrase": "Wiederherstellungswörter",
-    "recoveryPhraseDescription": "12 Wörter, die deine Kreise auf einem neuen Handy wiederherstellen",
     "privacy": "So funktioniert der Datenschutz",
     "privacyDescription": "Was Ende-zu-Ende-verschlüsselt hier bedeutet",
     "about": "Über",
@@ -56,15 +42,6 @@
     "deleting": "Dein Konto wird gelöscht…",
     "deletingDetail": "Das kann einen Moment dauern. Schließ die App nicht.",
     "notifications": "Mitteilungen",
-    "newCirclesRow": "Neue Kreise",
-    "invitesRow": "Einladungen",
-    "notificationsFootnote": "Diese Einstellungen gelten nur für dieses Gerät. Mitteilungen kommen verschlüsselt an und entstehen erst hier bei dir. Kein Push-Server sieht je einen Namen oder eine Nachricht.",
-    "invitePushLevels": {
-      "all": "Beitrittsanfragen und Antworten",
-      "requests": "Nur Beitrittsanfragen",
-      "answers": "Nur Antworten auf deine Anfragen",
-      "off": "Aus"
-    },
     "notifyLevels": {
       "photos": "Nur neue Fotos",
       "comments": "Fotos und Kommentare",
@@ -203,8 +180,7 @@
       "namePlaceholder": "z. B. Lena Schmidt",
       "continue": "Weiter",
       "addNameToContinue": "Gib deinen Namen ein, um fortzufahren",
-      "saveFailed": "Dein Profil konnte nicht gespeichert werden. Versuch es noch mal.",
-      "alreadyHaveAccount": "Ich habe schon ein Konto"
+      "saveFailed": "Dein Profil konnte nicht gespeichert werden. Versuch es noch mal."
     }
   },
   "circle": {

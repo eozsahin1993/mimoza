@@ -1,11 +1,6 @@
-import { generateSeedPhrase, seedPhraseToEntropy } from '@/features/account/crypto';
-import { saveProfile } from '@/data/db';
-import {
-  allowForeignManifestOverwrite,
-  recordInManifestBestEffort,
-} from '@/features/account/usecases/account-manifest';
-import { broadcastProfileUpdate } from '@/features/circle/usecases/broadcast-profile-update';
-import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
+import { generateUUID } from '@/core/crypto/primitives';
+import { getProfile as getLocalProfile, saveProfile } from '@/data/db';
+import { setName } from '@/features/account/services/account-relay';
 
 export type ProfileInput = {
   name: string;
@@ -13,79 +8,26 @@ export type ProfileInput = {
 };
 
 /**
- * Returns the device's master seed, generating and persisting one first if
- * none exists yet. Never overwrites an existing seed. Keychain survives a
- * same-device reinstall even though device_profile (SQLite) doesn't, so
- * this can run again with a real seed already sitting in Keychain —
- * generating a new one here would silently orphan every circle tied to
- * the original.
+ * Saves the device profile and publishes the name to the relay — what
+ * "finish setting up your profile" means. The relay owns the name; a
+ * circle's roster reads it from there directly, so there's nothing to
+ * broadcast to circles the way there used to be.
  *
- * Safe to call before profile setup finishes (see profile-setup.tsx, which
- * calls this on mount so the avatar preview has a stable colour to derive
- * from before "Continue" is ever pressed) — the seed itself has nothing to
- * do with the name or picture typed in on that screen.
- *
- * De-dupes concurrent calls through the one in-flight promise: that mount
- * and a fast tap on "Continue" racing each other on a brand-new install
- * would otherwise both see no seed yet and each generate their own — a
- * silent, last-write-wins split rather than a shared one.
- */
-let pendingMasterSeed: Promise<Uint8Array> | null = null;
-
-export async function ensureMasterSeed(): Promise<Uint8Array> {
-  if (pendingMasterSeed) return pendingMasterSeed;
-
-  pendingMasterSeed = (async () => {
-    const existing = await getMasterSeed();
-    if (existing) return existing;
-    const seed = seedPhraseToEntropy(generateSeedPhrase());
-    await saveMasterSeed(seed);
-    return seed;
-  })();
-
-  try {
-    return await pendingMasterSeed;
-  } finally {
-    pendingMasterSeed = null;
-  }
-}
-
-/**
- * Saves the device profile, tells every circle about it, and ensures a
- * master seed exists — what "finish setting up your profile" means. Silent
- * for now: no reveal/backup screen, Keychain-only, until a deliberate
- * manual-backup design (QR or otherwise) gets built later.
- *
- * The broadcast matters on every run but the first: this screen is also
- * how an existing profile is edited (see profile-setup.tsx), and
- * `member_added` carries a member's name and picture only as they were at
- * join time. Without the entry a later change reaches no other device, and
- * not even this one's own roster row. On first run there are no circles
- * yet and it does nothing.
+ * Reused for editing an existing profile too (see profile-setup.tsx), so
+ * the device id is kept across calls rather than reminted — a fresh one
+ * on every edit would silently orphan this device's push registration
+ * under the old id.
  */
 export async function completeProfileSetup(profile: ProfileInput): Promise<void> {
+  const relayProfile = await setName(profile.name);
+  const existing = await getLocalProfile();
   const now = Date.now();
-  await saveProfile({ ...profile, createdAt: now, updatedAt: now });
-  await broadcastProfileUpdate(profile.name, profile.picture);
-  await ensureMasterSeed();
-  // After the seed exists, or there'd be no key to encrypt it under on a
-  // first run. `profile_update` reaches the circles; this is what reaches a
-  // phone that has lost everything and has no circle to replay yet.
-  await recordInManifestBestEffort();
-}
-
-/**
- * Gives up on an account this device can't read, and takes responsibility
- * for the one thing that makes that irreversible.
- *
- * Minting the seed here rather than leaving it to `completeProfileSetup`
- * is the point: it happens *because* someone chose it, on a screen that
- * said what it costs. The manifest belonging to the old identity is
- * overwritten by the first sync after this — normally
- * `ForeignManifestError` refuses exactly that, and refusing is right when
- * nobody has decided. Here somebody has.
- */
-export async function abandonPriorAccount(): Promise<void> {
-  await ensureMasterSeed();
-  await allowForeignManifestOverwrite();
+  await saveProfile({
+    accountId: relayProfile.accountId,
+    name: profile.name,
+    picture: profile.picture,
+    deviceId: existing?.deviceId || generateUUID(),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  });
 }

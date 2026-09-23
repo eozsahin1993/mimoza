@@ -2,7 +2,7 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { useLocales } from 'expo-localization';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
@@ -17,24 +17,16 @@ import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-gro
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius, Space, Spacing } from '@/ui/theme/tokens';
-import { getProfile, listCircles, type Profile } from '@/data/db';
-import { deleteAccount, finishAccountDeletionIfPending, isAccountDeletionPending } from '@/features/account/usecases/delete-account';
+import { getProfile, type Profile } from '@/data/db';
+import { deleteAccount } from '@/features/account/usecases/delete-account';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
-import { logTestPushPayload } from '@/features/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
-import { InvitePushLevels, invitePushLevelForMask, PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
-import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
-import { applyInvitePushMask } from '@/features/invite/usecases/invite-push';
-import { getAppSettings } from '@/core/services/settings';
 import { Languages, resolveLanguage, type LanguagePreference } from '@/core/i18n/languages';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 import { bytesToDataUri } from '@/core/photo/image';
 import type { ThemePreference } from '@/core/services/settings';
-
-/** How often to check whether the background erasure has finished while this screen waits on it. */
-const DELETION_POLL_MS = 2_000;
 
 /** From app.json's "version" — Constants.expoConfig is only ever missing in a context this screen doesn't run in. */
 const appVersion = Constants.expoConfig?.version ?? 'Unknown';
@@ -65,47 +57,14 @@ export default function AccountScreen() {
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [resettingDevData, setResettingDevData] = useState(false);
-  const [levelPicker, setLevelPicker] = useState(false);
-  const [inviteLevelPicker, setInviteLevelPicker] = useState(false);
   const [languagePicker, setLanguagePicker] = useState(false);
-  // Gates the "bring over" direction: adopting another account's seed
-  // would strand any circle this device already joined under its own.
-  const [hasCircles, setHasCircles] = useState(true);
   // Set once account deletion is confirmed. From here the screen only
   // ever shows the "deleting" state — there's nothing left to cancel.
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const deletionPollInFlight = useRef(false);
-
-  // Polls rather than waiting on the 30s scheduler: deletion still
-  // finishes via finishAccountDeletionIfPending either way (it dedupes
-  // against this call), but a user staring at a spinner shouldn't wait
-  // half a minute for the first check.
-  useEffect(() => {
-    if (!deletingAccount) return;
-
-    const timer = setInterval(async () => {
-      if (deletionPollInFlight.current) return;
-      deletionPollInFlight.current = true;
-      try {
-        await finishAccountDeletionIfPending();
-        if (!(await isAccountDeletionPending())) {
-          clearInterval(timer);
-          router.replace('/');
-        }
-      } catch (err) {
-        console.error('Failed to check on account deletion', err);
-      } finally {
-        deletionPollInFlight.current = false;
-      }
-    }, DELETION_POLL_MS);
-
-    return () => clearInterval(timer);
-  }, [deletingAccount]);
 
   useFocusEffect(
     useCallback(() => {
       getProfile().then(setProfile);
-      listCircles().then((circles) => setHasCircles(circles.length > 0));
     }, []),
   );
 
@@ -130,9 +89,6 @@ export default function AccountScreen() {
     })),
   ];
 
-  const pushLevelOptions = PushLevels.map((level) => ({ id: level.id, label: t(`settings.pushLevels.${level.id}`) }));
-  const invitePushLevelOptions = InvitePushLevels.map((level) => ({ id: level.id, label: t(`settings.invitePushLevels.${level.id}`) }));
-
   /** Same shape the circle screen uses — one list, one row component, one set of spacings. */
   const settingsGroups: SettingsGroup[] = [
     {
@@ -149,63 +105,14 @@ export default function AccountScreen() {
       ],
     },
     {
-      title: t('settings.notifications'),
-      footnote: t('settings.notificationsFootnote'),
+      title: t('settings.about'),
       rows: [
-        {
-          label: t('settings.newCirclesRow'),
-          control: { kind: 'value', text: t(`settings.pushLevels.${settings.defaultPushLevel as PushLevelId}`) },
-          onPress: () => setLevelPicker(true),
-        },
-        {
-          label: t('settings.invitesRow'),
-          control: { kind: 'value', text: t(`settings.invitePushLevels.${invitePushLevelForMask(settings.invitePushMask)}`) },
-          onPress: () => setInviteLevelPicker(true),
-        },
-      ],
-    },
-    {
-      title: t('settings.devices'),
-      // No list and no count: nothing tracks which devices hold your keys,
-      // and nothing could revoke one if it did — every device with the
-      // seed derives the same identity, so the log can't tell them apart.
-      // A list you can't act on reads as control you don't have.
-      footnote: t('settings.devicesFootnote'),
-      rows: [
-        {
-          label: t('settings.addDevice'),
-          description: t('settings.addDeviceDescription'),
-          control: { kind: 'navigate' },
-          onPress: () => router.push('/account/scan-device'),
-        },
-        !hasCircles && {
-          label: t('settings.bringOver'),
-          description: t('settings.bringOverDescription'),
-          control: { kind: 'navigate' },
-          onPress: () => router.push('/account/transfer'),
-        },
-      ],
-    },
-    {
-      title: t('settings.recovery'),
-      rows: [
-        {
-          label: t('settings.recoveryPhrase'),
-          description: t('settings.recoveryPhraseDescription'),
-          control: { kind: 'navigate' },
-          onPress: () => router.push('/account/recovery'),
-        },
         {
           label: t('settings.privacy'),
           description: t('settings.privacyDescription'),
           control: { kind: 'navigate' },
           onPress: () => setPrivacyVisible(true),
         },
-      ],
-    },
-    {
-      title: t('settings.about'),
-      rows: [
         {
           label: t('settings.credits'),
           control: { kind: 'navigate' },
@@ -241,22 +148,16 @@ export default function AccountScreen() {
       __DEV__ && {
         label: resettingDevData ? 'Resetting…' : 'Reset all local data',
         description:
-          '__DEV__ only. Wipes circles, keys, the master seed, and the database schema, so a changed migration actually re-runs.',
+          '__DEV__ only. Wipes circles, keys, the account keypair, and the database schema, so a changed migration actually re-runs.',
         destructive: true,
         disabled: resettingDevData,
         onPress: handleDevReset,
-      },
-      __DEV__ && {
-        label: 'Log a test push payload',
-        description: '__DEV__ only. Logs a simctl push payload this device can decrypt, for testing the iOS notification extension.',
-        control: { kind: 'navigate' as const },
-        onPress: () => void logTestPushPayload(),
       },
     ],
   };
 
   function handleDevReset() {
-    Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, the master seed, and the database itself. No undo.', [
+    Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, the account keypair, and the database itself. No undo.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Reset',
@@ -312,8 +213,9 @@ export default function AccountScreen() {
             setDeletingAccount(true);
             try {
               await deleteAccount();
+              router.replace('/');
             } catch (err) {
-              console.error('Failed to start account deletion', err);
+              console.error('Failed to delete the account', err);
               setDeletingAccount(false);
             }
           },
@@ -382,35 +284,6 @@ export default function AccountScreen() {
       </ThemedSafeAreaView>
 
       <OptionSheet
-        visible={levelPicker}
-        onClose={() => setLevelPicker(false)}
-        title={t('settings.notifyMeAbout')}
-        options={pushLevelOptions}
-        selected={settings.defaultPushLevel as PushLevelId}
-        onSelect={(level) => {
-          setLevelPicker(false);
-          updateSettings({ defaultPushLevel: level });
-        }}
-      />
-
-      <OptionSheet
-        visible={inviteLevelPicker}
-        onClose={() => setInviteLevelPicker(false)}
-        title={t('settings.invitesRow')}
-        options={invitePushLevelOptions}
-        selected={invitePushLevelForMask(settings.invitePushMask)}
-        onSelect={(id) => {
-          setInviteLevelPicker(false);
-          const mask = InvitePushLevels.find((level) => level.id === id)?.mask ?? 0;
-          // Applies what was actually stored: a failed save rolls the setting
-          // back, and the relay mustn't be left holding the unsaved choice.
-          void updateSettings({ invitePushMask: mask })
-            .then(getAppSettings)
-            .then((stored) => applyInvitePushMask(stored.invitePushMask))
-            .catch((err) => console.error('Failed to apply invite notifications', err));
-        }}
-      />
-      <OptionSheet
         visible={languagePicker}
         onClose={() => setLanguagePicker(false)}
         title={t('settings.language')}
@@ -418,8 +291,7 @@ export default function AccountScreen() {
         selected={settings.language}
         onSelect={(language) => {
           setLanguagePicker(false);
-          // After the write, since the snapshot reads the stored setting.
-          void updateSettings({ language }).then(refreshPushSnapshot);
+          void updateSettings({ language });
         }}
       />
 

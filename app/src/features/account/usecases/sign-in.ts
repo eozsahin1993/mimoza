@@ -2,14 +2,16 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
 import { Platform } from 'react-native';
 
+import { toWire } from '@/core/crypto/content';
 import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
+import { ensureAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { unregisterPushEverywhere } from '@/features/push-notifications/usecases/enable-push';
-import { clearPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 import {
   logout as relayLogout,
   signInWithApple as relaySignInWithApple,
   signInWithGoogle as relaySignInWithGoogle,
 } from '@/features/account/services/auth-relay';
+import { getProfile as getRelayProfile, publishPublicKey } from '@/features/account/services/account-relay';
 
 export type SignInOutcome = 'success' | 'cancelled';
 
@@ -26,6 +28,13 @@ export type SignInResult = {
   outcome: SignInOutcome;
   suggestedName?: string;
   suggestedPictureUrl?: string;
+  /**
+   * What the relay already knows about this account. A name here means
+   * this account has completed profile setup before — on some other
+   * device, if this one has no local profile — so there's nothing to ask
+   * again.
+   */
+  relayProfile?: { accountId: string; name: string };
 };
 
 let googleConfigured = false;
@@ -47,6 +56,28 @@ function ensureGoogleConfigured(): void {
   }
   GoogleSignin.configure({ iosClientId, webClientId });
   googleConfigured = true;
+}
+
+/**
+ * Ensures this device has an account keypair and the relay has its public
+ * half — without that, nothing can ever be sealed to this device. `reset`
+ * follows `created`: a freshly minted keypair means every circle's
+ * sealed keys need resealing, which is what `reset: true` tells the relay
+ * to flag.
+ *
+ * Runs after every successful sign-in, not just the first — cheap when
+ * nothing changed (the relay's SetPublicKey is a plain idempotent write
+ * when `reset` is false), and it's what lets a returning device confirm
+ * its key still matches what the relay has on file.
+ */
+async function ensurePublishedKeypair(): Promise<{ accountId: string; name: string }> {
+  const { keypair, created } = await ensureAccountKeypair();
+  const publicKey = toWire(keypair.publicKey);
+  const relayProfile = await getRelayProfile();
+  if (created || relayProfile.publicKey !== publicKey) {
+    await publishPublicKey(publicKey, created);
+  }
+  return { accountId: relayProfile.accountId, name: relayProfile.name };
 }
 
 /**
@@ -73,6 +104,7 @@ export async function signInWithGoogle(): Promise<SignInResult> {
     }
     const token = await relaySignInWithGoogle(idToken);
     await saveAuthToken(token);
+    const relayProfile = await ensurePublishedKeypair();
     return {
       outcome: 'success',
       // .name is the combined display name — givenName/familyName are
@@ -80,6 +112,7 @@ export async function signInWithGoogle(): Promise<SignInResult> {
       // one field actually worth relying on cross-platform.
       suggestedName: response.data.user.name ?? undefined,
       suggestedPictureUrl: response.data.user.photo ?? undefined,
+      relayProfile,
     };
   } catch (err) {
     if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -118,35 +151,20 @@ export async function signInWithApple(): Promise<SignInResult> {
   }
   const token = await relaySignInWithApple(credential.identityToken, credential.authorizationCode);
   await saveAuthToken(token);
+  const relayProfile = await ensurePublishedKeypair();
 
   const suggestedName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
-  return { outcome: 'success', suggestedName: suggestedName || undefined };
+  return { outcome: 'success', suggestedName: suggestedName || undefined, relayProfile };
 }
 
 /**
  * Revokes the current session server-side and clears the locally stored
- * token. Deliberately *doesn't* touch circle keys, the master seed, or any
- * local circle/post data — relay auth and local circle content are
- * decoupled by design (the relay is blind to circles entirely), so
- * signing out is meant to be low-stakes and reversible: sign back in and
- * everything local is exactly as you left it. The server revoke is
- * best-effort — offline or relay-down doesn't block signing out locally.
- *
- * TODO(erase-device): a *separate*, clearly-destructive "Erase this
- * device" action still needs building — wipe every circle_identity_/
- * circle_secret_ Keychain entry, the master seed, and all local
- * circle/post/etc. data. Do NOT fold that into signOut() again; it was
- * tried and reverted because it silently destroyed the only copy of the
- * master seed with no safety net. That action needs to force the user
- * through the recovery-phrase reveal (account/recovery.tsx) and confirm
- * they've saved it *before* proceeding — and even then, recovery only
- * restores access on *this* device if the phrase was actually written
- * down somewhere durable; there's no server-side backup of it. A naive
- * password-protected backup was considered and rejected: a memorable
- * secret is too low-entropy for encryption alone to protect, and doing it
- * safely needs an attempt counter enforced somewhere even the operator
- * can't bypass — real hardware attestation, the way Signal does it —
- * which nothing here provides.
+ * token. Deliberately *doesn't* touch the account keypair, circle keys, or
+ * any local circle/post data — relay auth and local circle content are
+ * decoupled by design, so signing out is meant to be low-stakes and
+ * reversible: sign back in and everything local is exactly as you left
+ * it. The server revoke is best-effort — offline or relay-down doesn't
+ * block signing out locally.
  */
 export async function signOut(): Promise<void> {
   const token = await getAuthToken();
@@ -163,7 +181,4 @@ export async function signOut(): Promise<void> {
     }
   }
   await deleteAuthToken();
-  // After the token is gone, not before: a sync pass still running would
-  // otherwise write the snapshot back — see clearPushSnapshot.
-  await clearPushSnapshot();
 }

@@ -13,7 +13,8 @@ import { ThemedView } from '@/ui/theme/themed-view';
 import { Fonts, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
-import { completeProfileSetup, ensureMasterSeed } from '@/features/account/usecases/onboarding';
+import { completeProfileSetup } from '@/features/account/usecases/onboarding';
+import { getProfile as getRelayProfile } from '@/features/account/services/account-relay';
 import { primeOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
@@ -42,14 +43,15 @@ export default function ProfileSetupScreen() {
   const [error, setError] = useState<string | null>(null);
   const [colorSeed, setColorSeed] = useState<string | undefined>(undefined);
 
-  // A fresh install has no seed yet — created for real here rather than
-  // waiting for "Continue" (see `ensureMasterSeed`'s doc comment), so the
-  // avatar preview below has a stable colour to sit on immediately instead
-  // of hashing the name as it's typed, letter by letter.
+  // Reached only after a successful sign-in, so the relay already has an
+  // accountId for this session — read it here rather than wait for
+  // "Continue" so the avatar preview has a stable colour to sit on
+  // immediately instead of hashing the name as it's typed, letter by
+  // letter.
   useEffect(() => {
-    ensureMasterSeed()
-      .then((seed) => setColorSeed(primeOwnColorSeed(seed)))
-      .catch((err) => console.error('Failed to ensure a master seed', err));
+    getRelayProfile()
+      .then((profile) => setColorSeed(primeOwnColorSeed(profile.accountId)))
+      .catch((err) => console.error('Failed to read the account profile', err));
   }, []);
 
   // Reused for editing an existing profile, not just first-time setup —
@@ -142,21 +144,6 @@ export default function ProfileSetupScreen() {
             onPress={handleContinue}
             style={styles.continueButton}
           />
-
-          {/* Onboarding only: someone editing their profile from /account
-              already has this account. The transfer handshake goes through
-              the relay's mailbox, which needs a session — fine here, since
-              this screen is only reachable once signed in. */}
-          {isOnboarding ? (
-            <Pressable
-              style={styles.alreadyHaveAccount}
-              disabled={saving}
-              onPress={() => router.push('/account/transfer')}>
-              <ThemedText type="labelLarge" themeColor="accentBright">
-                {t('onboarding.profile.alreadyHaveAccount')}
-              </ThemedText>
-            </Pressable>
-          ) : null}
         </KeyboardAvoider>
       </ThemedSafeAreaView>
     </ThemedView>

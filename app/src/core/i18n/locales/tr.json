@@ -24,20 +24,6 @@
       "de": "Almanca"
     },
     "notifyMeAbout": "Bildirim tercihleri",
-    "pushLevels": {
-      "posts": "Sadece yeni fotoğraflar",
-      "comments": "Fotoğraflar ve yorumlar",
-      "reactions": "Fotoğraflar, yorumlar ve tepkiler"
-    },
-    "devices": "Cihazlar",
-    "devicesFootnote": "Eklediğin cihaz da bu cihazla aynı anahtarlara sahip olur. Bu erişimi sonradan geri alamazsın.",
-    "addDevice": "Başka bir cihaz ekle",
-    "addDeviceDescription": "Diğer telefonundaki QR kodu tara",
-    "bringOver": "Mevcut bir hesabı aktar",
-    "bringOverDescription": "Eski telefonunla taratmak için bir QR kod göster",
-    "recovery": "Hesap kurtarma",
-    "recoveryPhrase": "Kurtarma kelimeleri",
-    "recoveryPhraseDescription": "Yeni bir telefonda çevrelerini geri getiren 12 kelime",
     "privacy": "Gizlilik nasıl çalışır?",
     "privacyDescription": "Uçtan uca şifreleme burada ne demek",
     "about": "Hakkında",
@@ -56,15 +42,6 @@
     "deleting": "Hesabın siliniyor…",
     "deletingDetail": "Bu işlem biraz zaman alabilir. Lütfen uygulamayı kapatma.",
     "notifications": "Bildirimler",
-    "newCirclesRow": "Yeni çevreler",
-    "invitesRow": "Davetler",
-    "notificationsFootnote": "Bu ayarlar sadece bu telefon için. Bildirimler şifreli gelir ve burada, telefonunda hazırlanır; hiçbir bildirim sunucusu bir isim ya da mesaj görmez.",
-    "invitePushLevels": {
-      "all": "Katılma istekleri ve yanıtlar",
-      "requests": "Sadece katılma istekleri",
-      "answers": "Sadece isteklerine gelen yanıtlar",
-      "off": "Kapalı"
-    },
     "notifyLevels": {
       "photos": "Sadece yeni fotoğraflar",
       "comments": "Fotoğraflar ve yorumlar",
@@ -203,8 +180,7 @@
       "namePlaceholder": "ör. Ahmet Yılmaz",
       "continue": "Devam et",
       "addNameToContinue": "Devam etmek için adını gir",
-      "saveFailed": "Profil kaydedilemedi. Lütfen tekrar dene.",
-      "alreadyHaveAccount": "Zaten bir hesabım var"
+      "saveFailed": "Profil kaydedilemedi. Lütfen tekrar dene."
     }
   },
   "circle": {
