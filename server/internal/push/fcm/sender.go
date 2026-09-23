@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"mimoza-relay/internal/notify"
+	"mimoza-relay/internal/push"
 )
 
 type Sender struct {
@@ -33,7 +33,7 @@ func New(account *ServiceAccount) *Sender {
 // Send delivers one message to one device token. The text is
 // localization keys, which Android resolves against the app's own
 // strings.xml.
-func (s *Sender) Send(ctx context.Context, deviceToken string, message notify.Message) error {
+func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Message) error {
 	accessToken, err := s.tokens.accessToken(ctx)
 	if err != nil {
 		return err

@@ -22,7 +22,7 @@ import (
 	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/oidcverify"
 	"mimoza-relay/internal/config"
-	"mimoza-relay/internal/notify"
+	"mimoza-relay/internal/push"
 	"mimoza-relay/internal/push/apns"
 	"mimoza-relay/internal/push/fcm"
 
@@ -85,7 +85,7 @@ func AWSDeps(cfg config.Config, awsCfg aws.Config) Deps {
 	// for whichever one a device is not on.
 	toAndroid := fcm.NewSender(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile)
 	toIOS := apns.NewSender(awsCfg, cfg.APNSAuthKeyParameter, cfg.APNSAuthKeyFile, cfg.APNSKeyID, cfg.APNSTeamID, cfg.APNSTopic, cfg.APNSProduction)
-	send := func(ctx context.Context, token, platform string, message notify.Message) error {
+	send := func(ctx context.Context, token, platform string, message push.Message) error {
 		if err := toAndroid(ctx, token, platform, message); err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-package notify
+package push
 
 import "mimoza-relay/internal/circles"
 

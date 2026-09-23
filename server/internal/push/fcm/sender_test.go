@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"mimoza-relay/internal/notify"
+	"mimoza-relay/internal/push"
 )
 
 // A real key, generated per run — the assertion is genuinely signed, so
@@ -162,8 +162,8 @@ var _ = time.Second
 
 // testMessage is an ordinary card: the loc keys and the args a device
 // renders them with.
-func testMessage() notify.Message {
-	return notify.Message{
+func testMessage() push.Message {
+	return push.Message{
 		TitleKey: "push.title_circle",
 		BodyKey:  "push.posted",
 		Args:     []string{"Sarah", "Family"},

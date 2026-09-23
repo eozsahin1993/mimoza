@@ -9,12 +9,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"mimoza-relay/internal/accounts"
-	"mimoza-relay/internal/notify"
+	"mimoza-relay/internal/push"
 )
 
-// NewSender builds the iOS half of notify.Sender, with the same lazy
+// NewSender builds the iOS half of push.Sender, with the same lazy
 // credential as fcm: a relay without a key serves every other route.
-func NewSender(awsCfg aws.Config, parameterName, filePath, keyID, teamID, topic string, production bool) notify.Sender {
+func NewSender(awsCfg aws.Config, parameterName, filePath, keyID, teamID, topic string, production bool) push.Sender {
 	loader := &Loader{
 		Client:        ssm.NewFromConfig(awsCfg),
 		ParameterName: parameterName,
@@ -27,7 +27,7 @@ func NewSender(awsCfg aws.Config, parameterName, filePath, keyID, teamID, topic 
 		sender *Sender
 	)
 
-	return func(ctx context.Context, token, platform string, message notify.Message) error {
+	return func(ctx context.Context, token, platform string, message push.Message) error {
 		if platform != accounts.PlatformIOS {
 			return nil
 		}

@@ -4,7 +4,7 @@ import "context"
 
 // Notifier is what a write slice calls once its write has landed. It is
 // declared here because every slice wants the same one, and satisfied by
-// internal/notify.
+// internal/push.
 //
 // Nothing returns an error: the write already happened, and a push that
 // did not land is not something to make the caller repeat.

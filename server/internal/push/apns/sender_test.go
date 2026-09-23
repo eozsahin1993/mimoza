@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"mimoza-relay/internal/notify"
+	"mimoza-relay/internal/push"
 )
 
 // A real key, generated per run — the JWT path is genuinely exercised
@@ -144,8 +144,8 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { re
 
 // testMessage is an ordinary card: the loc keys and the args a device
 // renders them with.
-func testMessage() notify.Message {
-	return notify.Message{
+func testMessage() push.Message {
+	return push.Message{
 		TitleKey: "push.title_circle",
 		BodyKey:  "push.posted",
 		Args:     []string{"Sarah", "Family"},

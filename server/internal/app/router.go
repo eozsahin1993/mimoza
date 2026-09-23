@@ -24,7 +24,7 @@ import (
 	"mimoza-relay/internal/circles/reactions"
 	"mimoza-relay/internal/circles/requests"
 	"mimoza-relay/internal/invite"
-	"mimoza-relay/internal/notify"
+	"mimoza-relay/internal/push"
 	"mimoza-relay/internal/ratelimit"
 	"mimoza-relay/internal/synclog"
 	"mimoza-relay/internal/util/httputil"
@@ -62,7 +62,7 @@ type Deps struct {
 	AppleID *appleid.Client
 	// Send delivers one notification to one device, or is nil where an
 	// environment has no push credentials.
-	Send notify.Sender
+	Send push.Sender
 }
 
 func NewRouter(deps Deps) *http.ServeMux {
@@ -86,7 +86,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// authority signature beyond the session.
 	// One notifier for every slice that writes: it resolves who should
 	// hear about a change and tells their phones.
-	notifier := &notify.Notifier{
+	notifier := &push.Notifier{
 		Circles:  members.NewStore(deps.Circles),
 		Accounts: deps.Accounts,
 		Send:     deps.Send,

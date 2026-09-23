@@ -1,12 +1,13 @@
-// Package notify turns something that happened in a circle into the
-// notifications it should produce.
+// Package push turns something that happened in a circle into the
+// notifications it should produce, and hands each one to the platform
+// that delivers it.
 //
 // The relay composes these itself. It knows who did what and where,
 // because membership is plaintext, and it cannot read the photo or the
 // comment, so a card says who and where and never what. Text is a
 // localization key and its arguments rather than words: the device knows
 // its own language, and the relay does not.
-package notify
+package push
 
 import (
 	"context"

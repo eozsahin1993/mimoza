@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"mimoza-relay/internal/notify"
+	"mimoza-relay/internal/push"
 )
 
 const (
@@ -67,7 +67,7 @@ func (s *Sender) host() string {
 }
 
 // Send delivers one message to one device token.
-func (s *Sender) Send(ctx context.Context, deviceToken string, message notify.Message) error {
+func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Message) error {
 	token, err := s.tokens.providerToken()
 	if err != nil {
 		return err

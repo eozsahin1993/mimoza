@@ -1,4 +1,4 @@
-package notify
+package push
 
 // Loc keys the app ships strings for. The body names the actor and, for
 // a comment or a reaction, whether the photo was yours — which is the
