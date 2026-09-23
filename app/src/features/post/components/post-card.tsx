@@ -34,6 +34,13 @@ export type Post = {
   missingPhoto?: MissingPhoto;
   caption: string;
   reactions: Reaction[];
+  /**
+   * The count behind the pill — not reactions.reduce, because a reaction
+   * under a key version this device can't name yet (see summarise in
+   * data/db/reactions.ts) has no emoji to appear in `reactions` at all,
+   * but still counts.
+   */
+  reactionsTotal: number;
   /** The single comment a card shows — the newest. Absent on a post nobody has replied to. */
   latestComment?: CommentItem;
   /** How many there are in all, for the "Show all N" link. */
@@ -88,7 +95,7 @@ export function PostCard({
   const [showPicker, setShowPicker] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
 
-  const totalReactions = post.reactions.reduce((sum, reaction) => sum + reaction.count, 0);
+  const totalReactions = post.reactionsTotal;
   const reactedByMe = post.reactions.some((reaction) => reaction.reactedByMe);
   // Most-used first, so the pill says what the reaction was and not just
   // how much of it there was.

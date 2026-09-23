@@ -4,14 +4,14 @@ import { useMemo } from 'react';
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { type CommentItem } from '@/features/post/components/post-comments';
 import { missingPhotoFor } from '@/ui/components/photo-placeholder';
-import { PostCard, type Post } from '@/features/post/components/post-card';
+import { PostCard, type Post, type Reaction } from '@/features/post/components/post-card';
 import { Spacing } from '@/ui/theme/tokens';
 import { showError } from '@/core/services/messages';
 import type { CommentWithAuthor, Profile } from '@/data/db';
+import { getComments } from '@/data/db';
 import type { FeedPostView } from '@/features/feed/usecases/circle-feed';
-import { getCommentSummaries, markPostViewed } from '@/data/db';
-import { addComment } from '@/features/post/usecases/comment-on-post';
-import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
+import { commentOnPost } from '@/features/post/usecases/comment-on-post';
+import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative, formatTimestamp } from '@/core/utils/time';
@@ -30,7 +30,7 @@ export type PostRowsInput = {
   posts: FeedPostView[];
   /** This device's own profile — the fallback for a post whose author has no roster row yet. */
   profile: Profile | null;
-  /** Who the reader is, and whether they may re-file any photo — see set-album-visibility.ts. */
+  /** The reader's own account id, and whether they may re-file any photo — see set-album-visibility.ts. */
   ownPublicKey: string | null;
   ownIsAdmin: boolean;
   language: LanguageCode;
@@ -66,12 +66,13 @@ export function usePostRows({
     () => ({
       onToggleReaction: async (postId, emoji) => {
         await toggleReaction(circleId, postId, emoji);
-        patchPost(postId, { reactions: await getReactionsForPost(circleId, postId) });
+        patchPost(postId, { reactions: await getReactions(postId) });
       },
       onAddComment: async (postId, body) => {
-        await addComment(circleId, postId, body);
-        const summaries = await getCommentSummaries(circleId, [postId]);
-        patchPost(postId, { comments: summaries.get(postId) ?? { latest: null, total: 0 } });
+        const commentId = await commentOnPost(circleId, postId, body);
+        const [comment] = await getComments([commentId]);
+        const current = posts.find((view) => view.post.id === postId);
+        patchPost(postId, { comments: { latest: comment ?? null, total: (current?.comments.total ?? 0) + 1 } });
       },
       /**
        * Optimistic, like the post's own screen: the write is local-first
@@ -91,24 +92,20 @@ export function usePostRows({
         }
       },
       onOpenPost: (postId) => router.push({ pathname: '/post/[id]', params: { id: postId, circleId } }),
-      onSeen: (postId) => markPostViewed(postId).catch((err) => console.error('Failed to mark a post viewed', err)),
+      onSeen: () => {},
       /**
        * Expanding a post's comments is genuinely seeing them — same as
-       * opening post/[id] — so it clears the "new comments" dot immediately
-       * rather than waiting for the next full reload to notice.
+       * opening post/[id].
        */
-      onExpandComments: (postId) => {
-        markPostViewed(postId).catch((err) => console.error('Failed to mark a post viewed', err));
-        patchPost(postId, { hasUnseenComments: false });
-      },
+      onExpandComments: () => {},
     }),
-    [circleId, patchPost],
+    [circleId, patchPost, posts],
   );
 
   return useMemo(
     () => ({
       rows: posts.map((view) =>
-        postRow(view, profile, actions, ownIsAdmin || view.post.authorPublicKey === ownPublicKey, language),
+        postRow(view, profile, actions, ownIsAdmin || view.post.authorId === ownPublicKey, language),
       ),
     }),
     [posts, profile, actions, ownPublicKey, ownIsAdmin, language],
@@ -165,45 +162,45 @@ function pictureUri(picture: Uint8Array | null | undefined): string | undefined 
   return uri;
 }
 
+/** The relay's counts, adjusted by what's queued, into the shape PostCard already renders. */
+function toReactions(summary: FeedPostView['reactions']): Reaction[] {
+  return Object.entries(summary.counts).map(([emoji, count]) => ({ emoji, count, reactedByMe: summary.iReacted }));
+}
+
 /**
- * Data to view model. Author name and picture already came resolved from
- * the roster; this only turns bytes into data URIs and timestamps into
- * strings. Falls back to this device's own profile for a post whose author
- * has no roster row yet.
+ * Data to view model. Timestamps become strings and bytes become data
+ * URIs; nothing else changes shape. Falls back to this device's own
+ * profile for a post whose author has no roster row yet.
  */
 function toPostCard(view: FeedPostView, profile: Profile | null, language: LanguageCode): Post {
   const { post } = view;
-  const picture = post.authorPicture ?? profile?.picture;
+
+  // The reader's own post shows their own live picture rather than
+  // waiting on a roster row for themselves; anyone else's picture isn't
+  // resolved yet (see FeedPostView) and falls back to initials.
+  const isOwn = profile?.accountId === post.authorId;
 
   return {
     id: post.id,
-    authorName: post.authorName || profile?.name || i18n.getFixedT(language)('post.unknownMember'),
-    authorPhotoUri: pictureUri(picture),
+    authorName: view.authorName || (isOwn ? profile.name : '') || i18n.getFixedT(language)('post.unknownMember'),
+    authorPhotoUri: isOwn ? pictureUri(profile?.picture) : undefined,
+    authorPublicKey: post.authorId,
     timestamp: formatTimestamp(post.createdAt, language),
     photoUri: view.photoUri,
-    missingPhoto: view.photoUri ? undefined : missingPhotoFor(post.photoStatus),
+    missingPhoto: view.photoUri ? undefined : missingPhotoFor(view.photoStatus),
     caption: post.caption,
-    reactions: view.reactions,
-    authorPublicKey: post.authorPublicKey,
-    latestComment: view.comments.latest ? toCommentItem(view.comments.latest, language, profile?.name) : undefined,
+    reactions: toReactions(view.reactions),
+    reactionsTotal: view.reactions.total,
+    latestComment: view.comments.latest ? toCommentItem(view.comments.latest, language) : undefined,
     commentCount: view.comments.total,
-    hasUnseenComments: view.hasUnseenComments,
     inAlbum: post.inAlbum,
   };
 }
 
-/**
- * Author names on comments resolve live from the roster, so a member
- * renaming themselves updates every comment they wrote. Falls back to this
- * device's own profile for a comment written before its author's roster
- * row arrived — which is the local author's own comments, pre-sync.
- */
-function toCommentItem(comment: CommentWithAuthor, language: LanguageCode, ownName?: string): CommentItem {
+function toCommentItem(comment: CommentWithAuthor, language: LanguageCode): CommentItem {
   return {
     id: comment.id,
-    authorName: comment.authorName || ownName || i18n.getFixedT(language)('post.unknownMember'),
-    authorPhotoUri: pictureUri(comment.authorPicture),
-    authorPublicKey: comment.authorPublicKey,
+    authorName: comment.authorName || i18n.getFixedT(language)('post.unknownMember'),
     body: comment.body,
     timestamp: formatRelative(comment.createdAt, language),
   };
