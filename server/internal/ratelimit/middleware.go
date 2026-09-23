@@ -1,7 +1,7 @@
 package ratelimit
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"mimoza-relay/internal/auth"
@@ -22,7 +22,8 @@ func Require(store Store, next http.Handler) http.Handler {
 
 		allowed, err := store.Allow(r.Context(), accountID)
 		if err != nil {
-			log.Printf("rate limit check failed for account %s, allowing request: %v", accountID, err)
+			httputil.Log(r.Context(), slog.LevelError, "rate limit check failed, allowing the request",
+				"reason", "rate_limit_unreadable", "error", err, "accountId", accountID)
 			next.ServeHTTP(w, r)
 			return
 		}

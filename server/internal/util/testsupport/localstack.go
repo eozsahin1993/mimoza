@@ -32,7 +32,6 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	awsssm "github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
@@ -40,17 +39,11 @@ import (
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	"mimoza-relay/internal/blobs/cdn"
 	blobstore "mimoza-relay/internal/blobs/s3"
 	"mimoza-relay/internal/circles/dynamo"
-	"mimoza-relay/internal/config"
-	"mimoza-relay/internal/invite"
-	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	"mimoza-relay/internal/ratelimit"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
-	"mimoza-relay/internal/synclog"
-	"mimoza-relay/internal/synclog/cdn"
-	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
-	blobs3 "mimoza-relay/internal/synclog/s3"
 	"mimoza-relay/internal/util/localstack"
 )
 
@@ -114,7 +107,7 @@ func UniqueEmail(t testing.TB) string {
 // key uniqueness, not about how a real one is derived.
 func UniqueAccountID(t testing.TB) string {
 	t.Helper()
-	return fmt.Sprintf("account-%s-%d", t.Name(), time.Now().UnixNano())
+	return "account-" + unique(t)
 }
 
 // UniqueInviteTag returns an opaque string standing in for hash(invite_code)
@@ -198,72 +191,19 @@ func NewCircleTable(t testing.TB) *dynamo.Table {
 // the shared table being shared.
 func UniqueCircleID(t testing.TB) string {
 	t.Helper()
-	return fmt.Sprintf("circle-%s-%d", t.Name(), time.Now().UnixNano())
+	return "circle-" + unique(t)
 }
 
-// NewLogStore returns a real dynamodb-backed LogStore against LocalStack,
-// creating the test table once per test binary run (shared across tests —
-// safe because tests use distinct syncID values). Skips the test if
-// LocalStack isn't reachable.
-func NewLogStore(t testing.TB) synclog.LogStore {
+// unique is a test's name and a number that only ever goes up. The
+// clock alone is not enough: UnixNano is microsecond-resolution on some
+// machines, so two ids minted in the same breath come out identical, and
+// two members with one id is a roster that reads short.
+func unique(t testing.TB) string {
 	t.Helper()
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-
-	tableOnce.Do(func() {
-		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
-		if tableErr == nil {
-			tableErr = localstack.EnsureEntryIDIndex(context.Background(), client, tableName)
-		}
-	})
-	if tableErr != nil {
-		unreachable(t, "DynamoDB", tableErr)
-	}
-
-	return logdynamodb.New(client, tableName)
+	return fmt.Sprintf("%s-%d-%d", t.Name(), time.Now().UnixNano(), uniqueCounter.Add(1))
 }
 
-// RawDynamoDBClient returns the same client + table name NewLogStore uses,
-// for tests that need to inspect raw item attributes (e.g. expiresAt) or
-// delete an item directly to simulate what DynamoDB's background TTL
-// sweep would eventually do — sweep timing itself isn't something a fast
-// unit test can exercise for real.
-func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
-	t.Helper()
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-
-	tableOnce.Do(func() {
-		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
-		if tableErr == nil {
-			tableErr = localstack.EnsureEntryIDIndex(context.Background(), client, tableName)
-		}
-	})
-	if tableErr != nil {
-		unreachable(t, "DynamoDB", tableErr)
-	}
-
-	return client, tableName
-}
-
-// NewBlobStore returns a real s3-backed BlobStore against LocalStack,
-// creating the test bucket once per test binary run.
-func NewBlobStore(t testing.TB) synclog.BlobStore {
-	t.Helper()
-	client := awss3.NewFromConfig(loadConfig(t), func(o *awss3.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-		o.UsePathStyle = true
-	})
-
-	bucketOnce.Do(func() { bucketErr = localstack.CreateBucket(context.Background(), client, bucketName) })
-	if bucketErr != nil {
-		unreachable(t, "S3", bucketErr)
-	}
-
-	return blobs3.New(client, bucketName, 0)
-}
+var uniqueCounter atomic.Int64
 
 // NewBlobBucket returns the circles column's blob storage against
 // LocalStack, sharing the one test bucket.
@@ -303,27 +243,6 @@ func blobClient(t testing.TB) *awss3.Client {
 		unreachable(t, "S3", bucketErr)
 	}
 	return client
-}
-
-// NewBlobStoreWithCDN returns a blob store whose downloads are signed for
-// CloudFront, with the settings and signing key put in LocalStack's SSM
-// exactly as Terraform and the operator would.
-//
-// CloudFront itself isn't emulated, so this proves the parts that live
-// here — that the relay finds its settings, parses the key, and hands out
-// a signed CDN URL instead of an S3 one — not that CloudFront accepts the
-// signature. That only shows up in staging.
-func NewBlobStoreWithCDN(t testing.TB, prefix string) synclog.BlobStore {
-	t.Helper()
-
-	awsCfg := loadConfig(t)
-	putCDNParameters(t, awsCfg, prefix)
-
-	store := NewBlobStore(t).(*blobs3.Store)
-	return store.WithDownloads(cdn.New(cdn.Config{
-		SettingsParameter: "/" + prefix + "/cdn",
-		KeyParameter:      "/" + prefix + "/cloudfront-signing-key",
-	}, awsCfgWithEndpoint(awsCfg)))
 }
 
 // putCDNParameters writes what the signer reads at runtime: where the
@@ -385,53 +304,6 @@ func NewAuthStore(t testing.TB) auth.Store {
 	return authdynamodb.New(client, sessionsTableName)
 }
 
-// NewInviteStore returns a real dynamodb-backed invite.Store
-// against LocalStack, creating the test table once per test binary run —
-// composite pk/sk, same key shape as NewLogStore's table (see
-// server/provision/modules/storage/dynamodb.tf's invites resource), a
-// genuinely separate table from everything else. Takes a
-// retentionDays param for the same reason NewLogStore does: tests that
-// assert on the written expiresAt need a known, non-default window.
-func NewInviteStore(t testing.TB, retentionDays int64) invite.Store {
-	t.Helper()
-	// 0 stands for "whatever production would use", as config resolves it.
-	if retentionDays == 0 {
-		retentionDays = config.DefaultInviteRetentionDays
-	}
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-
-	inviteTableOnce.Do(func() {
-		inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName, localstack.WithSortKey)
-	})
-	if inviteTableErr != nil {
-		unreachable(t, "DynamoDB", inviteTableErr)
-	}
-
-	return invitedynamodb.New(client, inviteTableName, retentionDays)
-}
-
-// RawInviteDynamoDBClient returns the same client + table name
-// NewInviteStore uses, for tests that need to inspect raw item
-// attributes (e.g. expiresAt) — same purpose as RawDynamoDBClient, against
-// the separate invites table.
-func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
-	t.Helper()
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-
-	inviteTableOnce.Do(func() {
-		inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName, localstack.WithSortKey)
-	})
-	if inviteTableErr != nil {
-		unreachable(t, "DynamoDB", inviteTableErr)
-	}
-
-	return client, inviteTableName
-}
-
 // NewRateLimitStore returns a real dynamodb-backed ratelimit.Store
 // against LocalStack, creating the rate-limit table once per test binary
 // run (see server/provision/modules/storage/rate_limit_table.tf). Unlike the other New*
@@ -451,18 +323,6 @@ func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window t
 	}
 
 	return ratelimitdynamodb.New(client, rateLimitTableName, keyPrefix, maxRequests, window)
-}
-
-// UploadBlob puts payload at a presigned POST target, the way a client
-// does. Fields must be written before the "file" part: S3 requires that
-// order and ignores anything after it.
-//
-// Lives here rather than in one package's _test.go because two packages
-// now need a blob that genuinely exists — one to read back the uploader
-// recorded on it, one to delete it.
-func UploadBlob(t testing.TB, target synclog.UploadTarget, payload []byte) {
-	t.Helper()
-	PostBlob(t, target.URL, target.Fields, payload)
 }
 
 // PostBlob sends the bytes the way a device does: a multipart form to
@@ -514,26 +374,4 @@ func TryPostBlob(t testing.TB, url string, fields map[string]string, payload []b
 		t.Logf("upload refused: %d %s", resp.StatusCode, responseBody)
 	}
 	return resp.StatusCode
-}
-
-// RawItem reads one item straight out of the log table, bypassing the
-// store — for asserting on attributes the Store interface deliberately
-// doesn't expose, like the TTL stamp a deleted circle's meta carries.
-func RawItem(t testing.TB, pk, sk string) (map[string]ddbtypes.AttributeValue, error) {
-	t.Helper()
-	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstack.Endpoint())
-	})
-	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
-		TableName: aws.String(tableName),
-		Key: map[string]ddbtypes.AttributeValue{
-			"pk": &ddbtypes.AttributeValueMemberS{Value: pk},
-			"sk": &ddbtypes.AttributeValueMemberS{Value: sk},
-		},
-		ConsistentRead: aws.Bool(true),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return out.Item, nil
 }

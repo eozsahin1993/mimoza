@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -48,7 +49,7 @@ func main() {
 	registerTestOnly(mux, deps.Auth, deps.Accounts)
 
 	address := addr()
-	log.Printf("testrelay listening on %s against LocalStack at %s", address, localstack.Endpoint())
+	slog.Info("testrelay listening", "address", address, "localstack", localstack.Endpoint())
 	log.Fatal(http.ListenAndServe(address, logRequests(mux)))
 }
 
@@ -121,7 +122,8 @@ func logRequests(next http.Handler) http.Handler {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		log.Printf("%s %s -> %d (%s)", r.Method, r.URL.Path, rec.status, time.Since(start))
+		slog.Info("request", "method", r.Method, "path", r.URL.Path,
+			"status", rec.status, "ms", time.Since(start).Milliseconds())
 	})
 }
 

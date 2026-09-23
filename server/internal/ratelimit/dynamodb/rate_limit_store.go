@@ -9,7 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -71,7 +71,7 @@ func (s *Store) Allow(ctx context.Context, key string) (bool, error) {
 	})
 	if err == nil {
 		if count, countErr := dynamoutil.AttrInt(out.Attributes, "count"); countErr == nil {
-			s.warnIfNearLimit(pk, count)
+			s.warnIfNearLimit(ctx, pk, count)
 		}
 		return true, nil
 	}
@@ -134,8 +134,9 @@ func (s *Store) Allow(ctx context.Context, key string) (bool, error) {
 // warnIfNearLimit logs once a key's count crosses nearLimitWarningThreshold
 // — the budget numbers are a starting guess, not a measurement, so this is
 // how they'd get retuned from real traffic later.
-func (s *Store) warnIfNearLimit(pk string, count int64) {
+func (s *Store) warnIfNearLimit(ctx context.Context, pk string, count int64) {
 	if float64(count) >= float64(s.maxRequests)*nearLimitWarningThreshold {
-		log.Printf("rate limit: %s is at %d/%d for this window", pk, count, s.maxRequests)
+		slog.WarnContext(ctx, "a caller is at its rate limit for this window",
+			"reason", "rate_limited", "key", pk, "count", count, "limit", s.maxRequests)
 	}
 }

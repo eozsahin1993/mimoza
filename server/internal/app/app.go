@@ -28,12 +28,10 @@ import (
 
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	"mimoza-relay/internal/blobs/cdn"
 	blobstore "mimoza-relay/internal/blobs/s3"
 	circlesdynamo "mimoza-relay/internal/circles/dynamo"
-	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
-	"mimoza-relay/internal/synclog/cdn"
-	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 )
 
 const (
@@ -115,10 +113,8 @@ func AWSDeps(cfg config.Config, awsCfg aws.Config) Deps {
 		Accounts:        accountsdynamo.NewTable(dynamo(), cfg.AccountsTableName),
 		Circles:         circlesdynamo.NewTable(dynamo(), cfg.CirclesTableName),
 		InviteRetention: time.Duration(cfg.InviteRetentionDays) * 24 * time.Hour,
-		Log:             logdynamodb.New(dynamo(), cfg.TableName),
 		Blobs:           blob,
 		Auth:            authdynamodb.New(dynamo(), cfg.SessionsTableName),
-		Invite:          invitedynamodb.New(dynamo(), cfg.InviteTableName, cfg.InviteRetentionDays),
 		WriteLimit:      limit("write", cfg.RateLimitWriteMaxRequests),
 		ReadLimit:       limit("read", cfg.RateLimitReadMaxRequests),
 		Google:          oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb)),

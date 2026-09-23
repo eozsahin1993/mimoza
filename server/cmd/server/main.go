@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,7 +30,7 @@ func main() {
 	}
 
 	addr := ":" + cfg.Port
-	log.Printf("listening on %s", addr)
+	slog.Info("listening", "address", addr)
 	log.Fatal(http.ListenAndServe(addr, logRequests(presignForRequestHost(cfg.AWSEndpointURL, handler))))
 }
 
@@ -76,7 +77,8 @@ func logRequests(next http.Handler) http.Handler {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		log.Printf("%s %s -> %d (%s)", r.Method, r.URL.Path, rec.status, time.Since(start))
+		slog.Info("request", "method", r.Method, "path", r.URL.Path,
+			"status", rec.status, "ms", time.Since(start).Milliseconds())
 	})
 }
 

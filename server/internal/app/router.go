@@ -24,10 +24,8 @@ import (
 	"mimoza-relay/internal/circles/posts"
 	"mimoza-relay/internal/circles/reactions"
 	"mimoza-relay/internal/circles/requests"
-	"mimoza-relay/internal/invite"
 	"mimoza-relay/internal/push"
 	"mimoza-relay/internal/ratelimit"
-	"mimoza-relay/internal/synclog"
 	"mimoza-relay/internal/util/httputil"
 )
 
@@ -44,13 +42,11 @@ type Deps struct {
 	// InviteRetention is how long a code, and an unanswered request under
 	// it, lasts.
 	InviteRetention time.Duration
-	Log             synclog.LogStore
 	// Blobs is the bucket the encrypted photos live in. The relay never
 	// carries the bytes: it signs a URL and the device talks to S3 or
 	// the CDN directly.
-	Blobs  *blobstore.Store
-	Auth   auth.Store
-	Invite invite.Store
+	Blobs *blobstore.Store
+	Auth  auth.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.
 	WriteLimit ratelimit.Store
 	ReadLimit  ratelimit.Store
@@ -71,7 +67,7 @@ func NewRouter(deps Deps) *http.ServeMux {
 	// Logging wraps the inner mux, not this one: the route pattern is set
 	// by whichever mux matched, and StripPrefix hands the inner one its own
 	// copy of the request — from out here every route would read "/v1/".
-	mux.Handle("/v1/", http.StripPrefix("/v1", httputil.LogRequests(newV1Mux(deps))))
+	mux.Handle("/v1/", httputil.WithRequestID(http.StripPrefix("/v1", httputil.LogRequests(newV1Mux(deps)))))
 	return mux
 }
 

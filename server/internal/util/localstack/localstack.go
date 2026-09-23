@@ -23,7 +23,6 @@ import (
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
 	circlesdynamo "mimoza-relay/internal/circles/dynamo"
 	"mimoza-relay/internal/config"
-	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 )
 
 // DefaultEndpoint is where LocalStack listens locally and in CI.
@@ -128,8 +127,6 @@ func tables(n config.Resources) []struct {
 		name   string
 		sorted Sorted
 	}{
-		{n.TableName, WithSortKey},
-		{n.InviteTableName, WithSortKey},
 		{n.AccountsTableName, WithSortKey},
 		{n.CirclesTableName, WithSortKey},
 		{n.SessionsTableName, HashOnly},
@@ -150,9 +147,6 @@ func ProvisionSet(ctx context.Context, ddb *awsdynamodb.Client, s3 *awss3.Client
 		if err := CreateTable(ctx, ddb, table.name, table.sorted); err != nil {
 			return fmt.Errorf("create %s: %w", table.name, err)
 		}
-	}
-	if err := EnsureEntryIDIndex(ctx, ddb, names.TableName); err != nil {
-		return fmt.Errorf("add entryId index to %s: %w", names.TableName, err)
 	}
 	if err := EnsureAccountIDIndex(ctx, ddb, names.SessionsTableName); err != nil {
 		return fmt.Errorf("add accountId index to %s: %w", names.SessionsTableName, err)
@@ -225,13 +219,6 @@ func CreateTable(ctx context.Context, client *awsdynamodb.Client, name string, s
 		return fmt.Errorf("%s exists with a different key schema; delete it or restart LocalStack", name)
 	}
 	return nil
-}
-
-// EnsureEntryIDIndex adds the entryId GSI to the log table if it isn't
-// there yet — a separate, idempotent step since CreateTable's shape is
-// shared by every table here, most needing no GSI.
-func EnsureEntryIDIndex(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
-	return ensureIndex(ctx, client, tableName, index{name: logdynamodb.EntryIDIndexName, hash: "entryId", projection: ddbtypes.ProjectionTypeKeysOnly})
 }
 
 // EnsureAccountIDIndex adds the accountId GSI to the sessions table if it

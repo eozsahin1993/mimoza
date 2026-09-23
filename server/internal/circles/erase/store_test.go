@@ -281,27 +281,4 @@ func addMemberAt(t *testing.T, table *dynamo.Table, circleID, accountID, role st
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForMember(t, table, circleID, accountID)
-}
-
-// waitForMember works around LocalStack, where a consistent GetItem sees
-// a just-committed member while a consistent Query on the same partition
-// sometimes does not. Real DynamoDB does not do this; without the wait
-// the erasure reads a roster of one and deletes the circle, which turns
-// every assertion below into a confusing failure.
-func waitForMember(t *testing.T, table *dynamo.Table, circleID, accountID string) {
-	t.Helper()
-	for range 50 {
-		roster, err := table.ListMembers(context.Background(), circleID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, member := range roster {
-			if member.AccountID == accountID {
-				return
-			}
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("the member never appeared on the roster: %s", accountID)
 }
