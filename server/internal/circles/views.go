@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"log/slog"
+	"mimoza-relay/internal/blobs"
 	"net/http"
 	"time"
 )
@@ -129,7 +130,7 @@ func Status(err error) (int, string) {
 	case errors.Is(err, ErrNotMember), errors.Is(err, ErrNotAdmin),
 		errors.Is(err, ErrNotTheAuthor):
 		return http.StatusForbidden, err.Error()
-	case errors.Is(err, ErrAlreadyExists), errors.Is(err, ErrBlobExists),
+	case errors.Is(err, ErrAlreadyExists), errors.Is(err, blobs.ErrExists),
 		errors.Is(err, ErrCircleFull),
 		errors.Is(err, ErrStaleKeyVersion), errors.Is(err, ErrVersionMoved),
 		errors.Is(err, ErrWouldEmptyAdmins):

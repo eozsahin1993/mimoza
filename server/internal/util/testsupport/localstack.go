@@ -40,8 +40,8 @@ import (
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/auth"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	blobstore "mimoza-relay/internal/blobs/s3"
 	"mimoza-relay/internal/circles/dynamo"
-	circless3 "mimoza-relay/internal/circles/s3"
 	"mimoza-relay/internal/config"
 	"mimoza-relay/internal/invite"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
@@ -270,9 +270,9 @@ func NewBlobStore(t testing.TB) synclog.BlobStore {
 
 // NewBlobBucket returns the circles column's blob storage against
 // LocalStack, sharing the one test bucket.
-func NewBlobBucket(t testing.TB) *circless3.Store {
+func NewBlobBucket(t testing.TB) *blobstore.Store {
 	t.Helper()
-	return circless3.New(blobClient(t), bucketName, 0)
+	return blobstore.New(blobClient(t), bucketName, 0)
 }
 
 // NewBlobBucketWithCDN is NewBlobBucket with downloads signed for
@@ -283,7 +283,7 @@ func NewBlobBucket(t testing.TB) *circless3.Store {
 // here — that the relay finds its settings, parses the key and hands out
 // a signed CDN URL rather than an S3 one — not that CloudFront accepts
 // the signature. That only shows up in staging.
-func NewBlobBucketWithCDN(t testing.TB, prefix string) *circless3.Store {
+func NewBlobBucketWithCDN(t testing.TB, prefix string) *blobstore.Store {
 	t.Helper()
 	awsCfg := loadConfig(t)
 	putCDNParameters(t, awsCfg, prefix)
@@ -503,6 +503,15 @@ func UploadBlob(t testing.TB, target synclog.UploadTarget, payload []byte) {
 // applies the policy the relay signed.
 func PostBlob(t testing.TB, url string, fields map[string]string, payload []byte) {
 	t.Helper()
+	if status := TryPostBlob(t, url, fields, payload); status < 200 || status >= 300 {
+		t.Fatalf("upload failed: %d", status)
+	}
+}
+
+// TryPostBlob is PostBlob without the assertion, for the tests that mean
+// to be refused: it answers with S3's status rather than failing.
+func TryPostBlob(t testing.TB, url string, fields map[string]string, payload []byte) int {
+	t.Helper()
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -535,8 +544,9 @@ func PostBlob(t testing.TB, url string, fields map[string]string, payload []byte
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		responseBody, _ := io.ReadAll(resp.Body)
-		t.Fatalf("upload failed: %d %s", resp.StatusCode, responseBody)
+		t.Logf("upload refused: %d %s", resp.StatusCode, responseBody)
 	}
+	return resp.StatusCode
 }
 
 // RawItem reads one item straight out of the log table, bypassing the

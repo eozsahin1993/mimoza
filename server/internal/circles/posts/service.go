@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"mimoza-relay/internal/blobs"
 	"mimoza-relay/internal/circles"
-	"mimoza-relay/internal/circles/s3"
 )
 
 type store interface {
@@ -20,9 +20,11 @@ type store interface {
 	CountEntries(ctx context.Context, circleID, entryType string) (int64, error)
 }
 
-// blobs is the bucket, for the one thing this slice does to it: a
-// deleted post's photo has to go with it.
-type blobs interface {
+// bucket is the blob storage. It takes keys, so where a photo lives is
+// stated once, in photoKey.
+type bucket interface {
+	UploadTarget(ctx context.Context, key string, maxBytes int64) (blobs.UploadTarget, error)
+	DownloadURL(ctx context.Context, key string) (string, error)
 	Delete(ctx context.Context, key string) error
 }
 
@@ -30,7 +32,33 @@ type Service struct {
 	Store store
 	// Blobs is nil in tests that do not care about bytes; a post with no
 	// photo never reaches it either way.
-	Blobs blobs
+	Blobs bucket
+}
+
+// UploadTarget is issued before the post exists on purpose: a crash in
+// between leaves an orphan rather than a post pointing at bytes that
+// never arrived.
+func (s *Service) UploadTarget(ctx context.Context, circleID, postID, accountID string) (blobs.UploadTarget, error) {
+	if err := s.requireMember(ctx, circleID, accountID); err != nil {
+		return blobs.UploadTarget{}, err
+	}
+	return s.Blobs.UploadTarget(ctx, photoKey(circleID, postID), maxPhotoSize)
+}
+
+// PhotoURL refuses a deleted post: edge invalidation is best-effort, so
+// this is what actually stops the photo being fetched again.
+func (s *Service) PhotoURL(ctx context.Context, circleID, postID, accountID string) (string, error) {
+	if err := s.requireMember(ctx, circleID, accountID); err != nil {
+		return "", err
+	}
+	post, err := s.Store.GetPost(ctx, circleID, postID, accountID)
+	if err != nil {
+		return "", err
+	}
+	if !post.DeletedAt.IsZero() || !post.HasBlob {
+		return "", circles.ErrEntryNotFound
+	}
+	return s.Blobs.DownloadURL(ctx, photoKey(circleID, postID))
 }
 
 // Put writes a post. The key version is checked against the circle's
@@ -95,13 +123,10 @@ func (s *Service) Delete(ctx context.Context, circleID, postID, accountID string
 	if err != nil {
 		return circles.Entry{}, err
 	}
-	// The row goes first and the bytes after: the row is what a walk
-	// delivers and what refuses a signed URL, so a photo whose row is
-	// gone is already unreachable. A failed delete here leaks bytes
-	// nobody can ask for, which is worth reporting but not worth
-	// failing a deletion the caller can see happened.
+	// Row first, bytes after: the row is what refuses a signed URL, so a
+	// failure here leaks bytes nobody can ask for.
 	if s.Blobs != nil && post.HasBlob {
-		if err := s.Blobs.Delete(ctx, s3.PostKey(circleID, postID)); err != nil {
+		if err := s.Blobs.Delete(ctx, photoKey(circleID, postID)); err != nil {
 			slog.ErrorContext(ctx, "deleted a post but not its photo",
 				"reason", "blob_not_deleted", "error", err, "circleId", circleID, "entryId", postID)
 		}

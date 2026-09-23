@@ -26,8 +26,8 @@ import (
 
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	blobstore "mimoza-relay/internal/blobs/s3"
 	circlesdynamo "mimoza-relay/internal/circles/dynamo"
-	circless3 "mimoza-relay/internal/circles/s3"
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	pushdynamodb "mimoza-relay/internal/push/dynamodb"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
@@ -87,7 +87,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	// Whether downloads actually come from CloudFront is decided at
 	// runtime by whether its settings parameter exists — see
 	// internal/synclog/cdn. Nothing to configure per environment.
-	blob := circless3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize).WithDownloads(cdn.New(cdn.Config{
+	blob := blobstore.New(s3Client, cfg.BucketName, cfg.MaxBlobSize).WithDownloads(cdn.New(cdn.Config{
 		SettingsParameter: cfg.BlobCDNSettingsParameter,
 		KeyParameter:      cfg.BlobCDNSigningKeyParameter,
 	}, awsCfg))

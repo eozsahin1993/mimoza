@@ -2,9 +2,11 @@ package circle
 
 import (
 	"context"
+
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"mimoza-relay/internal/blobs"
 	"time"
 
 	"mimoza-relay/internal/circles"
@@ -37,16 +39,18 @@ type Pending struct {
 	CircleName string
 }
 
-// blobs is the bucket. Deleting a circle is the one thing this slice
-// does to it, and it does it to the whole prefix at once.
-type blobs interface {
-	DeleteCircle(ctx context.Context, circleID string) error
+// bucket holds the cover and, under the same prefix, every photo posted
+// to the circle.
+type bucket interface {
+	UploadTarget(ctx context.Context, key string, maxBytes int64) (blobs.UploadTarget, error)
+	DownloadURL(ctx context.Context, key string) (string, error)
+	DeletePrefix(ctx context.Context, prefix string) error
 }
 
 type Service struct {
 	Store store
 	// Blobs is nil in tests that do not care about bytes.
-	Blobs blobs
+	Blobs bucket
 	// Requests is what turns "no circles yet" into "waiting on Family".
 	Requests joinRequests
 }
@@ -111,17 +115,34 @@ func (s *Service) Delete(ctx context.Context, circleID, accountID string) error 
 	if err := s.Store.DeleteCircle(ctx, circleID); err != nil {
 		return err
 	}
-	// Every photo and every cover the circle ever had, in one sweep of
-	// its prefix. The rows are already gone, so a failure here leaves
-	// bytes nothing can name or reach.
+	// The rows are already gone, so a failure here leaves bytes nothing
+	// can name.
 	if s.Blobs == nil {
 		return nil
 	}
-	if err := s.Blobs.DeleteCircle(ctx, circleID); err != nil {
+	if err := s.Blobs.DeletePrefix(ctx, blobPrefix(circleID)); err != nil {
 		slog.ErrorContext(ctx, "deleted a circle but not its photos",
 			"reason", "blobs_not_deleted", "error", err, "circleId", circleID)
 	}
 	return nil
+}
+
+// CoverUploadTarget is an admin's, matching the change that follows it:
+// only an admin can point the circle at a new cover.
+func (s *Service) CoverUploadTarget(ctx context.Context, circleID, coverID, accountID string) (blobs.UploadTarget, error) {
+	if err := s.requireAdmin(ctx, circleID, accountID); err != nil {
+		return blobs.UploadTarget{}, err
+	}
+	return s.Blobs.UploadTarget(ctx, coverKey(circleID, coverID), maxCoverSize)
+}
+
+// CoverURL has no row to check beyond membership: every change mints a
+// new id.
+func (s *Service) CoverURL(ctx context.Context, circleID, coverID, accountID string) (string, error) {
+	if _, err := s.Store.GetMember(ctx, circleID, accountID); err != nil {
+		return "", err
+	}
+	return s.Blobs.DownloadURL(ctx, coverKey(circleID, coverID))
 }
 
 // List is where a sync starts: every circle this account is in, with the

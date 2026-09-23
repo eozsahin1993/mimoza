@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"mimoza-relay/internal/accounts/avatar"
 	"mimoza-relay/internal/accounts/deletion"
 	"mimoza-relay/internal/accounts/devices"
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
@@ -19,7 +20,7 @@ import (
 	"mimoza-relay/internal/auth/http/google"
 	"mimoza-relay/internal/auth/http/logout"
 	"mimoza-relay/internal/auth/oidcverify"
-	"mimoza-relay/internal/circles/blobs"
+	blobstore "mimoza-relay/internal/blobs/s3"
 	"mimoza-relay/internal/circles/circle"
 	"mimoza-relay/internal/circles/comments"
 	"mimoza-relay/internal/circles/dynamo"
@@ -28,7 +29,6 @@ import (
 	"mimoza-relay/internal/circles/posts"
 	"mimoza-relay/internal/circles/reactions"
 	"mimoza-relay/internal/circles/requests"
-	circless3 "mimoza-relay/internal/circles/s3"
 	"mimoza-relay/internal/invite"
 	"mimoza-relay/internal/push"
 	pushhttp "mimoza-relay/internal/push/http"
@@ -68,7 +68,7 @@ type Deps struct {
 	// Blobs is the bucket the encrypted photos live in. The relay never
 	// carries the bytes: it signs a URL and the device talks to S3 or
 	// the CDN directly.
-	Blobs  *circless3.Store
+	Blobs  *blobstore.Store
 	Auth   auth.Store
 	Invite invite.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.
@@ -125,10 +125,6 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		Store: posts.NewStore(deps.Circles),
 		Blobs: deps.Blobs,
 	}, readLimit, writeLimit)
-	blobs.Register(circlesMux, &blobs.Service{
-		Store:  blobs.NewStore(deps.Circles),
-		Bucket: deps.Blobs,
-	}, readLimit, writeLimit)
 	comments.Register(circlesMux, &comments.Service{Store: comments.NewStore(deps.Circles)}, writeLimit)
 	reactions.Register(circlesMux, &reactions.Service{Store: reactions.NewStore(deps.Circles)}, writeLimit)
 	circleinvites.Register(circlesMux, &circleinvites.Service{
@@ -149,10 +145,15 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	profile.Register(accountMux, &profile.Service{
 		Store:   profile.NewStore(deps.Accounts),
 		Circles: members.NewStore(deps.Circles),
+		Blobs:   deps.Blobs,
 	}, readLimit, writeLimit)
 	devices.Register(accountMux, &devices.Service{Store: devices.NewStore(deps.Accounts)}, writeLimit)
+	avatar.Register(accountMux, &avatar.Service{Bucket: deps.Blobs}, readLimit, writeLimit)
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
+	// Anyone's avatar, not only the caller's: a roster names people you
+	// share a circle with, and their pictures are what it is for.
+	mux.Handle("/avatars/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 
 	deleteAccountService := &deletion.Service{AuthStore: deps.Auth, Store: deletion.NewStore(deps.Accounts)}
 	if deps.AppleID != nil {

@@ -12,6 +12,8 @@ func Register(mux *http.ServeMux, service *Service, read, write func(http.Handle
 		wrap    func(http.Handler) http.Handler
 	}{
 		{"POST /circles/{circleId}/entries", &PutHandler{Service: service}, write},
+		{"POST /circles/{circleId}/blobs/{postId}/upload-target", &UploadHandler{Service: service}, write},
+		{"GET /circles/{circleId}/blobs/{postId}", &PhotoHandler{Service: service}, read},
 		{"GET /circles/{circleId}/entries", &WalkHandler{Service: service}, read},
 		{"GET /circles/{circleId}/entries/{postId}/children", &ChildrenHandler{Service: service}, read},
 		{"PATCH /circles/{circleId}/entries/{postId}", &PatchHandler{Service: service}, write},

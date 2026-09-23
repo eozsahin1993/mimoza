@@ -38,7 +38,8 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 	relay := harness.Start(t)
 	admin := relay.SignIn()
 	member := relay.SignIn()
-	admin.Put(api("/account/profile"), harness.Body{"name": "Sarah", "avatarKey": "avatars/sarah"}).Expect(http.StatusOK)
+	adminAvatar := "avatars/" + admin.AccountID() + "/hash-1"
+	admin.Put(api("/account/profile"), harness.Body{"name": "Sarah", "avatarKey": adminAvatar}).Expect(http.StatusOK)
 	member.Put(api("/account/profile"), harness.Body{"name": "Ali"}).Expect(http.StatusOK)
 
 	circleID := createCircle(t, admin, "Family")
@@ -66,7 +67,7 @@ func TestCircles_TheRosterSaysWhoEveryoneIs(t *testing.T) {
 
 	for _, entry := range roster.Members {
 		if entry.AccountID == admin.AccountID() {
-			harness.AssertEqual(t, entry.AvatarKey, "avatars/sarah", "the avatar comes with the name")
+			harness.AssertEqual(t, entry.AvatarKey, adminAvatar, "the avatar comes with the name")
 			harness.AssertEqual(t, entry.Role, "admin", "and the membership survives the join")
 		}
 	}
@@ -87,7 +88,8 @@ func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
 	relay := harness.Start(t)
 	admin := relay.SignIn()
 	joiner := relay.SignIn()
-	joiner.Put(api("/account/profile"), harness.Body{"name": "Ali", "avatarKey": "avatars/ali"}).Expect(http.StatusOK)
+	joinerAvatar := "avatars/" + joiner.AccountID() + "/hash-1"
+	joiner.Put(api("/account/profile"), harness.Body{"name": "Ali", "avatarKey": joinerAvatar}).Expect(http.StatusOK)
 
 	circleID := createCircle(t, admin, "Family")
 	var invite struct {
@@ -106,7 +108,7 @@ func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
 	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
 	harness.AssertEqual(t, len(pending.Requests), 1, "one ask")
 	harness.AssertEqual(t, pending.Requests[0].Name, "Ali", "named")
-	harness.AssertEqual(t, pending.Requests[0].AvatarKey, "avatars/ali", "with a face")
+	harness.AssertEqual(t, pending.Requests[0].AvatarKey, joinerAvatar, "with a face")
 	harness.AssertEqual(t, pending.Requests[0].AccountID, joiner.AccountID(), "and the account behind it")
 }
 

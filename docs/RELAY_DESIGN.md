@@ -98,12 +98,25 @@ through the `lookup` row.
 | `by-type-updated` | `pk` | `typeUpdatedKey = post#<updatedAt:013d>#<postId>` | posts forward, including changed ones |
 | `by-account` | `accountId` | `sk` | every circle an account is in |
 
-Blobs live in S3 at `<circleId>/<postId>` and `<circleId>/cover/<coverId>`,
-delivered as CloudFront URLs signed for an hour. Every key is written
-once, so a cached object is never stale and the cache TTL is free to be
-long. The bytes never pass through the relay in either direction: an
-upload is a presigned form the device posts straight to the bucket, and
-a download is a signed URL it fetches from the edge.
+Blobs live in S3 at `<circleId>/<postId>`, `<circleId>/cover/<coverId>`
+and `avatars/<accountId>/<avatarId>`, delivered as CloudFront URLs signed
+for an hour. The bytes never pass through the relay in either direction:
+an upload is a presigned form the device posts straight to the bucket,
+and a download is a signed URL it fetches from the edge.
+
+Every key is written once. A cover id and an avatar id are content
+hashes the client computes, so changing either is a new key rather than
+an overwrite: a cached copy can never be stale, the edge holds objects
+indefinitely, and re-uploading something unchanged is refused because
+those exact bytes are already there. Ids that become keys are checked
+for shape before they get near one (`internal/util/ids`).
+
+An avatar belongs to an account, not a circle, so it is unencrypted and
+is the one blob readable by any signed-in caller who holds its key. The
+key is unguessable and travels only on a roster or a pending request, so
+holding one already implies having been allowed to see it. A profile may
+only name a key under its own account, and replacing a picture deletes
+the one it replaced.
 
 A blob is uploaded before the entry that references it, so a crash in
 between leaves an orphaned object rather than a post pointing at bytes
@@ -185,10 +198,12 @@ GET /circles/{id}/entries/{postId}/children
 
 POST /circles/{id}/blobs/{postId}/upload-target
 POST /circles/{id}/blobs/cover/{coverId}/upload-target
+POST /account/avatar/{avatarId}/upload-target
   → a presigned form, refused where bytes already sit at that key
 
 GET /circles/{id}/blobs/{postId}
 GET /circles/{id}/blobs/cover/{coverId}
+GET /avatars/{accountId}/{avatarId}
   → a URL signed for an hour, refused for a post that is deleted or
     never had a photo
 ```

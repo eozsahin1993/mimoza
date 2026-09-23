@@ -3,6 +3,8 @@ package accounts
 import (
 	"errors"
 	"net/http"
+
+	"mimoza-relay/internal/blobs"
 )
 
 var (
@@ -10,6 +12,10 @@ var (
 	// ErrProviderLinked means this sign-in already resolves to another
 	// account — linking it again would split one person in two.
 	ErrProviderLinked = errors.New("accounts: this sign-in belongs to another account")
+	// ErrNotYourAvatar means a profile named a picture stored under
+	// another account, which would let someone wear a face that is not
+	// theirs.
+	ErrNotYourAvatar = errors.New("accounts: that avatar belongs to another account")
 )
 
 // Status maps a column error to what the caller sees, in one place so
@@ -22,6 +28,10 @@ func Status(err error) (int, string) {
 	case errors.Is(err, ErrNotFound):
 		return http.StatusNotFound, err.Error()
 	case errors.Is(err, ErrProviderLinked):
+		return http.StatusConflict, err.Error()
+	case errors.Is(err, ErrNotYourAvatar):
+		return http.StatusForbidden, err.Error()
+	case errors.Is(err, blobs.ErrExists):
 		return http.StatusConflict, err.Error()
 	default:
 		return http.StatusInternalServerError, "something went wrong"

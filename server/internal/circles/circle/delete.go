@@ -21,3 +21,7 @@ func (h *DeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// blobPrefix ends in a slash: without it the sweep also matches a circle
+// whose id starts with the same characters.
+func blobPrefix(circleID string) string { return circleID + "/" }

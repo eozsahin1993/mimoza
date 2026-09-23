@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"mimoza-relay/internal/app"
+	blobstore "mimoza-relay/internal/blobs/s3"
 	"mimoza-relay/internal/config"
-	blobs3 "mimoza-relay/internal/synclog/s3"
 )
 
 func main() {
@@ -57,7 +57,7 @@ func presignForRequestHost(endpoint string, next http.Handler) http.Handler {
 		if port := s3URL.Port(); port != "" {
 			public.Host = net.JoinHostPort(host, port)
 		}
-		next.ServeHTTP(w, r.WithContext(blobs3.WithPresignEndpoint(r.Context(), public.String())))
+		next.ServeHTTP(w, r.WithContext(blobstore.WithPresignEndpoint(r.Context(), public.String())))
 	})
 }
 

@@ -3,7 +3,10 @@
 // circle belong to the other slices.
 package circle
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // Register mounts every route this resource answers. wrap, if non-nil,
 // wraps each handler first — see internal/api for what they carry.
@@ -13,9 +16,11 @@ func Register(mux *http.ServeMux, service *Service, read, write func(http.Handle
 		"POST /circles":              &CreateHandler{Service: service},
 		"PATCH /circles/{circleId}":  &PatchHandler{Service: service},
 		"DELETE /circles/{circleId}": &DeleteHandler{Service: service},
+		"POST /circles/{circleId}/blobs/cover/{coverId}/upload-target": &CoverUploadHandler{Service: service},
+		"GET /circles/{circleId}/blobs/cover/{coverId}":                &CoverHandler{Service: service},
 	} {
 		wrap := write
-		if pattern == "GET /circles" {
+		if strings.HasPrefix(pattern, "GET ") {
 			wrap = read
 		}
 		if wrap != nil {

@@ -16,10 +16,15 @@ locals {
 # cache key entirely — which is the whole point: five members holding five
 # differently-signed URLs must share one cached object.
 resource "aws_cloudfront_cache_policy" "blobs" {
-  count       = local.blobs_enabled
-  name        = "${var.name_prefix}-blobs"
+  count = local.blobs_enabled
+  name  = "${var.name_prefix}-blobs"
+  # Every key is written once and never overwritten: a post's photo is
+  # keyed by entry id, a cover and an avatar by a content hash. Objects
+  # carry no Cache-Control of their own — a presigned POST policy can
+  # only name fields it signed — so default_ttl is what the edge uses,
+  # and a year is what immutable means.
   min_ttl     = 0
-  default_ttl = 86400
+  default_ttl = 31536000
   max_ttl     = 31536000
 
   parameters_in_cache_key_and_forwarded_to_origin {
