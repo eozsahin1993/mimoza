@@ -154,7 +154,11 @@ func (s *Store) ListEntries(ctx context.Context, circleID, readerID string, curs
 		}
 	}
 
-	page := circles.Page{Entries: entries, More: len(entries) == int(limit)}
+	// Not len(entries) == limit: DynamoDB also cuts a Query short at 1 MB
+	// of items, below limit, and only LastEvaluatedKey says so — a page
+	// read off the row count alone would read that as the end of the
+	// walk and silently drop everything past it.
+	page := circles.Page{Entries: entries, More: len(out.LastEvaluatedKey) > 0}
 	if len(entries) > 0 {
 		// Each cursor resumes in its own index, so each takes the entry
 		// that is last in that index — not the last row of this page,

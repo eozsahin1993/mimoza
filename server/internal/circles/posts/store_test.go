@@ -3,6 +3,7 @@ package posts_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -68,6 +69,44 @@ func TestDeletePost_OnAPostThatWasNeverThere(t *testing.T) {
 	_, err := posts.NewStore(table).DeletePost(ctx, circleID, "never-posted")
 	if !errors.Is(err, circles.ErrEntryNotFound) {
 		t.Fatalf("expected ErrEntryNotFound, got %v", err)
+	}
+}
+
+// DynamoDB truncates a Query at 1 MB of items regardless of Limit, and
+// hands back fewer rows than asked for along with a LastEvaluatedKey.
+// More has to come from that key, not from whether the row count met
+// Limit — a page this large would meet Limit only coincidentally, and a
+// version keyed on the count alone would call this the end of the walk.
+func TestListEntries_MoreSurvivesA1MBPageCutBelowTheLimit(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	store := posts.NewStore(table)
+
+	circleID := testsupport.UniqueCircleID(t)
+	author := testsupport.UniqueAccountID(t)
+	seedCircle(t, table, circleID, author)
+
+	// 20 posts x 60 KB clears 1 MB well before either the post count or
+	// any one item nears DynamoDB's own 400 KB item limit.
+	big := make([]byte, 60*1024)
+	for i := range 20 {
+		id := fmt.Sprintf("post-%d", i)
+		if _, err := store.PutPost(ctx, circleID, circles.Entry{
+			ID: id, AuthorID: author, KeyVersion: 1, Ciphertext: big,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	page, err := store.ListEntries(ctx, circleID, "", circles.Cursor{Type: circles.TypePost}, 200)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Entries) >= 20 {
+		t.Fatalf("expected the 1 MB cap to cut the page well short of all 20, got %d", len(page.Entries))
+	}
+	if !page.More {
+		t.Fatalf("got %d of 20 entries under a limit of 200 — that gap is the 1 MB cap, not the end of the walk", len(page.Entries))
 	}
 }
 
