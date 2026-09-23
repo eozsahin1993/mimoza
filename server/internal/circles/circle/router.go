@@ -9,7 +9,7 @@ import (
 )
 
 // Register mounts every route this resource answers. wrap, if non-nil,
-// wraps each handler first — see internal/api for what they carry.
+// wraps each handler first — see internal/app for what they carry.
 func Register(mux *http.ServeMux, service *Service, read, write func(http.Handler) http.Handler) {
 	for pattern, handler := range map[string]http.Handler{
 		"GET /circles":               &ListHandler{Service: service},

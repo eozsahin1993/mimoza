@@ -1,9 +1,4 @@
-// Package api is the composition root — the "final router outside" that
-// wires shared storage components into each endpoint's own service and
-// aggregates every endpoint's route registration into one mux. Called
-// once by each cmd/ entry point (cmd/lambda, cmd/server), whichever way
-// the app ends up served.
-package api
+package app
 
 import (
 	"net/http"
@@ -37,9 +32,7 @@ import (
 	"mimoza-relay/internal/util/httputil"
 )
 
-// PushDeps groups the push slice's dependencies. A struct because
-// NewRouter already takes two ratelimit.Store values, and a third
-// positional one would be easy to pass in the wrong order silently.
+// PushDeps groups the push slice's dependencies.
 type PushDeps struct {
 	Store          push.Store
 	RecipientLimit ratelimit.Store
@@ -48,19 +41,16 @@ type PushDeps struct {
 	Dispatch func(push.Delivery, int64, []byte)
 }
 
-// Deps is everything the router wires into its endpoints, named rather
-// than positional — four fields share two types (two ratelimit.Store,
-// two *oidcverify.Verifier), so a positional list let a read budget stand
-// in for a write one with nothing to catch it. PushDeps was already a
-// struct for the same reason; this finishes the job.
+// Deps is everything the router wires into its endpoints. Named fields
+// rather than positional: two ratelimit.Store and two *oidcverify.Verifier
+// means a read budget could stand in for a write one with nothing to
+// catch it.
 type Deps struct {
-	// Accounts is the table every accounts slice builds its own store
-	// on, the same way Circles is: the slices share key shapes and the
-	// two reads other columns need, not a store type.
+	// Accounts and Circles are the tables each slice in that column builds
+	// its own store on — the slices share key shapes and the few reads
+	// other columns need, not a store type.
 	Accounts *accountsdynamo.Table
-	// Circles is the table every circles slice builds its own store on;
-	// the slices share key shapes and a few reads, not a store type.
-	Circles *dynamo.Table
+	Circles  *dynamo.Table
 	// InviteRetention is how long a code, and an unanswered request under
 	// it, lasts.
 	InviteRetention time.Duration
@@ -93,24 +83,16 @@ func NewRouter(deps Deps) *http.ServeMux {
 	return mux
 }
 
-// newV1Mux is the only version that exists today. When a v2 is needed, add
-// a sibling newV2Mux and mount it at "/v2/" alongside this one — existing
-// clients keep hitting "/v1/" unchanged, and each endpoint's own Register
-// stays unaware that versioning exists at all.
 func newV1Mux(deps Deps) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Grouped under one sub-mux so RequireSession wraps all eight at once —
-	// each endpoint also checks its own write token/authority signature
-	// beyond this shared session check. Rate limiting wraps each handler
-	// individually instead of circleMux as a whole, since writes and reads
-	// carry different budgets (see internal/ratelimit).
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
 	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
 
-	// The relay-owned circles, one slice per resource. Each registers
-	// its own routes and carries the read or write budget that route
-	// needs; the session check wraps all of them at once.
+	// One sub-mux so RequireSession wraps every circles slice at once,
+	// while the budget wraps each handler individually — reads and writes
+	// don't share one. Each endpoint still checks its own write token or
+	// authority signature beyond the session.
 	circlesMux := http.NewServeMux()
 	circle.Register(circlesMux, &circle.Service{
 		Store:    circle.NewStore(deps.Circles),
@@ -140,7 +122,6 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, httputil.LogRoutes(circlesMux)))
 	mux.Handle("/invites/", auth.RequireSession(deps.Auth, httputil.LogRoutes(circlesMux)))
 
-	// The account itself: its profile, its public key, its devices.
 	accountMux := http.NewServeMux()
 	profile.Register(accountMux, &profile.Service{
 		Store:   profile.NewStore(deps.Accounts),

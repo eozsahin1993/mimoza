@@ -44,15 +44,18 @@ func (s *Store) CreateInvite(ctx context.Context, invite circles.Invite) error {
 		dynamo.AttrExpiresAt: dynamoutil.Num(invite.ExpiresAt.Unix()),
 	}
 
-	_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Put: &types.Put{TableName: aws.String(s.Name), Item: item}},
-			{Put: &types.Put{
-				TableName:           aws.String(s.Name),
-				Item:                lookup,
-				ConditionExpression: aws.String("attribute_not_exists(pk)"),
-			}},
-		},
+	err := dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{Put: &types.Put{TableName: aws.String(s.Name), Item: item}},
+				{Put: &types.Put{
+					TableName:           aws.String(s.Name),
+					Item:                lookup,
+					ConditionExpression: aws.String("attribute_not_exists(pk)"),
+				}},
+			},
+		})
+		return err
 	})
 	if dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed {
 		return circles.ErrAlreadyExists
@@ -123,21 +126,24 @@ func (s *Store) ListInvites(ctx context.Context, circleID string) ([]circles.Inv
 }
 
 func (s *Store) RevokeInvite(ctx context.Context, circleID, code string) error {
-	_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Delete: &types.Delete{
-				TableName: aws.String(s.Name),
-				Key:       s.Key(dynamo.CirclePK(circleID), dynamo.InviteKey(code)),
-			}},
-			// Keyed by the code alone, so without this an admin of one
-			// circle could revoke another circle's code by sending it.
-			{Delete: &types.Delete{
-				TableName:                 aws.String(s.Name),
-				Key:                       s.Key(dynamo.InvitePK(code), dynamo.MetaSK),
-				ConditionExpression:       aws.String(dynamo.AttrCircleID + " = :circleId"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{":circleId": dynamoutil.Str(circleID)},
-			}},
-		},
+	err := dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{Delete: &types.Delete{
+					TableName: aws.String(s.Name),
+					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.InviteKey(code)),
+				}},
+				// Keyed by the code alone, so without this an admin of one
+				// circle could revoke another circle's code by sending it.
+				{Delete: &types.Delete{
+					TableName:                 aws.String(s.Name),
+					Key:                       s.Key(dynamo.InvitePK(code), dynamo.MetaSK),
+					ConditionExpression:       aws.String(dynamo.AttrCircleID + " = :circleId"),
+					ExpressionAttributeValues: map[string]types.AttributeValue{":circleId": dynamoutil.Str(circleID)},
+				}},
+			},
+		})
+		return err
 	})
 	if dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed {
 		// The code belongs to another circle, or is already gone.

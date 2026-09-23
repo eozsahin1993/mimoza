@@ -21,7 +21,7 @@ export class SessionExpiredError extends Error {
   }
 }
 
-/** Thrown on HTTP 429 (see server/internal/api/ratelimit) — not handled specially, just identifiable in logs. Callers already retry any thrown error later (outbox, pullMeta, photo-queue.ts), and the budget is sized to make this rare. */
+/** Thrown on HTTP 429 (see server/internal/ratelimit) — not handled specially, just identifiable in logs. Callers already retry any thrown error later (outbox, pullMeta, photo-queue.ts), and the budget is sized to make this rare. */
 export class RateLimitedError extends Error {
   constructor() {
     super('Rate limit exceeded — try again shortly.');

@@ -5,7 +5,7 @@ import { JoinRequestGoneError } from '@/core/services/relay-errors';
 
 /**
  * Thin fetch-based client for the invite mailbox's endpoints (server-side:
- * server/internal/api/invitemailbox). Same division of labor as relay.ts:
+ * server/internal/invite/http). Same division of labor as relay.ts:
  * this module only knows how to talk to the wire, nothing about
  * invite-code derivation or decryption (that's services/crypto.ts and the
  * domain usecases that call this).

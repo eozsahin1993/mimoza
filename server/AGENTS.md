@@ -24,9 +24,10 @@ backing technology (`dynamodb/`, `s3/`):
   (`apns/`, `fcm/`).
 - `ratelimit/` — the per-account request budget.
 
-`internal/api/` holds only `router.go` (the composition root — the one
-place that imports every column and wires stores into services) and its
-test suite. `internal/app/app.go` builds the real AWS-backed adapters.
+`internal/app/` is the composition root — the one place that imports every
+column: `router.go` wires stores into services and aggregates the routes,
+`app.go` builds the real AWS-backed adapters that fill that wiring, and the
+package's test suite drives the assembled router end to end.
 `internal/util/httputil`, `internal/util/dynamoutil`, `internal/config`,
 `internal/util/localstack`, and `internal/util/testsupport` are cross-cutting
 plumbing shared by every column, not owned by any one of them — don't

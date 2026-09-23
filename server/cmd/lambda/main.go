@@ -1,6 +1,6 @@
 // Command lambda is the AWS Lambda entry point — the only place Lambda's
 // event/response shapes are allowed to appear. It takes the handler
-// internal/app builds and hands it to httpadapter, so internal/api and
+// internal/app builds and hands it to httpadapter, so the relay and
 // everything it depends on has no idea it's running on Lambda at all.
 package main
 

@@ -1,5 +1,5 @@
 // Package harness drives a relay the way a client does: over HTTP, with
-// no access to anything inside it. Not for handler coverage — internal/api's
+// no access to anything inside it. Not for handler coverage — internal/app's
 // own tests already have that — but for the sequences between calls, where
 // a client's real problems live: create an invite, request against it,
 // approve, then find the approval readable when it shouldn't be.
@@ -35,7 +35,6 @@ import (
 
 	"mimoza-relay/internal/accounts"
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
-	"mimoza-relay/internal/api"
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/util/localstack"
@@ -96,8 +95,8 @@ func Start(t *testing.T) *Relay {
 	}
 	t.Cleanup(func() { localstack.TeardownSet(context.Background(), ddb, s3Client, names) })
 
-	deps := app.Deps(localstack.RelayConfig(names), awsCfg)
-	server := httptest.NewServer(api.NewRouter(deps))
+	deps := app.AWSDeps(localstack.RelayConfig(names), awsCfg)
+	server := httptest.NewServer(app.NewRouter(deps))
 	t.Cleanup(server.Close)
 
 	return &Relay{t: t, baseURL: server.URL, sessions: deps.Auth, accounts: deps.Accounts}
@@ -130,7 +129,7 @@ type Device struct {
 func (d *Device) AccountID() string { return d.accountID }
 
 // SignIn mints a session for a fresh account, skipping Google and Apple.
-// Provider verification is internal/api's business; what matters here is
+// Provider verification is internal/app's business; what matters here is
 // that requests carry a credential the relay accepts.
 func (r *Relay) SignIn() *Device {
 	r.t.Helper()

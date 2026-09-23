@@ -1,7 +1,7 @@
 // End-to-end tests for the push routes, against the fully assembled
 // router — see router_test.go's top comment for why this is separate from
 // the per-package unit tests.
-package api_test
+package app_test
 
 import (
 	"bytes"

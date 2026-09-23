@@ -27,7 +27,7 @@ func NewStore(table *dynamo.Table) *Store { return &Store{Table: table} }
 
 // The slice's service depends on the interface, not this type; the
 // assertion is what makes a drift between them a build failure here
-// rather than a wiring failure in internal/api.
+// rather than a wiring failure in internal/app.
 var _ store = (*Store)(nil)
 
 // ListMemberships is GET /circles: every circle this account belongs to.
@@ -52,42 +52,45 @@ func (s *Store) CreateCircle(ctx context.Context, circle circles.Circle, founder
 		ReceivedAt:  now,
 	}
 
-	_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Put: &types.Put{
-				TableName: aws.String(s.Name),
-				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:        dynamoutil.Str(dynamo.CirclePK(circle.ID)),
-					dynamoutil.SKAttr:        dynamoutil.Str(dynamo.MetaSK),
-					dynamo.AttrName:          dynamoutil.Str(circle.Name),
-					dynamo.AttrKeyVersion:    dynamoutil.Num(1),
-					dynamo.AttrRosterVersion: dynamoutil.Num(1),
-					dynamo.AttrMemberCount:   dynamoutil.Num(1),
-					dynamo.AttrAdminCount:    dynamoutil.Num(1),
-					dynamo.AttrLastEntryAt:   dynamoutil.Millis(now),
-					dynamo.AttrCreatedBy:     dynamoutil.Str(founder.AccountID),
-					dynamo.AttrCreatedAt:     dynamoutil.Millis(now),
-				},
-				ConditionExpression: aws.String("attribute_not_exists(pk)"),
-			}},
-			{Put: &types.Put{
-				TableName: aws.String(s.Name),
-				Item:      dynamo.MemberItem(circle.ID, founder, now),
-			}},
-			{Put: &types.Put{
-				TableName: aws.String(s.Name),
-				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circle.ID)),
-					dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(founder.AccountID)),
-					dynamo.AttrKeys:      dynamo.SealedKeysAttr(circles.SealedKeys{1: sealed}),
-					dynamo.AttrUpdatedAt: dynamoutil.Millis(now),
-				},
-			}},
-			{Put: &types.Put{
-				TableName: aws.String(s.Name),
-				Item:      dynamo.ActivityItem(circle.ID, activity),
-			}},
-		},
+	err := dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{Put: &types.Put{
+					TableName: aws.String(s.Name),
+					Item: map[string]types.AttributeValue{
+						dynamoutil.PKAttr:        dynamoutil.Str(dynamo.CirclePK(circle.ID)),
+						dynamoutil.SKAttr:        dynamoutil.Str(dynamo.MetaSK),
+						dynamo.AttrName:          dynamoutil.Str(circle.Name),
+						dynamo.AttrKeyVersion:    dynamoutil.Num(1),
+						dynamo.AttrRosterVersion: dynamoutil.Num(1),
+						dynamo.AttrMemberCount:   dynamoutil.Num(1),
+						dynamo.AttrAdminCount:    dynamoutil.Num(1),
+						dynamo.AttrLastEntryAt:   dynamoutil.Millis(now),
+						dynamo.AttrCreatedBy:     dynamoutil.Str(founder.AccountID),
+						dynamo.AttrCreatedAt:     dynamoutil.Millis(now),
+					},
+					ConditionExpression: aws.String("attribute_not_exists(pk)"),
+				}},
+				{Put: &types.Put{
+					TableName: aws.String(s.Name),
+					Item:      dynamo.MemberItem(circle.ID, founder, now),
+				}},
+				{Put: &types.Put{
+					TableName: aws.String(s.Name),
+					Item: map[string]types.AttributeValue{
+						dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circle.ID)),
+						dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(founder.AccountID)),
+						dynamo.AttrKeys:      dynamo.SealedKeysAttr(circles.SealedKeys{1: sealed}),
+						dynamo.AttrUpdatedAt: dynamoutil.Millis(now),
+					},
+				}},
+				{Put: &types.Put{
+					TableName: aws.String(s.Name),
+					Item:      dynamo.ActivityItem(circle.ID, activity),
+				}},
+			},
+		})
+		return err
 	})
 	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return circles.ErrAlreadyExists
@@ -152,7 +155,10 @@ func (s *Store) UpdateCircle(ctx context.Context, circleID, name, coverID, actor
 		items = append(items, activity(s, circleID, actorID, circles.EventCoverChanged, coverID, now))
 	}
 
-	_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+	err := dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+		return err
+	})
 	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return circles.Circle{}, circles.ErrCircleNotFound
 	}

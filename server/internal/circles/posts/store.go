@@ -23,7 +23,7 @@ func NewStore(table *dynamo.Table) *Store { return &Store{Table: table} }
 
 // The slice's service depends on the interface, not this type; the
 // assertion is what makes a drift between them a build failure here
-// rather than a wiring failure in internal/api.
+// rather than a wiring failure in internal/app.
 var _ store = (*Store)(nil)
 
 // PutPost writes one post and moves the circle's lastEntryAt. The post
@@ -31,15 +31,18 @@ var _ store = (*Store)(nil)
 // it already wrote rather than a second copy of it.
 func (s *Store) PutPost(ctx context.Context, circleID string, entry circles.Entry) (circles.Entry, error) {
 	entry.ReceivedAt = s.Now()
-	_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Put: &types.Put{
-				TableName:           aws.String(s.Name),
-				Item:                dynamo.PostItem(circleID, entry),
-				ConditionExpression: aws.String("attribute_not_exists(sk)"),
-			}},
-			{Update: s.TouchCircle(circleID, entry.ReceivedAt)},
-		},
+	err := dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{Put: &types.Put{
+					TableName:           aws.String(s.Name),
+					Item:                dynamo.PostItem(circleID, entry),
+					ConditionExpression: aws.String("attribute_not_exists(sk)"),
+				}},
+				{Update: s.TouchCircle(circleID, entry.ReceivedAt)},
+			},
+		})
+		return err
 	})
 	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return s.GetPost(ctx, circleID, entry.ID, "")

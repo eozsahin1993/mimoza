@@ -1,5 +1,5 @@
 # One Lambda handling every endpoint (its own net/http.ServeMux does the
-# real routing internally — see server/internal/api), reachable at a
+# real routing internally — see server/internal/app), reachable at a
 # single URL. A Function URL is just a dedicated HTTPS endpoint attached
 # directly to the function; API Gateway would earn its keep only for
 # multi-function routing or WebSocket. The custom domain that used to

@@ -1,7 +1,7 @@
 // End-to-end tests for DELETE /v1/account, against the fully assembled
 // router — see router_test.go's top comment for why this is separate
 // from the per-package unit tests.
-package api_test
+package app_test
 
 import (
 	"net/http"

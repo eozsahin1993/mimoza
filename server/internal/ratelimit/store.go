@@ -9,7 +9,7 @@ import "context"
 
 // Store tracks a fixed-window request budget per key. A single Store value
 // is configured (at construction) with one particular limit and window —
-// server/internal/api/router.go wires up two separate instances against
+// server/internal/app/router.go wires up two separate instances against
 // the same underlying table, one for write-type circle endpoints and one
 // (with a much higher limit) for reads, so a caller's key never has its
 // write and read budgets confused with each other.

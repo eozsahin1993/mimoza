@@ -6,7 +6,7 @@ import { authorizedFetch, describeError } from '@/core/services/relay';
 import { CircleGoneError, RateLimitedError } from '@/core/services/relay-errors';
 
 /**
- * The relay's circle-log endpoints (server-side: server/internal/api's
+ * The relay's circle-log endpoints (server-side: server/internal/synclog/http's
  * createlog, appendlog, rotatelog, changeauthority, deletecircle, getlog,
  * getepochs). No retry/queueing logic here; that's sync-circle.ts's job.
  */

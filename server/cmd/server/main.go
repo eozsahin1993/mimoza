@@ -1,8 +1,8 @@
 // Command server is the "dedicated, always-on" alternative to cmd/lambda —
 // the same handler from internal/app, served with http.ListenAndServe
 // instead of through Lambda/API Gateway. Exists to prove the port/adapter
-// split actually buys the portability it's meant to: nothing below
-// internal/api changes to support this, only this file exists.
+// split actually buys the portability it's meant to: nothing in
+// internal/app changes to support this, only this file exists.
 package main
 
 import (

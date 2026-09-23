@@ -31,8 +31,8 @@ provision/
 ```
 
 `cmd/server` and `cmd/lambda` both build their handler with
-`internal/app.New`, which calls the same `api.NewRouter(...)` — nothing
-below `internal/api` knows or cares whether it's running on Lambda or as a
+`internal/app.New`, which calls the same `app.NewRouter(...)` — nothing
+below `internal/app` knows or cares whether it's running on Lambda or as a
 long-lived process.
 
 ## Storage: six tables, six different reasons

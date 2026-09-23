@@ -189,66 +189,69 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 	}
 
 	now := s.Now()
-	_, err = s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Update: &types.Update{
-				TableName:        aws.String(s.Name),
-				Key:              s.Key(dynamo.CirclePK(circleID), dynamo.RequestKey(requestID)),
-				UpdateExpression: aws.String("SET #status = :status"),
-				// Still open, and still in date: a request can expire
-				// between an admin listing it and answering it.
-				ConditionExpression: aws.String("attribute_exists(sk) AND #status = :pending AND " +
-					"(attribute_not_exists(#expiresAt) OR #expiresAt > :now)"),
-				ExpressionAttributeNames: map[string]string{
-					"#status":    dynamo.AttrStatus,
-					"#expiresAt": dynamo.AttrExpiresAt,
-				},
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":status":  dynamoutil.Str(circles.RequestApproved),
-					":pending": dynamoutil.Str(circles.RequestPending),
-					":now":     dynamoutil.Num(now.Unix()),
-				},
-			}},
-			{Put: &types.Put{
-				TableName: aws.String(s.Name),
-				Item:      dynamo.MemberItem(circleID, member, now),
-			}},
-			{Put: &types.Put{
-				TableName: aws.String(s.Name),
-				Item: map[string]types.AttributeValue{
-					dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circleID)),
-					dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(member.AccountID)),
-					dynamo.AttrKeys:      dynamo.SealedKeysAttr(sealed),
-					dynamo.AttrUpdatedAt: dynamoutil.Millis(now),
-				},
-			}},
-			// memberCount is what makes the cap hold when two admins
-			// approve at once: the count read above can be stale, this
-			// condition cannot.
-			{Update: &types.Update{
-				TableName: aws.String(s.Name),
-				Key:       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
-				UpdateExpression: aws.String("ADD " + dynamo.AttrRosterVersion + " :one, " +
-					dynamo.AttrMemberCount + " :one"),
-				ConditionExpression: aws.String("attribute_not_exists(" + dynamo.AttrMemberCount + ") OR " +
-					dynamo.AttrMemberCount + " < :cap"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":one": dynamoutil.Num(1),
-					":cap": dynamoutil.Num(circles.MaxMembers),
-				},
-			}},
-			{Put: &types.Put{
-				TableName: aws.String(s.Name),
-				Item: dynamo.ActivityItem(circleID, circles.Entry{
-					Type:        circles.TypeActivity,
-					Event:       circles.EventJoined,
-					AuthorID:    actorID,
-					SubjectID:   member.AccountID,
-					SubjectName: name,
-					ReceivedAt:  now,
-				}),
-			}},
-		},
+	err = dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{Update: &types.Update{
+					TableName:        aws.String(s.Name),
+					Key:              s.Key(dynamo.CirclePK(circleID), dynamo.RequestKey(requestID)),
+					UpdateExpression: aws.String("SET #status = :status"),
+					// Still open, and still in date: a request can expire
+					// between an admin listing it and answering it.
+					ConditionExpression: aws.String("attribute_exists(sk) AND #status = :pending AND " +
+						"(attribute_not_exists(#expiresAt) OR #expiresAt > :now)"),
+					ExpressionAttributeNames: map[string]string{
+						"#status":    dynamo.AttrStatus,
+						"#expiresAt": dynamo.AttrExpiresAt,
+					},
+					ExpressionAttributeValues: map[string]types.AttributeValue{
+						":status":  dynamoutil.Str(circles.RequestApproved),
+						":pending": dynamoutil.Str(circles.RequestPending),
+						":now":     dynamoutil.Num(now.Unix()),
+					},
+				}},
+				{Put: &types.Put{
+					TableName: aws.String(s.Name),
+					Item:      dynamo.MemberItem(circleID, member, now),
+				}},
+				{Put: &types.Put{
+					TableName: aws.String(s.Name),
+					Item: map[string]types.AttributeValue{
+						dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circleID)),
+						dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(member.AccountID)),
+						dynamo.AttrKeys:      dynamo.SealedKeysAttr(sealed),
+						dynamo.AttrUpdatedAt: dynamoutil.Millis(now),
+					},
+				}},
+				// memberCount is what makes the cap hold when two admins
+				// approve at once: the count read above can be stale, this
+				// condition cannot.
+				{Update: &types.Update{
+					TableName: aws.String(s.Name),
+					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
+					UpdateExpression: aws.String("ADD " + dynamo.AttrRosterVersion + " :one, " +
+						dynamo.AttrMemberCount + " :one"),
+					ConditionExpression: aws.String("attribute_not_exists(" + dynamo.AttrMemberCount + ") OR " +
+						dynamo.AttrMemberCount + " < :cap"),
+					ExpressionAttributeValues: map[string]types.AttributeValue{
+						":one": dynamoutil.Num(1),
+						":cap": dynamoutil.Num(circles.MaxMembers),
+					},
+				}},
+				{Put: &types.Put{
+					TableName: aws.String(s.Name),
+					Item: dynamo.ActivityItem(circleID, circles.Entry{
+						Type:        circles.TypeActivity,
+						Event:       circles.EventJoined,
+						AuthorID:    actorID,
+						SubjectID:   member.AccountID,
+						SubjectName: name,
+						ReceivedAt:  now,
+					}),
+				}},
+			},
+		})
+		return err
 	})
 	switch {
 	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:

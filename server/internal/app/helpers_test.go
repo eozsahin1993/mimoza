@@ -3,7 +3,7 @@
 // underneath. Not covered by the per-package unit tests, which call
 // service methods directly and never exercise routing, JSON encoding or
 // base64 handling.
-package api_test
+package app_test
 
 import (
 	"net/http"

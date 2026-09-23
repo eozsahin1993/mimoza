@@ -17,7 +17,6 @@ import (
 
 	"mimoza-relay/internal/accounts"
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
-	"mimoza-relay/internal/api"
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/util/localstack"
@@ -44,8 +43,8 @@ func main() {
 	// Shared() rather than Unique(): this process lives for the run, not
 	// one test, so there's nothing to isolate it from — and its tables are
 	// the ones internal/util/testsupport already expects to find.
-	deps := app.Deps(localstack.RelayConfig(localstack.Shared()), awsCfg)
-	mux := api.NewRouter(deps)
+	deps := app.AWSDeps(localstack.RelayConfig(localstack.Shared()), awsCfg)
+	mux := app.NewRouter(deps)
 	registerTestOnly(mux, deps.Auth, deps.Accounts)
 
 	address := addr()
@@ -83,7 +82,7 @@ func addr() string {
 // A bypass rather than a fake issuer because the alternative is worse —
 // standing up a fake OIDC provider here would mean the integration suite
 // testing the fake's JWKS round-trip rather than the relay. Real provider
-// verification is covered where it belongs, by internal/api's own tests
+// verification is covered where it belongs, by internal/app's own tests
 // against testsupport.FakeOIDCProvider.
 func registerTestOnly(mux *http.ServeMux, sessions auth.Store, accountStore *accountsdynamo.Table) {
 	mux.HandleFunc("POST /testonly/session", func(w http.ResponseWriter, r *http.Request) {

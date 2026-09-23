@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"mimoza-relay/internal/circles"
 	"mimoza-relay/internal/util/dynamoutil"
 )
 
@@ -144,5 +145,7 @@ func WithRetryOn(alsoRetry func(error) bool, write func() error) error {
 		}
 		time.Sleep(time.Duration(attempt+1) * 10 * time.Millisecond)
 	}
-	return fmt.Errorf("gave up after %d attempts: %w", MaxAttempts, err)
+	// Contention that outlasts the retries is the caller's to repeat, not
+	// a fault of ours: without this it reaches them as a 500.
+	return fmt.Errorf("gave up after %d attempts: %w: %w", MaxAttempts, circles.ErrVersionMoved, err)
 }
