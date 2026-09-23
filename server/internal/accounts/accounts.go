@@ -16,9 +16,7 @@ import "time"
 type Profile struct {
 	AccountID string
 	Name      string
-	// PublicKey is X25519, for sealing. Replacing it is how a device with
-	// no keychain gets back in, and it makes every sealed key stale until
-	// another member reseals them.
+	// PublicKey is X25519, for sealing.
 	PublicKey      []byte
 	PublicKeySetAt time.Time
 	CreatedAt      time.Time
@@ -30,9 +28,7 @@ type Device struct {
 	DeviceID  string
 	PushToken string
 	Platform  string
-	// Locale is what language the device wants its notifications in. The
-	// relay sends localization keys rather than text, so this is only a
-	// fallback for a platform that needs one.
+	// Locale is what language the device wants its notifications in.
 	Locale    string
 	UpdatedAt time.Time
 }
@@ -50,8 +46,7 @@ type Provider struct {
 	Name    string
 	Subject string
 	// RefreshToken is Apple's, banked at sign-in because deleting an
-	// account has to revoke the grant behind it and the authorization
-	// code it comes from dies within minutes.
+	// account has to revoke the grant behind it.
 	RefreshToken string
 	LinkedAt     time.Time
 }

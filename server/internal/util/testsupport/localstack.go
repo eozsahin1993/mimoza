@@ -52,10 +52,8 @@ import (
 // can't differ in shape from the one the relay is served against.
 var (
 	shared             = localstack.Shared()
-	tableName          = shared.TableName
 	bucketName         = shared.BucketName
 	sessionsTableName  = shared.SessionsTableName
-	inviteTableName    = shared.InviteTableName
 	rateLimitTableName = shared.RateLimitTableName
 )
 

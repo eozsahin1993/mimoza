@@ -22,24 +22,20 @@ const DefaultInviteRetentionDays = 7
 // server/provision/modules/storage creates them with; a rename there has
 // to happen in ResourcesFor too.
 type Resources struct {
-	TableName          string // sync log
 	BucketName         string
 	SessionsTableName  string
 	AccountsTableName  string
 	CirclesTableName   string
-	InviteTableName    string
 	RateLimitTableName string
 }
 
 // ResourcesFor derives every resource name from one prefix.
 func ResourcesFor(prefix string) Resources {
 	return Resources{
-		TableName:          prefix + "-sync-log",
 		BucketName:         prefix + "-blobs",
 		SessionsTableName:  prefix + "-sessions",
 		AccountsTableName:  prefix + "-accounts",
 		CirclesTableName:   prefix + "-circles",
-		InviteTableName:    prefix + "-invites",
 		RateLimitTableName: prefix + "-rate-limit",
 	}
 }
@@ -124,10 +120,7 @@ type Config struct {
 	MaxBlobSize int64
 	// InviteRetentionDays is how long invites, join requests and push's
 	// invite addresses last — one number for all three, so none outlives
-	// the others. See .env.example's INVITE_RETENTION_DAYS.
-	// Eviction itself is DynamoDB's native TTL
-	// (see provision/modules/storage/dynamodb.tf), not this process — this
-	// only controls what expiresAt gets written as.
+	// the others.
 	InviteRetentionDays int64
 	// LogLevel is debug|info|warn|error — info in deployed environments,
 	// debug locally where the volume costs nothing and the detail helps.
