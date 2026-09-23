@@ -1,8 +1,5 @@
 // Package config is the one place environment-derived settings are read
-// from — both cmd/lambda and cmd/server call Load() instead of scattering
-// (and duplicating) os.Getenv calls across entry points. Add new fields
-// here as the app needs more configuration, rather than reaching for
-// os.Getenv anywhere else.
+// from. Add fields here rather than reaching for os.Getenv elsewhere.
 package config
 
 import (
@@ -16,11 +13,9 @@ import (
 // Eviction itself is DynamoDB's TTL; this only sets what expiresAt says.
 const DefaultInviteRetentionDays = 7
 
-// Resources names every table and the blob bucket one environment uses.
-// All of them come from its prefix (mimoza-<env> in AWS, test-style
-// prefixes against LocalStack) under the "<prefix>-<suffix>" convention
-// server/provision/modules/storage creates them with; a rename there has
-// to happen in ResourcesFor too.
+// Resources names every table and the blob bucket one environment uses,
+// derived from its prefix. A rename in provision/modules/storage must
+// happen in ResourcesFor too.
 type Resources struct {
 	BucketName         string
 	SessionsTableName  string
@@ -45,15 +40,13 @@ func ResourcesFor(prefix string) Resources {
 type Config struct {
 	Resources
 	// FCMCredentialParameter is the SSM SecureString holding the FCM
-	// service-account key. Created by hand, never by Terraform — a
-	// Terraform-managed value lands in state as plaintext.
+	// service-account key. Hand-created — Terraform state is plaintext.
 	FCMCredentialParameter string
-	// FCMCredentialFile is a local path read instead of SSM — for running
-	// the relay against LocalStack. Empty in Lambda.
+	// FCMCredentialFile is a local path read instead of SSM, for
+	// LocalStack. Empty in Lambda.
 	FCMCredentialFile string
 	// APNSAuthKeyParameter is the SSM SecureString holding the APNs .p8
-	// auth key. Same reasoning as FCMCredentialParameter: created by hand,
-	// never by Terraform.
+	// auth key. Hand-created, like FCMCredentialParameter.
 	APNSAuthKeyParameter string
 	// APNSAuthKeyFile is a local path read instead of SSM — for LocalStack.
 	APNSAuthKeyFile string
@@ -67,81 +60,60 @@ type Config struct {
 	// False by default: a debug-signed build only works against sandbox.
 	APNSProduction bool
 	// RateLimitWriteMaxRequests/RateLimitReadMaxRequests are starting
-	// guesses, not measurements — env-tunable so they can be adjusted from
-	// real traffic without a redeploy.
+	// guesses, env-tunable so they can change without a redeploy.
 	RateLimitWriteMaxRequests int64
 	RateLimitReadMaxRequests  int64
 	// RateLimitWindowMinutes is the fixed window both budgets reset on.
 	RateLimitWindowMinutes int64
 	// GoogleClientIDIOS/Android/Web are the accepted "aud" values for
-	// Google Sign-In ID tokens, one per platform client registered in
-	// Google Cloud Console — named per-platform (mirroring app/.env.local's
-	// EXPO_PUBLIC_GOOGLE_*_CLIENT_ID) rather than one combined list, so a
-	// missing platform is an obviously-empty field instead of a silently
-	// wrong position in a comma list. Any of these may be empty if that
-	// platform isn't in use yet.
+	// Google Sign-In, one per platform so a missing one is an empty field
+	// rather than a wrong slot in a combined list. May be empty if unused.
 	GoogleClientIDIOS     string
 	GoogleClientIDAndroid string
 	GoogleClientIDWeb     string
-	// AppleClientIDIOS is the accepted "aud" value for Sign in with Apple
-	// ID tokens — the app's iOS bundle ID. A Services ID would join this
-	// as a second named field if a web/Android Apple flow is ever added.
-	// Also the "sub" of the client secret internal/auth/appleid signs.
+	// AppleClientIDIOS is the accepted "aud" for Sign in with Apple
+	// tokens, and the "sub" of the client secret internal/auth/appleid signs.
 	AppleClientIDIOS string
 	// AppleSignInKeyParameter is the SSM SecureString holding the Sign in
-	// with Apple .p8 key — the one account deletion revokes an Apple grant
-	// with. Same reasoning as FCMCredentialParameter: created by hand,
-	// never by Terraform. A different key from the APNs one above; the
-	// developer portal issues them separately and they aren't
-	// interchangeable.
+	// with Apple .p8 key. Hand-created like FCMCredentialParameter, and
+	// not interchangeable with the APNs key above despite both being .p8s.
 	AppleSignInKeyParameter string
 	// AppleSignInKeyFile is a local path read instead of SSM — for LocalStack.
 	AppleSignInKeyFile string
-	// AppleSignInKeyID identifies that key at Apple. AppleSignInTeamID is
-	// the same team APNS_TEAM_ID names, kept a separate setting so one can
-	// be configured without the other. Either empty means revocation is
-	// off: deleting an account still works, it just leaves the Apple grant.
+	// AppleSignInKeyID/AppleSignInTeamID identify that key at Apple, kept
+	// separate from APNSTeamID's team so either can be set alone. Either
+	// empty means revocation is off: deletion still works, minus the grant.
 	AppleSignInKeyID  string
 	AppleSignInTeamID string
-	// BlobCDNSettingsParameter holds where the blob CDN is — base URL, key
-	// pair id, distribution id — as JSON. Written by modules/cdn rather
-	// than set here: the distribution needs the Lambda's function URL, so
-	// telling the Lambda about the distribution in its own environment
-	// would close a dependency cycle. Absent until blobs move to
-	// CloudFront, which the relay reads as "keep presigning S3".
+	// BlobCDNSettingsParameter holds the blob CDN's base URL, key pair id
+	// and distribution id as JSON. Written by modules/cdn, not here, to
+	// avoid a dependency cycle with the Lambda's URL. Absent (local, or
+	// before an env's first CDN apply) means "keep presigning S3".
 	BlobCDNSettingsParameter string
 	// BlobCDNSigningKeyParameter is the SSM SecureString holding the RSA
-	// private key that signs download URLs. Created by hand, never by
-	// Terraform — same reasoning as FCMCredentialParameter.
+	// key that signs download URLs. Hand-created, like FCMCredentialParameter.
 	BlobCDNSigningKeyParameter string
-	// MaxBlobSize is passed straight to s3.NewBlobStore, overriding its
-	// DefaultMaxBlobSize — see .env.example's MAX_BLOB_SIZE_BYTES. 0 means
-	// "use the adapter's own default".
+	// MaxBlobSize is passed to blobs/s3.New, overriding DefaultMaxBlobSize.
+	// 0 means "use the adapter's own default" — see MAX_BLOB_SIZE_BYTES.
 	MaxBlobSize int64
 	// InviteRetentionDays is how long invites, join requests and push's
-	// invite addresses last — one number for all three, so none outlives
-	// the others.
+	// invite addresses last — one number for all three.
 	InviteRetentionDays int64
 	// LogLevel is debug|info|warn|error — info in deployed environments,
 	// debug locally where the volume costs nothing and the detail helps.
 	LogLevel string
 	// Port is only used by cmd/server (cmd/lambda doesn't listen on a port).
 	Port string
-	// S3ForcePathStyle is only ever true for local testing against
-	// LocalStack, which doesn't resolve virtual-hosted-style bucket
-	// subdomains (bucket.host) the way real S3 does. Real AWS always uses
-	// the default (false) — never set this in a deployed environment.
+	// S3ForcePathStyle is true only for LocalStack, which can't resolve
+	// virtual-hosted-style bucket subdomains. Never set true in a deployed env.
 	S3ForcePathStyle bool
-	// AWSEndpointURL is the SDK's own AWS_ENDPOINT_URL — the SDK reads it
-	// directly; this copy is only for cmd/server to tell it's pointed at a
-	// LocalStack on loopback (see its presignForRequestHost). Empty in AWS.
+	// AWSEndpointURL mirrors the SDK's own AWS_ENDPOINT_URL (which the SDK
+	// reads directly) for cmd/server's own presignForRequestHost. Empty in AWS.
 	AWSEndpointURL string
 }
 
-// Load reads every setting from the environment, once, at startup. Fails
-// fast (log.Fatalf) on a missing required value or a malformed one —
-// cmd/ entries are meant to crash immediately on misconfiguration, not
-// limp along with a zero value.
+// Load reads every setting from the environment once, at startup, and
+// fails fast (log.Fatalf) on anything missing or malformed.
 func Load() Config {
 	prefix := mustEnv("RESOURCE_PREFIX")
 	return Config{
@@ -197,9 +169,8 @@ func envOr(name, fallback string) string {
 	return fallback
 }
 
-// positiveIntEnv is intEnv for a value where zero or less is never
-// meant: a retention of 0 would write expiry times that have already
-// passed.
+// positiveIntEnv is intEnv where zero or less is never meant: a
+// retention of 0 would write expiry times already in the past.
 func positiveIntEnv(name string, fallback int64) int64 {
 	value := intEnv(name, fallback)
 	if value <= 0 {

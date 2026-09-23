@@ -91,7 +91,7 @@ func AWSDeps(cfg config.Config, awsCfg aws.Config) Deps {
 	}
 
 	// Whether downloads come from CloudFront is decided at runtime by
-	// whether its settings parameter exists — see internal/synclog/cdn.
+	// whether its settings parameter exists — see internal/blobs/cdn.
 	// Nothing to configure per environment.
 	blob := blobstore.New(s3Client, cfg.BucketName, cfg.MaxBlobSize).WithDownloads(cdn.New(cdn.Config{
 		SettingsParameter: cfg.BlobCDNSettingsParameter,
