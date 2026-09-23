@@ -54,12 +54,10 @@ every member of a circle.
 
 | | |
 |---|---|
-| `<prefix>-sync-log` | The archive. One partition per circle, append-only, never mutated. |
-| `<prefix>-accounts` | One document per account: the encrypted recovery manifest, and the Apple refresh token deletion revokes with. |
+| `<prefix>-circles` | One partition per circle: meta, members, sealed keys, invites, requests, posts, activity and children. |
+| `<prefix>-accounts` | One partition per account: profile, devices, linked providers, and the Apple refresh token deletion revokes with. |
 | `<prefix>-sessions` | Bearer tokens this relay issued. |
-| `<prefix>-invites` | Invites and pending join requests, on a TTL. |
 | `<prefix>-rate-limit` | Per-account request budgets. |
-| `<prefix>-push` | Routing preferences and one row per device. |
 | `<prefix>-blobs` (S3) | Photo ciphertext. Glacier IR after 90 days. |
 | SSM `/<prefix>/*` | Settings, and the four SecureString credentials. |
 
@@ -92,8 +90,7 @@ cannot select a circle's rows to fix them.
 **Auth and rate limiting are both the relay's own, not AWS's.** Sign-in
 verifies a Google or Apple ID token against that provider's JWKS over
 plain HTTPS — no AWS permission involved — and issues a bearer token of
-the relay's own. Every route requires it except sign-in and `POST
-/push/send`, which is unauthenticated by design (`PUSH_DESIGN.md`).
+the relay's own. Every route requires it except sign-in.
 Budgets are counters in DynamoDB, applied per handler: writes and reads
 carry different limits, and push recipients carry a third. There is no
 WAF; see *Cost* for why.
@@ -203,18 +200,18 @@ reader onward should be served from the edge.
   one object: the cache policy sets query strings to `none`, and
   CloudFront strips `Expires`/`Key-Pair-Id`/`Policy`/`Signature` before
   the origin sees them.
-- **Post photos are immutable** (`<syncId>/<entryId>`) — long TTL.
-- **Covers overwrite in place** at `<syncId>/cover`
-  (`internal/synclog/s3/blob_store.go`), so that path is **uncached**
-  until the hash moves into it — `cover_photo_set` already carries
-  `photoHash`, so devices know it before fetching.
+- **Every key is immutable** — `<circleId>/<postId>` for a photo,
+  `<circleId>/cover/<coverId>` for a cover,
+  `<circleId>/avatar/<accountId>/<avatarId>` for a member's picture. A
+  changed cover or picture is a new id, never an overwrite, so all three
+  take a long TTL and none needs an uncached path.
 - **Invalidate on delete only.** Nothing else ever changes. One path per
-  photo; one wildcard (`/<syncId>/*`) per circle for bulk deletion, which
-  counts as a single path. First 1,000 paths/month free, account-wide.
-  Best-effort: the bytes are already destroyed by then, so a failed
-  invalidation is logged rather than failing the delete.
-- Invite previews carry no blob — name and avatar ride inline, encrypted
-  under the invite key (`INVITE_FLOW.md`). No pre-membership blob access.
+  photo; one wildcard (`/<circleId>/*`) per circle for bulk deletion,
+  which counts as a single path. First 1,000 paths/month free,
+  account-wide. Best-effort: the bytes are already destroyed by then, so
+  a failed invalidation is logged rather than failing the delete.
+- Invite previews carry no blob — a name and a member count, nothing
+  more. No pre-membership blob access.
 
 Provider portability comes from the domain plus the relay handing out
 URLs at request time; clients never see S3. Signing is CloudFront-specific
@@ -257,7 +254,7 @@ Consequences worth knowing:
 
 ## Backups
 
-**Point-in-time recovery on `sync-log` and `accounts`, in prod only.**
+**Point-in-time recovery on `circles` and `accounts`, in prod only.**
 
 PITR is not snapshots and there is no interval to tune: it captures
 changes continuously and restores to any second in the last 35 days, by
@@ -267,17 +264,17 @@ debugging tool. It also only covers what happened after it was switched
 on, which is why it goes on before launch rather than after the first
 incident.
 
-Those two tables because they are the ones holding data nobody else can
-reconstruct — the archive itself, and the encrypted recovery manifest.
-`sessions`, `invites` and `rate-limit` are all ephemeral by design
-(expiry, TTL, counters), and `push` self-heals as devices re-register.
+Those two tables because they are the ones holding what nobody else can
+reconstruct: every circle's content and roster, and the accounts behind
+them. `sessions` and `rate-limit` are ephemeral by design (expiry,
+counters). Losing `circles` loses the photos outright — devices hold
+only what they have synced, and no member can rebuild another's.
 
-This is worth paying for despite the recovery floor in `SYNC_DESIGN.md`
-("every device holds the full archive and all keys locally"), because that
-floor has one hole: it assumes a device survived. Relay data loss *and* a
-dead phone leaves nothing to re-upload from. At $0.20/GB-month against
-tables holding ciphertext and metadata — the photos are in S3, not here —
-this is cents a month for years.
+There is no floor under this any more. A device holds only the circles
+it belongs to and only what it has synced, so relay data loss is not
+something the fleet can heal from. At $0.20/GB-month against tables
+holding ciphertext and metadata — the photos are in S3, not here — this
+is cents a month for years.
 
 **Blobs have no backup, and the obvious fix is ruled out.** Versioning is
 off deliberately (`modules/storage/s3.tf`): deleting a post, a circle or
@@ -376,9 +373,6 @@ tier. Storage accumulates; nothing deletes photos unless asked.
 3. WAF — deferred. ~$6/month per environment, and the account-level rate
    limiter already handles fairness. IP rules are a cost shield, not a
    replacement: shared carrier and household IPs force loose thresholds.
-
-`POST /push/send` is unauthenticated by design (`PUSH_DESIGN.md`) — the
-one endpoint reachable without an account.
 
 ---
 

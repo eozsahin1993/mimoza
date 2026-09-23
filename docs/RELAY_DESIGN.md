@@ -1,10 +1,7 @@
 # Relay design
 
-Status: **being built.** The circles half is built and answers under
-`/v1`, replacing the routes `SYNC_DESIGN.md` and `INVITE_FLOW.md`
-describe. Accounts, push and blobs are still as `PUSH_DESIGN.md` and
-`ACCOUNT_RECOVERY.md` describe them; this document replaces those two as
-they land.
+What the relay stores and what its routes promise. `SYNC_DESIGN.md` is
+the other half: how a device keeps in step with it.
 
 The relay owns accounts, circles, membership, roles, devices and invites
 in plaintext. Content is end-to-end encrypted: photos, captions, comments,
@@ -256,6 +253,37 @@ disagree, and the device pages **backward** through `by-type-received`,
 where a key never moves, until the two agree again. `lastEntryAt` is only
 a hint that something happened at all, since a late write stamps an
 older time than one already seen.
+
+## Joining
+
+The one flow with a key exchange in it, so it is worth spelling out.
+
+```
+admin                     relay                    joiner
+  │ POST /circles/{id}/invites                       │
+  │────────────────────► code ────────────────────►  │  (shared out of band)
+  │                        │  GET /invites/{code}    │
+  │                        │◄────────────────────────│  name, member count,
+  │                        │                         │  who shared it
+  │                        │  POST /invites/{code}/requests
+  │                        │◄────────────────────────│  no body
+  │ GET /circles/{id}/requests                       │
+  │◄─── the ask, with the joiner's public key ───────│
+  │ POST .../requests/{rid}/approve                  │
+  │──── every key version, sealed to that key ─────► │
+```
+
+A code belongs to the circle, not to whoever made it, so any admin sees
+and can revoke the same one. Codes expire; nothing else does.
+
+The ask carries no body: the key an approver seals to is the one the
+joiner's account published at sign-in. It is also the only place that
+key appears, since the joiner is not on the roster yet — which is why
+the ask returns it and why an ask without one cannot be approved.
+
+Approval must carry **every** version from 1 to current. A joiner missing
+one can see that history exists and not read it, so the relay refuses an
+incomplete set rather than admitting someone half-way.
 
 ## Push
 
