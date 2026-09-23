@@ -14,11 +14,23 @@ import {
   type FeedCursor,
   type FeedPostView,
 } from '@/features/feed/usecases/circle-feed';
-import type { MemberEvent } from '@/data/db';
+import type { MemberEvent } from '@/features/feed/usecases/group-member-events';
 import { onPhotoFetched } from '@/core/photo/photo-events';
 import { showError } from '@/core/services/messages';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
-import { syncCircle } from '@/core/sync/sync-circles';
+import { syncCircles } from '@/core/sync/sync-circles';
+
+/**
+ * Merges a page's activity into what's already loaded. Pages necessarily
+ * overlap — loadCircleFeedPage has no upper bound to fetch a tight window
+ * with (see its own comment) — so this dedupes by id and restores
+ * newest-first order, which groupMemberEvents depends on.
+ */
+function mergeEvents(current: MemberEvent[], next: MemberEvent[]): MemberEvent[] {
+  const byId = new Map(current.map((event) => [event.id, event]));
+  for (const event of next) byId.set(event.id, event);
+  return [...byId.values()].sort((a, b) => b.occurredAt - a.occurredAt);
+}
 
 export type UseCircleFeedOptions = {
   /** Whether to offer the fresh-joiner banner at all — hidden anyway once there are posts. */
@@ -117,7 +129,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
       const page = await loadCircleFeedPage(circleId, feed.meta, feed.cursor);
       setFeed((current) =>
         current
-          ? { ...current, posts: [...current.posts, ...page.posts], events: [...current.events, ...page.events], cursor: page.nextCursor }
+          ? { ...current, posts: [...current.posts, ...page.posts], events: mergeEvents(current.events, page.events), cursor: page.nextCursor }
           : current,
       );
     } catch (err) {
@@ -187,7 +199,9 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     if (!circleId) return;
     setRefreshing(true);
     try {
-      await syncCircle(circleId);
+      // Account-wide now — the relay owns membership, so a sync pass is
+      // every circle at once rather than one this screen could target.
+      await syncCircles();
       nudgePhotoQueue();
     } catch (err) {
       // Reported, then re-read below anyway: a pull that couldn't reach

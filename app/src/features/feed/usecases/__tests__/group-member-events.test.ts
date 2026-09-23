@@ -1,5 +1,5 @@
 import { groupMemberEvents } from '@/features/feed/usecases/group-member-events';
-import type { MemberEvent } from '@/data/db';
+import type { MemberEvent } from '@/features/feed/usecases/group-member-events';
 
 const DAY = 24 * 60 * 60 * 1000;
 // A fixed instant, comfortably inside a single local calendar day, so

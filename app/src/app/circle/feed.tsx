@@ -15,7 +15,6 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Space, Spacing } from '@/ui/theme/tokens';
 import { markCircleViewed } from '@/data/db';
-import { ensurePushForCircle } from '@/features/push-notifications/usecases/enable-push';
 import { useCircleFeed } from '@/features/feed/hooks/use-circle-feed';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
@@ -46,10 +45,7 @@ export default function FeedScreen() {
       // A new post sorts to the top of the feed, so simply opening it is
       // genuine proof it was seen — unlike a comment, which can land on any
       // post regardless of age (see the viewability tracking below).
-      if (circleId) markCircleViewed(circleId).catch((err) => console.error('Failed to mark the circle viewed', err));
-      // Covers a circle created or joined since launch; a no-op after the
-      // first time. Never prompts — that's the home screen's.
-      if (circleId) ensurePushForCircle(circleId).catch((error) => console.error('Failed to set up notifications', error));
+      if (circleId) markCircleViewed(circleId, Date.now()).catch((err) => console.error('Failed to mark the circle viewed', err));
     }, [circleId, reload]),
   );
 

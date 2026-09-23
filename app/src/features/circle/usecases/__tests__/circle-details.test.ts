@@ -1,12 +1,20 @@
+jest.mock('@/features/invite/services/invite-relay', () => ({ listInvites: jest.fn() }));
+
 import { applyCircle, applyRoster, initDatabase, saveProfile } from '@/data/db';
 import { loadCircleDetails } from '@/features/circle/usecases/circle-details';
 import { generateUUID } from '@/core/crypto/primitives';
+import { listInvites } from '@/features/invite/services/invite-relay';
 
+const invites = listInvites as jest.Mock;
 const ACCOUNT_ID = 'account-1';
 
 beforeAll(async () => {
   await initDatabase();
   await saveProfile({ accountId: ACCOUNT_ID, name: 'Founder', deviceId: 'device-1', createdAt: 1, updatedAt: 1 });
+});
+
+beforeEach(() => {
+  invites.mockReset().mockResolvedValue([]);
 });
 
 async function makeCircle(ownRole: string): Promise<string> {
@@ -47,7 +55,25 @@ test('reports a plain member as not an admin', async () => {
   expect((await loadCircleDetails(circleId)).ownIsAdmin).toBe(false);
 });
 
-test('stubs the invite as null until the invite column read lands here', async () => {
+test("an admin's live invite comes through", async () => {
+  const invite = { code: 'ABC123', createdBy: ACCOUNT_ID, createdAt: 1, expiresAt: 2 };
+  invites.mockResolvedValue([invite]);
+  const circleId = await makeCircle('admin');
+
+  expect((await loadCircleDetails(circleId)).invite).toEqual(invite);
+});
+
+test('a member gets no invite, and the relay is never asked for one', async () => {
+  const circleId = await makeCircle('member');
+
+  expect((await loadCircleDetails(circleId)).invite).toBeNull();
+  expect(invites).not.toHaveBeenCalled();
+});
+
+// The screen is worth showing without a code, and the relay refuses the
+// read to anyone but an admin anyway — see loadCircleDetails.
+test('a failed invite read is swallowed rather than failing the whole screen', async () => {
+  invites.mockRejectedValue(new Error('offline'));
   const circleId = await makeCircle('admin');
 
   expect((await loadCircleDetails(circleId)).invite).toBeNull();
@@ -66,4 +92,5 @@ test('returns an empty shape for a circle this device does not have', async () =
     invite: null,
     notifyLevel: 'all',
   });
+  expect(invites).not.toHaveBeenCalled();
 });

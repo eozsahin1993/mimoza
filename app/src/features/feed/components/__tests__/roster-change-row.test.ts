@@ -1,6 +1,6 @@
 import { rosterChangeRows } from '@/features/feed/components/roster-change-row';
 import type { MembershipEventGroupItem } from '@/features/feed/components/membership-event-row';
-import type { MemberEvent } from '@/data/db';
+import type { MemberEvent } from '@/features/feed/usecases/group-member-events';
 
 const NOON = new Date(2026, 0, 10, 12, 0, 0).getTime();
 

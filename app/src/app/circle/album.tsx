@@ -10,7 +10,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Space, Spacing } from '@/ui/theme/tokens';
-import { getAlbumPhotos, getAttachment, getCircleSummary, type AlbumPhoto } from '@/data/db';
+import { getAlbum, getAttachment, getCircle } from '@/data/db';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { formatMonth } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
@@ -18,7 +18,10 @@ import { useLanguage } from '@/core/i18n/use-language';
 /** Photos per row. Four fits a month on a screen without shrinking faces past recognising. */
 const COLUMNS = 4;
 
-type AlbumItem = AlbumPhoto & { uri: string | null };
+/** Just enough of a post to lay the grid out — see getAlbum. */
+type AlbumPhoto = { id: string; createdAt: number };
+
+type AlbumItem = AlbumPhoto & { uri: string | null; photoStatus?: string };
 
 /**
  * A month header, then that month's photos in rows of `COLUMNS`.
@@ -87,11 +90,13 @@ async function resolvePhotos(circleId: string, photos: AlbumPhoto[]): Promise<Al
 
   for (const photo of photos) {
     let uri = ensurePhotoUri(circleId, photo.id, () => null);
+    let photoStatus: string | undefined;
     if (!uri) {
       const attachment = await getAttachment(circleId, photo.id);
       if (attachment?.bytes) uri = writePhotoFile(circleId, photo.id, attachment.bytes);
+      else photoStatus = attachment?.status;
     }
-    resolved.push({ ...photo, uri: uri ?? null });
+    resolved.push({ ...photo, uri: uri ?? null, photoStatus });
   }
 
   return resolved;
@@ -110,8 +115,9 @@ export default function AlbumScreen() {
   const load = useCallback(async () => {
     if (!circleId) return;
 
-    const [circle, photos] = await Promise.all([getCircleSummary(circleId), getAlbumPhotos(circleId)]);
+    const [circle, posts] = await Promise.all([getCircle(circleId), getAlbum(circleId)]);
     setCircleName(circle?.name ?? '');
+    const photos: AlbumPhoto[] = posts.map((post) => ({ id: post.id, createdAt: post.createdAt }));
     setRows(buildRows(await resolvePhotos(circleId, photos)));
     setLoaded(true);
   }, [circleId]);
