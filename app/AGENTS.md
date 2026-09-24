@@ -100,3 +100,49 @@ takes two generated files and names what moved.
 Adding a dependency changes the hash even when it ships no native code —
 the tool can't know, so it assumes a rebuild. That's the right way round;
 the expensive mistake is shipping JS against a binary that can't run it.
+
+## Android emulators need a real lock screen for Blockstore to work
+
+Symptom: `account-keypair.ts` (via `synced-store.ts`, backed by
+`modules/synced-keystore`) mints a fresh keypair on every sign-in
+instead of finding the one from last time — `setSynced` reports success
+("written, backedUpToCloud=false"), but a `getSynced` for that exact key
+moments later, on the same device, comes back empty. `adb logcat` shows
+`BlockstoreImpl: Blockstore feature not enabled. Return false.` right
+before the write.
+
+Blockstore's end-to-end encryption derives its keys from the device's
+own lock credential. An emulator's default "None"/swipe screen lock has
+none, so the feature silently no-ops — Play Services doesn't throw, it
+just doesn't persist anything, which looks exactly like a code bug in
+this app until you check logcat for that specific line.
+
+Fix: give the emulator an actual PIN/pattern/password before testing
+anything that touches the account keypair —
+`adb shell locksettings set-pin 1234` works without touching the
+emulator's UI at all. Do this once per fresh emulator, before the first
+sign-in.
+
+## Testing Blockstore restore needs a real uninstall, not clear-storage or a restart
+
+Symptom: the same "mints fresh instead of finding last time's key" as
+above, but persisting even with a lock screen set and `backedUpToCloud:
+true` reported on every write — on a real device, not just an emulator.
+
+Block Store's own restore path only fires on a genuine package
+uninstall-then-reinstall — per Android's own testing guide for it, that's
+tied to the `PACKAGE_REMOVED`/`PACKAGE_ADDED` broadcasts, the one
+app-lifecycle signal Play Services can actually observe system-wide.
+Clearing storage never sends that signal (the package is never removed),
+and neither does force-stopping or reloading the app — both leave the
+install completely alone, so there is no restore event for Blockstore to
+respond to. Confirmed live: three restarts and a clear-storage in a row
+all minted a fresh key with `backedUpToCloud: true` reported each time;
+a real `adb uninstall` followed by reinstalling found the previous key
+correctly on the very next sign-in.
+
+Fix: to actually test the restore path, uninstall the app for real
+(`adb uninstall <package>`, or the device's own Settings/launcher) and
+reinstall it. Clearing storage or killing the process doesn't exercise
+the same path and will look identical to Blockstore being broken when it
+isn't.
