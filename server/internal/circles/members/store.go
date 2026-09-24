@@ -273,11 +273,12 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID, 
 			TableName: aws.String(s.Name),
 			Key:       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
 			UpdateExpression: aws.String(
-				"SET " + dynamo.AttrKeyVersion + " = :next ADD " + dynamo.AttrRosterVersion + " :one, " +
-					dynamo.AttrMemberCount + " :minusOne" + adminDelta,
+				"SET " + dynamo.AttrLastEntryAt + " = :now, " + dynamo.AttrKeyVersion + " = :next ADD " +
+					dynamo.AttrRosterVersion + " :one, " + dynamo.AttrMemberCount + " :minusOne" + adminDelta,
 			),
 			ConditionExpression: aws.String(dynamo.AttrKeyVersion + " = :expected"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":now":      dynamoutil.Millis(s.Now()),
 				":next":     dynamoutil.Num(expectedVersion + 1),
 				":expected": dynamoutil.Num(expectedVersion),
 				":one":      dynamoutil.Num(1),
@@ -455,18 +456,35 @@ func (s *Store) leaveConflict(ctx context.Context, circleID string, expectedVers
 
 // Rewrap replaces one member's sealed keys with copies under their new
 // public key, and clears the flag that asked for them.
+//
+// A per-version merge, not a full-item replace: `sealed` is only the
+// versions the rewrapping device knew about when it computed this, and a
+// kick's own survivor loop (see RemoveMember) can add a newer version to
+// this same item between that computation and this write landing. A full
+// replace would silently drop that version, with nothing to flag the
+// loss since this call is also what clears needsRewrap.
 func (s *Store) ReplaceSealedKeys(ctx context.Context, circleID, accountID string, sealed circles.SealedKeys) error {
+	setClauses := make([]string, 0, len(sealed)+1)
+	names := map[string]string{"#keys": dynamo.AttrKeys}
+	values := map[string]types.AttributeValue{":now": dynamoutil.Millis(s.Now())}
+	for version, key := range sealed {
+		placeholder := "#v" + strconv.FormatInt(version, 10)
+		value := ":v" + strconv.FormatInt(version, 10)
+		names[placeholder] = strconv.FormatInt(version, 10)
+		values[value] = dynamoutil.Binary(key)
+		setClauses = append(setClauses, "#keys."+placeholder+" = "+value)
+	}
+	setClauses = append(setClauses, dynamo.AttrUpdatedAt+" = :now")
+
 	err := dynamo.WithRetry(func() error {
 		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 			TransactItems: []types.TransactWriteItem{
-				{Put: &types.Put{
-					TableName: aws.String(s.Name),
-					Item: map[string]types.AttributeValue{
-						dynamoutil.PKAttr:    dynamoutil.Str(dynamo.CirclePK(circleID)),
-						dynamoutil.SKAttr:    dynamoutil.Str(dynamo.SealedKeyKey(accountID)),
-						dynamo.AttrKeys:      dynamo.SealedKeysAttr(sealed),
-						dynamo.AttrUpdatedAt: dynamoutil.Millis(s.Now()),
-					},
+				{Update: &types.Update{
+					TableName:                 aws.String(s.Name),
+					Key:                       s.Key(dynamo.CirclePK(circleID), dynamo.SealedKeyKey(accountID)),
+					UpdateExpression:          aws.String("SET " + strings.Join(setClauses, ", ")),
+					ExpressionAttributeNames:  names,
+					ExpressionAttributeValues: values,
 				}},
 				{Update: &types.Update{
 					TableName:                 aws.String(s.Name),
