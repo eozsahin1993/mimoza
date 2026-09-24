@@ -22,13 +22,10 @@ export type PendingJoinRequestCardProps = {
 
 /**
  * One pending join request, with its own approve/deny actions, rendered
- * as a feed row (see `feed/pending-request-row.tsx`). Only ever rendered
- * for the invite's actual creator (see that function's creator-only
- * gate) — "Tapped your link" is never anyone else's: approval is always
- * the invite's specific creator, never any admin, since an admin who
- * didn't create this invite has no real context to judge the request
- * against — just an unverified, self-reported name, no stronger a signal
- * than the creator already has.
+ * as a feed row (see `feed/pending-request-row.tsx`). Shown to every
+ * admin, not just whoever shared the invite the requester used — the
+ * relay pages every admin about a new request (see requests/service.go's
+ * Create), so any of them can act on it.
  */
 export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: PendingJoinRequestCardProps) {
   const { t } = useTranslation();

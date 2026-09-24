@@ -1,4 +1,5 @@
 import { authorizedFetch, describeError } from '@/core/services/relay';
+import { JoinRequestGoneError } from '@/core/services/relay-errors';
 
 /**
  * Getting into a circle: the codes an admin hands out, and the asks that
@@ -88,10 +89,12 @@ export async function approveRequest(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sealed }),
   });
+  if (response.status === 404) throw new JoinRequestGoneError();
   if (!response.ok) throw new Error(await describeError(response, 'approving an ask'));
 }
 
 export async function denyRequest(circleId: string, requestId: string): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${circleId}/requests/${requestId}/deny`, { method: 'POST' });
+  if (response.status === 404) throw new JoinRequestGoneError();
   if (!response.ok) throw new Error(await describeError(response, 'declining an ask'));
 }
