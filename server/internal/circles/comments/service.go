@@ -12,7 +12,7 @@ type store interface {
 	GetPost(ctx context.Context, circleID, postID, readerID string) (circles.Entry, error)
 	ListChildren(ctx context.Context, circleID, postID string) ([]circles.Comment, []circles.Reaction, error)
 	AddComment(ctx context.Context, circleID string, comment circles.Comment) (circles.Entry, error)
-	DeleteComment(ctx context.Context, circleID, postID, commentID string) (circles.Entry, error)
+	DeleteComment(ctx context.Context, circleID, postID, commentID, accountID string) (circles.Entry, error)
 }
 
 type Service struct {
@@ -70,9 +70,9 @@ func (s *Service) Delete(ctx context.Context, circleID, postID, commentID, accou
 		}
 		if !comment.DeletedAt.IsZero() {
 			// Already gone: hand back the post rather than deleting twice.
-			return s.Store.GetPost(ctx, circleID, postID, "")
+			return s.Store.GetPost(ctx, circleID, postID, accountID)
 		}
-		return s.Store.DeleteComment(ctx, circleID, postID, commentID)
+		return s.Store.DeleteComment(ctx, circleID, postID, commentID, accountID)
 	}
 	return circles.Entry{}, circles.ErrEntryNotFound
 }

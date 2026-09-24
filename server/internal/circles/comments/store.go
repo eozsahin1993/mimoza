@@ -70,18 +70,18 @@ func (s *Store) AddComment(ctx context.Context, circleID string, comment circles
 	switch {
 	case dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed:
 		// The same comment id again: already written, nothing to add.
-		return s.GetPost(ctx, circleID, comment.PostID, "")
+		return s.GetPost(ctx, circleID, comment.PostID, comment.AuthorID)
 	case dynamoutil.CancelledFor(err, 1) == dynamoutil.ConditionalCheckFailed:
 		return circles.Entry{}, circles.ErrEntryNotFound
 	case err != nil:
 		return circles.Entry{}, err
 	}
-	return s.GetPost(ctx, circleID, comment.PostID, "")
+	return s.GetPost(ctx, circleID, comment.PostID, comment.AuthorID)
 }
 
 // DeleteComment strips one comment and takes it off its post's count. If
 // it was the one on show, the preview is rebuilt from whatever survives.
-func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID string) (circles.Entry, error) {
+func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID, accountID string) (circles.Entry, error) {
 	post, err := s.GetPost(ctx, circleID, postID, "")
 	if err != nil {
 		return circles.Entry{}, err
@@ -134,7 +134,7 @@ func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID s
 	if err != nil {
 		return circles.Entry{}, err
 	}
-	return s.GetPost(ctx, circleID, postID, "")
+	return s.GetPost(ctx, circleID, postID, accountID)
 }
 
 func onShow(preview []circles.Comment, commentID string) bool {
