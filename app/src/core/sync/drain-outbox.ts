@@ -10,6 +10,7 @@ import {
   type OutboxEntry,
 } from '@/data/db';
 import { sealContent } from '@/core/crypto/content';
+import { encrypt } from '@/core/crypto/primitives';
 import { reactionTag } from '@/core/crypto/reaction-tags';
 import { BlobPaths, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import { BlobAlreadyExistsError, NetworkUnreachableError } from '@/core/services/relay-errors';
@@ -58,7 +59,7 @@ async function send(
       // Bytes before the row: a crash in between leaves an unreferenced
       // blob, which the circle's deletion sweeps. The other order leaves
       // a post pointing at nothing.
-      await uploadPhoto(ctx.circleId, postId);
+      await uploadPhoto(ctx.circleId, postId, key.key);
       const { visibility, ...sealed } = content;
       return putPost(ctx.circleId, {
         entryId: postId,
@@ -132,12 +133,20 @@ async function send(
   }
 }
 
-/** Already-uploaded is what a retry sees once the earlier attempt landed. */
-async function uploadPhoto(circleId: string, postId: string): Promise<void> {
+/**
+ * Already-uploaded is what a retry sees once the earlier attempt landed.
+ *
+ * Encrypted here, under the key current at drain time — not when the
+ * post was queued, same reasoning as the caption: a rotation in between
+ * must not leave the blob sealed under a version older than the entry
+ * that names it. The local copy stays plaintext; only the network-bound
+ * copy is ever sealed.
+ */
+async function uploadPhoto(circleId: string, postId: string, key: Uint8Array): Promise<void> {
   const attachment = await getAttachment(circleId, postId);
   if (!attachment?.bytes) throw new Error('A queued post has no photo on this device.');
   try {
-    await uploadBlob(await getUploadTarget(circleId, BlobPaths.photo(postId)), attachment.bytes);
+    await uploadBlob(await getUploadTarget(circleId, BlobPaths.photo(postId)), encrypt(attachment.bytes, key));
   } catch (err) {
     if (!(err instanceof BlobAlreadyExistsError)) throw err;
   }

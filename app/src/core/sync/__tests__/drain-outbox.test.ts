@@ -14,6 +14,7 @@ import {
   saveProfile,
 } from '@/data/db';
 import { openContent, sealContent } from '@/core/crypto/content';
+import { decrypt } from '@/core/crypto/primitives';
 import { reactionTag } from '@/core/crypto/reaction-tags';
 import { NetworkUnreachableError } from '@/core/services/relay-errors';
 import { drainOutbox } from '@/core/sync/drain-outbox';
@@ -125,6 +126,23 @@ describe('draining the outbox', () => {
     // what is sealed beside it.
     expect(sent.visibility).toBe('album');
     expect(await due(circleId, Date.now())).toEqual([]);
+  });
+
+  // The relay only ever holds the sealed copy — a plaintext blob there
+  // would fail every other device's decrypt on download, and worse,
+  // would actually be readable by whoever runs the relay.
+  test('the uploaded photo is encrypted, not the plaintext bytes', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
+    queueOnePost(circleId, postId);
+    relay.putPost.mockResolvedValue(answer(postId));
+
+    await drainOutbox(circleId);
+
+    const [, uploadedBytes] = blobs.uploadBlob.mock.calls[0];
+    const plaintext = new Uint8Array([1, 2, 3]);
+    expect(uploadedBytes).not.toEqual(plaintext);
+    expect(decrypt(uploadedBytes, KEY_V1)).toEqual(plaintext);
   });
 
   test('the relay’s answer replaces the local copy without waiting for a walk', async () => {
