@@ -4,6 +4,7 @@ import {
   applyCircle,
   applyRoster,
   coverEntryId,
+  getAttachment,
   getCircle,
   getProfile,
   dropRequest,
@@ -18,6 +19,7 @@ import { timed } from '@/core/utils/timing';
 import { drainOutbox } from '@/core/sync/drain-outbox';
 import { pullNewEntries } from '@/core/sync/pull-entries';
 import { entryContext } from '@/core/sync/entry-handlers';
+import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getRoster, listCircles, type Circle } from '@/features/circle/services/circle-relay';
 import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-exchange';
 
@@ -92,26 +94,6 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string): Pro
   const before = await getCircle(circle.circleId);
   await applyCircle(circle, now);
 
-  // Unconditional, not folded into rosterMoved below: a cover change
-  // bumps neither rosterVersion nor keyVersion, so gating this on that
-  // flag would miss it. Requires coverKeyVersion, not just coverId — a
-  // circle whose cover was set before the relay carried a version would
-  // otherwise get a row that retries forever and never succeeds (see
-  // fetchOne in photo-queue.ts, which needs a real key version to fetch
-  // at all). onConflictDoNothing makes a repeat of the same cover free.
-  if (circle.coverId && circle.coverKeyVersion) {
-    await insertAttachment({
-      circleId: circle.circleId,
-      entryId: coverEntryId(circle.coverId),
-      kind: AttachmentKinds.CIRCLE_COVER,
-      keyVersion: circle.coverKeyVersion,
-      status: AttachmentStatuses.PENDING,
-      fetchAttempts: 0,
-      nextAttemptAt: null,
-      createdAt: now,
-    });
-  }
-
   const rosterMoved =
     !before ||
     before.rosterVersion !== circle.rosterVersion ||
@@ -157,6 +139,25 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string): Pro
       // next pass sees this as still-stale and tries again.
       await applyCircle({ ...circle, rosterVersion: before?.rosterVersion ?? 0, keyVersion: before?.keyVersion ?? 0 }, now);
       throw err;
+    }
+  }
+
+  if (circle.coverId && circle.coverKeyVersion) {
+    const entryId = coverEntryId(circle.coverId);
+    if (!(await getAttachment(circle.circleId, entryId))) {
+      const keys = await getCircleKeyMap(circle.circleId);
+      if (keys?.[circle.coverKeyVersion]) {
+        await insertAttachment({
+          circleId: circle.circleId,
+          entryId,
+          kind: AttachmentKinds.CIRCLE_COVER,
+          keyVersion: circle.coverKeyVersion,
+          status: AttachmentStatuses.PENDING,
+          fetchAttempts: 0,
+          nextAttemptAt: null,
+          createdAt: now,
+        });
+      }
     }
   }
 

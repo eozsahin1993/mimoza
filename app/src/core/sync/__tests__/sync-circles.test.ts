@@ -32,7 +32,7 @@ jest.mock('@/features/circle/usecases/key-exchange', () => ({
   resealFor: jest.fn(async () => undefined),
 }));
 jest.mock('@/core/services/keystore/circle-keys', () => ({
-  getCircleKeyMap: jest.fn(async () => ({ 1: new Uint8Array(32).fill(1) })),
+  getCircleKeyMap: jest.fn(async () => ({ 1: new Uint8Array(32).fill(1), 3: new Uint8Array(32).fill(1) })),
   getCurrentContentKey: jest.fn(async () => ({ version: 1, key: new Uint8Array(32).fill(1) })),
 }));
 jest.mock('@/core/photo/photo-queue', () => ({ nudgePhotoQueue: jest.fn() }));
@@ -44,6 +44,9 @@ const relay = jest.requireMock('@/features/circle/services/circle-relay') as {
 const keys = jest.requireMock('@/features/circle/usecases/key-exchange') as {
   storeSealedKeys: jest.Mock;
   resealFor: jest.Mock;
+};
+const circleKeys = jest.requireMock('@/core/services/keystore/circle-keys') as {
+  getCircleKeyMap: jest.Mock;
 };
 
 const NOW = 1_700_000_000_000;
@@ -250,6 +253,45 @@ describe('a sync pass', () => {
     relay.getRoster.mockResolvedValue(roster());
     expect(await syncCircles()).toBe(0);
     expect(await listMembers(id)).toHaveLength(1);
+  });
+
+  // Queuing the cover ahead of a roster/key fetch that then fails would
+  // hand the photo queue a keyVersion this device never got a chance to
+  // fetch, and it would fail immediately with "no content key for
+  // version N" instead of waiting for the next pass's chance.
+  test('a failed roster fetch does not queue the cover for a version this device has no key for yet', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({
+      circles: [circleOf(id, { coverId: 'cover-1', coverKeyVersion: 3 })],
+      requests: [],
+    });
+    relay.getRoster.mockRejectedValueOnce(new Error('offline'));
+
+    expect(await syncCircles()).toBe(1);
+    expect(await getAttachment(id, coverEntryId('cover-1'))).toBeNull();
+
+    relay.getRoster.mockResolvedValue(roster());
+    expect(await syncCircles()).toBe(0);
+    expect(await getAttachment(id, coverEntryId('cover-1'))).not.toBeNull();
+  });
+
+  // storeSealedKeys swallows a version it cannot open rather than
+  // throwing (it's waiting on someone else's reseal), so the ordering fix
+  // above alone would not have caught this one: the roster/key block
+  // finishes "successfully" with this device still missing the version.
+  test('a roster sync that leaves this device without the cover key yet does not queue it', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({
+      circles: [circleOf(id, { coverId: 'cover-1', coverKeyVersion: 3 })],
+      requests: [],
+    });
+    circleKeys.getCircleKeyMap.mockResolvedValueOnce({ 1: new Uint8Array(32).fill(1) });
+
+    expect(await syncCircles()).toBe(0);
+    expect(await getAttachment(id, coverEntryId('cover-1'))).toBeNull();
+
+    expect(await syncCircles()).toBe(0);
+    expect(await getAttachment(id, coverEntryId('cover-1'))).not.toBeNull();
   });
 
   test('a cover with a key version becomes a pending attachment other devices can fetch', async () => {
