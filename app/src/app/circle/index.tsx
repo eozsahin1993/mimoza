@@ -98,7 +98,7 @@ export default function CircleListScreen() {
         ]);
         // The newest post's own clock, for the row's timestamp. The
         // circle's lastEntryAt is the relay's and counts activity too.
-        return { ...circle, memberCount, photoUri, newCount, newestPostAt: newest[0]?.createdAt ?? 0 };
+        return { ...circle, memberCount, photoUri, newCount, newestPostAt: newest[0]?.createdAt ?? null };
       }),
     );
     setCircles(withCounts);
