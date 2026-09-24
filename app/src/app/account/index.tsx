@@ -42,7 +42,8 @@ const appVersion = Constants.expoConfig?.version ?? 'Unknown';
  */
 function buildLabel(): string {
   const native = Application.nativeBuildVersion;
-  const js = (Constants.expoConfig?.extra as { jsBuild?: string } | undefined)?.jsBuild;
+  const jsBuild = (Constants.expoConfig?.extra as { jsBuild?: unknown } | undefined)?.jsBuild;
+  const js = typeof jsBuild === 'string' ? jsBuild : null;
   if (!native) return '';
   return js && js !== native ? ` (${native}.${js})` : ` (${native})`;
 }
