@@ -21,6 +21,11 @@ type Notification struct {
 	EntryID  string
 	ParentID string
 	AuthorID string
+	// RequestID names the ask a join_request notification is about, so a
+	// tap can check whether it's still the one waiting rather than
+	// whichever one happens to be first — another admin may have already
+	// answered it, or the same requester may have asked again since.
+	RequestID string
 	// Only is who this reaches when it is not the circle at large.
 	Only []string
 }

@@ -35,6 +35,9 @@ func compose(event Event, actor, circle, recipient string) Message {
 	if event.ParentID != "" {
 		message.Data["parentEntryId"] = event.ParentID
 	}
+	if event.RequestID != "" {
+		message.Data["requestId"] = event.RequestID
+	}
 
 	yours := event.AuthorID != "" && event.AuthorID == recipient
 	switch event.Kind {

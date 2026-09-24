@@ -66,6 +66,12 @@ func (f *fakeStore) ApproveRequest(_ context.Context, _, requestID, _ string, me
 
 func (f *fakeStore) DenyRequest(context.Context, string, string) error { return nil }
 
+type fakeNotifier struct{ sent []circles.Notification }
+
+func (f *fakeNotifier) Notify(_ context.Context, event circles.Notification) {
+	f.sent = append(f.sent, event)
+}
+
 type fakeProfiles struct {
 	byID map[string]accounts.Profile
 	err  error
@@ -130,6 +136,38 @@ func TestCreate_SealsToTheKeyOnTheAccount(t *testing.T) {
 	}
 	if request.Status != circles.RequestPending {
 		t.Errorf("status = %q, want pending", request.Status)
+	}
+}
+
+// A tap on the notification needs the request's own id to tell whether
+// it's still the one waiting — another admin may have already answered
+// it by the time this one opens the app.
+func TestCreate_NotifiesAdminsWithTheRequestID(t *testing.T) {
+	store := &fakeStore{
+		invite:  circles.Invite{CircleID: "circle-1", Code: "code"},
+		members: map[string]circles.Member{"admin-1": {AccountID: "admin-1", Role: circles.RoleAdmin}},
+	}
+	notifier := &fakeNotifier{}
+	service := &Service{
+		Store:     store,
+		Profiles:  people(person("asker-1", "Sarah")),
+		Notify:    notifier,
+		Retention: time.Hour,
+	}
+
+	request, err := service.Create(context.Background(), "code", "asker-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notifier.sent) != 1 {
+		t.Fatalf("expected one notification, got %d", len(notifier.sent))
+	}
+	sent := notifier.sent[0]
+	if sent.RequestID != request.ID {
+		t.Errorf("RequestID = %q, want the request's own id %q", sent.RequestID, request.ID)
+	}
+	if sent.Kind != circles.NotifyJoinRequest || sent.CircleID != "circle-1" || sent.ActorID != "asker-1" {
+		t.Errorf("unexpected notification shape: %+v", sent)
 	}
 }
 

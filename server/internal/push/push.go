@@ -21,8 +21,8 @@ type Message struct {
 	TitleKey string
 	BodyKey  string
 	Args     []string
-	// Data is what a tap routes on: the circle, the entry, and the post
-	// a comment or reaction hangs off.
+	// Data is what a tap routes on: the circle, the entry, the post a
+	// comment or reaction hangs off, and a join request's own id.
 	Data   map[string]string
 	Silent bool
 }

@@ -99,7 +99,7 @@ func (s *Service) Create(ctx context.Context, code, accountID string) (circles.R
 		if err == nil {
 			s.Notify.Notify(ctx, circles.Notification{
 				Kind: circles.NotifyJoinRequest, CircleID: invite.CircleID,
-				ActorID: accountID, Only: adminsOf(roster),
+				ActorID: accountID, RequestID: request.ID, Only: adminsOf(roster),
 			})
 		}
 	}
