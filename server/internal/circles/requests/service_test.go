@@ -16,9 +16,10 @@ type fakeStore struct {
 	created  circles.Request
 	requests []circles.Request
 	approved struct {
-		requestID string
-		member    circles.Member
-		name      string
+		requestID       string
+		member          circles.Member
+		name            string
+		expectedVersion int64
 	}
 }
 
@@ -55,10 +56,11 @@ func (f *fakeStore) ListRequests(context.Context, string) ([]circles.Request, er
 	return f.requests, nil
 }
 
-func (f *fakeStore) ApproveRequest(_ context.Context, _, requestID, _ string, member circles.Member, _ circles.SealedKeys, name string) error {
+func (f *fakeStore) ApproveRequest(_ context.Context, _, requestID, _ string, member circles.Member, _ circles.SealedKeys, name string, expectedVersion int64) error {
 	f.approved.requestID = requestID
 	f.approved.member = member
 	f.approved.name = name
+	f.approved.expectedVersion = expectedVersion
 	return nil
 }
 
@@ -208,8 +210,10 @@ func TestList_RefusesAMemberWhoIsNotAnAdmin(t *testing.T) {
 // still say who joined after they have left again.
 func TestApprove_StampsTheJoinerName(t *testing.T) {
 	store := &fakeStore{
-		members:  map[string]circles.Member{"admin-1": {AccountID: "admin-1", Role: circles.RoleAdmin}},
-		requests: []circles.Request{{ID: "request-1", CircleID: "circle-1", AccountID: "asker-1", Status: circles.RequestPending}},
+		members: map[string]circles.Member{"admin-1": {AccountID: "admin-1", Role: circles.RoleAdmin}},
+		requests: []circles.Request{
+			{ID: "request-1", CircleID: "circle-1", AccountID: "asker-1", PublicKey: []byte("asker-1-key"), Status: circles.RequestPending},
+		},
 	}
 	service := &Service{Store: store, Profiles: people(person("asker-1", "Sarah"))}
 
@@ -220,7 +224,35 @@ func TestApprove_StampsTheJoinerName(t *testing.T) {
 	if store.approved.name != "Sarah" {
 		t.Errorf("stamped %q, want Sarah", store.approved.name)
 	}
+	if store.approved.expectedVersion != 1 {
+		t.Errorf("expected the circle's current key version threaded through, got %d", store.approved.expectedVersion)
+	}
 	if store.approved.member.AccountID != "asker-1" || store.approved.member.Role != circles.RoleMember {
 		t.Errorf("expected the asker admitted as a member, got %+v", store.approved.member)
+	}
+}
+
+// sealed is built by the approving admin's device against the public
+// key the ask carried. A requester who rotated their key after asking —
+// a new device, a lost-keypair reset — has a different key now, so
+// admitting them with keys sealed to the old one would hand them
+// nothing they can open.
+func TestApprove_RefusesWhenTheRequestersKeyHasChangedSinceTheAsk(t *testing.T) {
+	store := &fakeStore{
+		members: map[string]circles.Member{"admin-1": {AccountID: "admin-1", Role: circles.RoleAdmin}},
+		requests: []circles.Request{
+			{ID: "request-1", CircleID: "circle-1", AccountID: "asker-1", PublicKey: []byte("old-key"), Status: circles.RequestPending},
+		},
+	}
+	// person() gives asker-1 the key "asker-1-key" — different from what
+	// the stored request snapshotted.
+	service := &Service{Store: store, Profiles: people(person("asker-1", "Sarah"))}
+
+	err := service.Approve(context.Background(), "circle-1", "request-1", "admin-1", circles.SealedKeys{1: []byte("sealed")})
+	if !errors.Is(err, circles.ErrPublicKeyChanged) {
+		t.Fatalf("expected ErrPublicKeyChanged, got %v", err)
+	}
+	if store.approved.requestID != "" {
+		t.Error("nothing should have been admitted")
 	}
 }

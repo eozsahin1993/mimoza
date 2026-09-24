@@ -2,12 +2,14 @@ package requests_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"mimoza-relay/internal/circles"
 	"mimoza-relay/internal/circles/circle"
 	"mimoza-relay/internal/circles/dynamo"
+	"mimoza-relay/internal/circles/members"
 	"mimoza-relay/internal/circles/requests"
 	"mimoza-relay/internal/util/testsupport"
 )
@@ -122,6 +124,75 @@ func TestListRequestsForAccount_AnAskIsNotAMembership(t *testing.T) {
 	}
 	if len(memberships) != 0 {
 		t.Fatalf("an ask must not read as a membership, got %+v", memberships)
+	}
+}
+
+// The happy path: admitted with the roster version bumped, the sealed
+// keys stored under the joiner's own account, and the request marked
+// answered rather than left pending.
+func TestApproveRequest_AdmitsTheRequester(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	circleStore, requestStore := circle.NewStore(table), requests.NewStore(table)
+
+	joiner := testsupport.UniqueAccountID(t)
+	circleID := seedCircle(t, table)
+	ask(t, requestStore, circleID, joiner)
+
+	member := circles.Member{AccountID: joiner, Role: circles.RoleMember, NotifyLevel: circles.NotifyAll}
+	err := requestStore.ApproveRequest(ctx, circleID, "request-"+joiner, "admin", member,
+		circles.SealedKeys{1: []byte("sealed-for-joiner")}, "Joiner", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	memberships, err := circleStore.ListMemberships(ctx, joiner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(memberships) != 1 {
+		t.Fatalf("expected the joiner admitted, got %+v", memberships)
+	}
+}
+
+// The sealed keys are built against whatever KeyVersion the caller read
+// before this call — if a kick rotates the circle in between, admitting
+// the requester anyway would leave them without the version the circle
+// actually moved to, with nothing to flag the gap afterward.
+func TestApproveRequest_RefusesAStaleKeyVersion(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	circleStore, memberStore := circle.NewStore(table), members.NewStore(table)
+	requestStore := requests.NewStore(table)
+
+	circleID := testsupport.UniqueCircleID(t)
+	admin := testsupport.UniqueAccountID(t)
+	other := admin + "-other"
+	joiner := testsupport.UniqueAccountID(t)
+	if err := circleStore.CreateCircle(ctx, circles.Circle{
+		ID: circleID, Name: "test", KeyVersion: 1, RosterVersion: 1, CreatedBy: admin, CreatedAt: time.Now(),
+	}, circles.Member{AccountID: admin, Role: circles.RoleAdmin, NotifyLevel: circles.NotifyAll}, []byte("sealed")); err != nil {
+		t.Fatal(err)
+	}
+	ask(t, requestStore, circleID, other)
+	if err := requestStore.ApproveRequest(ctx, circleID, "request-"+other, admin,
+		circles.Member{AccountID: other, Role: circles.RoleMember, NotifyLevel: circles.NotifyAll},
+		circles.SealedKeys{1: []byte("other-v1")}, "Other", 1); err != nil {
+		t.Fatalf("seeding other as a member: %v", err)
+	}
+	ask(t, requestStore, circleID, joiner)
+
+	// Rotates the circle to v2 — the approval below is built as if it
+	// were still v1.
+	if err := memberStore.RemoveMember(ctx, circleID, other, admin, "Other", 1, map[string][]byte{admin: []byte("admin-v2")}); err != nil {
+		t.Fatalf("kicking other: %v", err)
+	}
+
+	member := circles.Member{AccountID: joiner, Role: circles.RoleMember, NotifyLevel: circles.NotifyAll}
+	err := requestStore.ApproveRequest(ctx, circleID, "request-"+joiner, admin, member,
+		circles.SealedKeys{1: []byte("sealed-v1")}, "Joiner", 1)
+	if !errors.Is(err, circles.ErrVersionMoved) {
+		t.Fatalf("expected ErrVersionMoved, got %v", err)
 	}
 }
 

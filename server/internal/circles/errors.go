@@ -27,4 +27,9 @@ var (
 	// key to seal the circle's content keys to, so admitting it would
 	// admit someone who could not read a word of the circle.
 	ErrNoPublicKey = errors.New("circles: this account has published no public key")
+	// ErrPublicKeyChanged means the requester rotated their key after
+	// asking to join: the approval was sealed to the key on the request,
+	// which is no longer the one the requester's device holds the
+	// private half of. Ask again, so the approver seals to the current one.
+	ErrPublicKeyChanged = errors.New("circles: the requester's public key changed since they asked")
 )

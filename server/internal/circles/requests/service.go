@@ -16,7 +16,7 @@ type store interface {
 	GetInvite(ctx context.Context, code string) (circles.Invite, error)
 	CreateRequest(ctx context.Context, request circles.Request) error
 	ListRequests(ctx context.Context, circleID string) ([]circles.Request, error)
-	ApproveRequest(ctx context.Context, circleID, requestID, actorID string, member circles.Member, sealed circles.SealedKeys, name string) error
+	ApproveRequest(ctx context.Context, circleID, requestID, actorID string, member circles.Member, sealed circles.SealedKeys, name string, expectedVersion int64) error
 	DenyRequest(ctx context.Context, circleID, requestID string) error
 }
 
@@ -154,6 +154,10 @@ func (s *Service) Approve(ctx context.Context, circleID, requestID, accountID st
 	if err := s.requireAdmin(ctx, circleID, accountID); err != nil {
 		return err
 	}
+	circle, err := s.Store.GetCircle(ctx, circleID)
+	if err != nil {
+		return err
+	}
 
 	requests, err := s.Store.ListRequests(ctx, circleID)
 	if err != nil {
@@ -166,18 +170,26 @@ func (s *Service) Approve(ctx context.Context, circleID, requestID, accountID st
 		if request.Status != circles.RequestPending {
 			return circles.ErrRequestNotFound
 		}
+		// The name is stamped now, so the wall can still say who joined
+		// after they have left again or deleted their account. Fetched
+		// here rather than trusted from the request: it is also the
+		// freshest read of the account's public key, and sealed was built
+		// against the key snapshotted on the ask, which the requester may
+		// have since rotated away from — sealing to it would admit a
+		// member who cannot open a word of what they were just given.
+		name := ""
+		if profile, err := s.Profiles.GetProfile(ctx, request.AccountID); err == nil {
+			name = profile.Name
+			if string(profile.PublicKey) != string(request.PublicKey) {
+				return circles.ErrPublicKeyChanged
+			}
+		}
 		member := circles.Member{
 			AccountID:   request.AccountID,
 			Role:        circles.RoleMember,
 			NotifyLevel: circles.NotifyAll,
 		}
-		// The name is stamped now, so the wall can still say who joined
-		// after they have left again or deleted their account.
-		name := ""
-		if profile, err := s.Profiles.GetProfile(ctx, request.AccountID); err == nil {
-			name = profile.Name
-		}
-		if err := s.Store.ApproveRequest(ctx, circleID, requestID, accountID, member, sealed, name); err != nil {
+		if err := s.Store.ApproveRequest(ctx, circleID, requestID, accountID, member, sealed, name, circle.KeyVersion); err != nil {
 			return err
 		}
 		if s.Notify != nil {

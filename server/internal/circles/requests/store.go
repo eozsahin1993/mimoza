@@ -178,14 +178,18 @@ func (s *Store) ListRequests(ctx context.Context, circleID string) ([]circles.Re
 // to them, the request's new status and the activity row, in one
 // transaction. Anything less could leave a member who cannot read, or a
 // request that looks pending after it was granted.
-func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID string, member circles.Member, sealed circles.SealedKeys, name string) error {
-	circle, err := s.GetCircle(ctx, circleID)
-	if err != nil {
-		return err
-	}
+//
+// expectedVersion is the circle's KeyVersion as the caller read it when
+// it built sealed — not re-read here, so the meta update below can
+// condition on it. A kick landing between that read and this transaction
+// would otherwise let the approval commit anyway, admitting a member
+// whose sealed set covers everything up to a version the circle has
+// already moved past — permanently, since nothing flags a fresh member
+// for a rewrap the way a rotation does for the members already there.
+func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID string, member circles.Member, sealed circles.SealedKeys, name string, expectedVersion int64) error {
 	// Every version, or the joiner cannot read the history they were
 	// admitted to see.
-	for version := int64(1); version <= circle.KeyVersion; version++ {
+	for version := int64(1); version <= expectedVersion; version++ {
 		if len(sealed[version]) == 0 {
 			return circles.ErrIncompleteKeys
 		}
@@ -236,17 +240,20 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 				}},
 				// memberCount is what makes the cap hold when two admins
 				// approve at once: the count read above can be stale, this
-				// condition cannot.
+				// condition cannot. keyVersion closes the same window for
+				// the sealed keys above: a rotation landing after the
+				// caller built sealed must not let this commit anyway.
 				{Update: &types.Update{
 					TableName: aws.String(s.Name),
 					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
 					UpdateExpression: aws.String("ADD " + dynamo.AttrRosterVersion + " :one, " +
 						dynamo.AttrMemberCount + " :one"),
-					ConditionExpression: aws.String("attribute_not_exists(" + dynamo.AttrMemberCount + ") OR " +
-						dynamo.AttrMemberCount + " < :cap"),
+					ConditionExpression: aws.String("(attribute_not_exists(" + dynamo.AttrMemberCount + ") OR " +
+						dynamo.AttrMemberCount + " < :cap) AND " + dynamo.AttrKeyVersion + " = :expectedVersion"),
 					ExpressionAttributeValues: map[string]types.AttributeValue{
-						":one": dynamoutil.Num(1),
-						":cap": dynamoutil.Num(circles.MaxMembers),
+						":one":             dynamoutil.Num(1),
+						":cap":             dynamoutil.Num(circles.MaxMembers),
+						":expectedVersion": dynamoutil.Num(expectedVersion),
 					},
 				}},
 				{Put: &types.Put{
@@ -269,9 +276,24 @@ func (s *Store) ApproveRequest(ctx context.Context, circleID, requestID, actorID
 		// Gone, or already answered — either way there is nothing to grant.
 		return circles.ErrRequestNotFound
 	case dynamoutil.CancelledFor(err, 3) == dynamoutil.ConditionalCheckFailed:
-		return circles.ErrCircleFull
+		return s.approveConflict(ctx, circleID, expectedVersion)
 	}
 	return err
+}
+
+// approveConflict tells a lost race from a genuinely full circle: the
+// meta row's condition ANDs both, so a cancelled write doesn't say by
+// itself which one failed. A plain read after the fact is fine here —
+// the write has already lost, so there is no freshness to protect.
+func (s *Store) approveConflict(ctx context.Context, circleID string, expectedVersion int64) error {
+	current, err := s.GetCircle(ctx, circleID)
+	if err != nil {
+		return err
+	}
+	if current.KeyVersion != expectedVersion {
+		return circles.ErrVersionMoved
+	}
+	return circles.ErrCircleFull
 }
 
 func (s *Store) DenyRequest(ctx context.Context, circleID, requestID string) error {

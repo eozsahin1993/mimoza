@@ -134,7 +134,7 @@ func Status(err error) (int, string) {
 	case errors.Is(err, ErrAlreadyExists), errors.Is(err, blobs.ErrExists),
 		errors.Is(err, ErrCircleFull),
 		errors.Is(err, ErrStaleKeyVersion), errors.Is(err, ErrVersionMoved),
-		errors.Is(err, ErrWouldEmptyAdmins):
+		errors.Is(err, ErrWouldEmptyAdmins), errors.Is(err, ErrPublicKeyChanged):
 		return http.StatusConflict, err.Error()
 	case errors.Is(err, ErrBadCursor), errors.Is(err, ErrIncompleteKeys),
 		errors.Is(err, ErrNoPublicKey):
