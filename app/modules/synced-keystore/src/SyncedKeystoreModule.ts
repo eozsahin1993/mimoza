@@ -1,7 +1,7 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
 declare class SyncedKeystoreModule extends NativeModule<Record<never, never>> {
-  setSynced(key: string, value: string): Promise<void>;
+  setSynced(key: string, value: string): Promise<string>;
   getSynced(key: string): Promise<string | null>;
   deleteSynced(key: string): Promise<void>;
 }

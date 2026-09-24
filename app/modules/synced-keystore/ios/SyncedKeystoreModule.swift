@@ -5,8 +5,9 @@ public final class SyncedKeystoreModule: Module {
   public func definition() -> ModuleDefinition {
     Name("SyncedKeystore")
 
-    AsyncFunction("setSynced") { (key: String, value: String) in
+    AsyncFunction("setSynced") { (key: String, value: String) -> String in
       try self.set(key: key, value: value)
+      return value
     }
 
     AsyncFunction("getSynced") { (key: String) -> String? in
@@ -32,6 +33,8 @@ public final class SyncedKeystoreModule: Module {
     ]
   }
 
+  // errSecSuccess means the local Keychain took it, not that iCloud has
+  // propagated it anywhere — that hand-off is entirely up to the OS.
   private func set(key: String, value: String) throws {
     var add = baseQuery(key: key)
     add[kSecValueData as String] = Data(value.utf8)
@@ -39,11 +42,13 @@ public final class SyncedKeystoreModule: Module {
     add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
 
     let status = SecItemAdd(add as CFDictionary, nil)
+    print("[SyncedKeystore] set \(key): SecItemAdd status \(status)")
     if status == errSecDuplicateItem {
       var search = baseQuery(key: key)
       search[kSecAttrSynchronizable as String] = kSecAttrSynchronizableAny
       let update: [String: Any] = [kSecValueData as String: Data(value.utf8)]
       let updateStatus = SecItemUpdate(search as CFDictionary, update as CFDictionary)
+      print("[SyncedKeystore] set \(key): SecItemUpdate status \(updateStatus)")
       guard updateStatus == errSecSuccess else { throw KeyChainException(updateStatus) }
       return
     }
@@ -61,6 +66,7 @@ public final class SyncedKeystoreModule: Module {
 
     var item: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &item)
+    print("[SyncedKeystore] get \(key): SecItemCopyMatching status \(status)")
     switch status {
     case errSecSuccess:
       guard let data = item as? Data else { return nil }
@@ -76,6 +82,7 @@ public final class SyncedKeystoreModule: Module {
     var query = baseQuery(key: key)
     query[kSecAttrSynchronizable as String] = kSecAttrSynchronizableAny
     let status = SecItemDelete(query as CFDictionary)
+    print("[SyncedKeystore] delete \(key): SecItemDelete status \(status)")
     guard status == errSecSuccess || status == errSecItemNotFound else {
       throw KeyChainException(status)
     }
