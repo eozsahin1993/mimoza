@@ -362,7 +362,7 @@
     "justJoinedBody": "İçerikler birazdan gelecek.",
     "approveRequestFailed": "Katılma isteği onaylanamadı",
     "denyRequestFailed": "Katılma isteği reddedilemedi",
-    "requestGoneTitle": "Bu istek kapanmış",
+    "requestGoneTitle": "Katılma isteği bulunamadı",
     "requestGoneMessage": "Başka bir yönetici senden önce davranmış ya da isteğin süresi dolmuş.",
     "refreshFailed": "Akış yenilenemedi",
     "membership": {

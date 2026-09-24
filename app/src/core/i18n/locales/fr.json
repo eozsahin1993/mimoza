@@ -362,7 +362,7 @@
     "justJoinedBody": "Le contenu va bientôt arriver.",
     "approveRequestFailed": "Impossible d’accepter la demande",
     "denyRequestFailed": "Impossible de refuser la demande",
-    "requestGoneTitle": "Demande déjà close",
+    "requestGoneTitle": "Demande introuvable",
     "requestGoneMessage": "Un autre administrateur y a déjà répondu, ou elle a expiré.",
     "refreshFailed": "Impossible d’actualiser",
     "membership": {

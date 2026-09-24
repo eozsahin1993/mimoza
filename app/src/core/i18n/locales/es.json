@@ -362,7 +362,7 @@
     "justJoinedBody": "El contenido llegará en un momento.",
     "approveRequestFailed": "No se ha podido aprobar la solicitud",
     "denyRequestFailed": "No se ha podido descartar la solicitud",
-    "requestGoneTitle": "Solicitud ya cerrada",
+    "requestGoneTitle": "Solicitud no encontrada",
     "requestGoneMessage": "Otro administrador ya la ha respondido, o ha caducado.",
     "refreshFailed": "No se ha podido actualizar",
     "membership": {

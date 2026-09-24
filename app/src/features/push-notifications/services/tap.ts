@@ -78,8 +78,7 @@ async function openDestination(response: NotificationResponse): Promise<void> {
 
     // A join-request notification can outlive the request it's about —
     // another admin may have already approved or denied it by the time
-    // this one is tapped. The feed simply won't show that row any more;
-    // say so, rather than leaving whoever tapped it looking for it.
+    // this one is tapped.
     if (requestId) {
       const stillPending = (await discoverPendingRequests(circleId)).some((request) => request.requestId === requestId);
       if (!stillPending) {

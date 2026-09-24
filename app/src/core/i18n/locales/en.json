@@ -362,7 +362,7 @@
     "justJoinedBody": "Content will sync soon.",
     "approveRequestFailed": "Could not let them in",
     "denyRequestFailed": "Could not dismiss the request",
-    "requestGoneTitle": "Request already closed",
+    "requestGoneTitle": "Join request not found",
     "requestGoneMessage": "Another admin got to it first, or it expired.",
     "refreshFailed": "Could not refresh the feed",
     "membership": {

@@ -362,7 +362,7 @@
     "justJoinedBody": "Die Inhalte kommen gleich.",
     "approveRequestFailed": "Anfrage konnte nicht angenommen werden",
     "denyRequestFailed": "Anfrage konnte nicht abgelehnt werden",
-    "requestGoneTitle": "Anfrage bereits abgeschlossen",
+    "requestGoneTitle": "Anfrage nicht gefunden",
     "requestGoneMessage": "Ein anderer Admin war schneller, oder die Anfrage ist abgelaufen.",
     "refreshFailed": "Aktualisieren fehlgeschlagen",
     "membership": {
