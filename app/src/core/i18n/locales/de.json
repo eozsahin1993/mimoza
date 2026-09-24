@@ -170,6 +170,8 @@
     "signInFailedTitle": "Anmeldung fehlgeschlagen",
     "signInFailed": "Die Anmeldung mit {{provider}} hat nicht geklappt. Versuch es noch mal.",
     "signInFailedTryOther": "Die Anmeldung mit {{provider}} hat nicht geklappt. Versuch es noch mal oder nimm stattdessen {{other}}.",
+    "recoveringTitle": "Dein Konto wird wiederhergestellt",
+    "recoveringMessage": "Das kann ein paar Sekunden dauern.",
     "profile": {
       "header": "Dein Profil",
       "title": "Wie sollen dich die Leute in deinen Kreisen sehen?",

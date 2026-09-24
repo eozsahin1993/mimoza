@@ -170,6 +170,8 @@
     "signInFailedTitle": "No se ha podido iniciar sesión",
     "signInFailed": "No se ha podido iniciar sesión con {{provider}}. Inténtalo de nuevo.",
     "signInFailedTryOther": "No se ha podido iniciar sesión con {{provider}}. Inténtalo de nuevo o prueba con {{other}}.",
+    "recoveringTitle": "Recuperando tu cuenta",
+    "recoveringMessage": "Esto puede tardar unos segundos.",
     "profile": {
       "header": "Tu perfil",
       "title": "¿Cómo quieres que te vean en tus círculos?",

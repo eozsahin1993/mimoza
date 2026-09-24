@@ -170,6 +170,8 @@
     "signInFailedTitle": "Sign-in failed",
     "signInFailed": "Couldn't sign in with {{provider}}. Try again.",
     "signInFailedTryOther": "Couldn't sign in with {{provider}}. Try again, or try {{other}} instead.",
+    "recoveringTitle": "Recovering your account",
+    "recoveringMessage": "This can take a few seconds.",
     "profile": {
       "header": "Your profile",
       "title": "Who are you, to the people in your circles?",

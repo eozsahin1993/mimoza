@@ -9,6 +9,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { AppleSignInButton, GoogleSignInButton } from '@/features/account/components/social-sign-in-button';
+import { LoadingModal } from '@/ui/components/loading-modal';
 import { Wordmark } from '@/ui/components/wordmark';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
@@ -37,6 +38,7 @@ export default function WelcomeScreen() {
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
 
   // Re-checked on focus, not just mount, so navigating back here post-sign-in still redirects away.
@@ -57,7 +59,10 @@ export default function WelcomeScreen() {
   async function handleSignIn(provider: Provider) {
     setBusyProvider(provider);
     try {
-      const result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+      const result =
+        provider === 'google'
+          ? await signInWithGoogle(() => setIsRecovering(true))
+          : await signInWithApple(() => setIsRecovering(true));
       if (result.outcome !== 'success') return;
 
       // Launch skipped this while signed out, and signing out removed it.
@@ -117,6 +122,7 @@ export default function WelcomeScreen() {
       );
     } finally {
       setBusyProvider(null);
+      setIsRecovering(false);
     }
   }
 
@@ -174,6 +180,8 @@ export default function WelcomeScreen() {
       </ThemedSafeAreaView>
 
       <PrivacyInfoModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
+
+      <LoadingModal visible={isRecovering} label={t('onboarding.recoveringTitle')} sublabel={t('onboarding.recoveringMessage')} />
     </ThemedView>
   );
 }

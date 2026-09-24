@@ -170,6 +170,8 @@
     "signInFailedTitle": "Giriş başarısız",
     "signInFailed": "{{provider}} ile giriş yapılamadı. Lütfen tekrar dene.",
     "signInFailedTryOther": "{{provider}} ile giriş yapılamadı. Tekrar deneyebilir veya {{other}} ile devam edebilirsin.",
+    "recoveringTitle": "Hesabın kurtarılıyor",
+    "recoveringMessage": "Bu birkaç saniye sürebilir.",
     "profile": {
       "header": "Profilin",
       "title": "Çevrelerindekiler seni nasıl tanısın?",

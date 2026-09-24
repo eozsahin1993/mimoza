@@ -170,6 +170,8 @@
     "signInFailedTitle": "Échec de la connexion",
     "signInFailed": "Impossible de te connecter avec {{provider}}. Réessaie.",
     "signInFailedTryOther": "Impossible de te connecter avec {{provider}}. Réessaie, ou essaie plutôt avec {{other}}.",
+    "recoveringTitle": "Récupération de ton compte",
+    "recoveringMessage": "Cela peut prendre quelques secondes.",
     "profile": {
       "header": "Ton profil",
       "title": "Comment veux-tu apparaître dans tes cercles ?",
