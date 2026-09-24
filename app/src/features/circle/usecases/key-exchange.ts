@@ -10,10 +10,18 @@ import { rewrapKeys, type RosterMember } from '@/features/circle/services/circle
  * content stays under whichever key was current when it was written.
  */
 
-/** Sealed copies from the roster, by version. One that will not open is skipped rather than failing the sync. */
+/**
+ * Sealed copies from the roster, by version. One that will not open is
+ * skipped rather than failing the sync — but no local keypair at all
+ * throws, rather than silently doing nothing: sync-circles.ts only
+ * retries this on the next roster/key version change, so silently
+ * succeeding here would leave a circle's content permanently unsynced
+ * on a device that has nothing yet to open sealed keys with, instead of
+ * retried on the very next pass the way any other failure here is.
+ */
 export async function storeSealedKeys(circleId: string, sealed: Record<string, string>, accountId: string): Promise<void> {
   const keypair = await getAccountKeypair(accountId);
-  if (!keypair) return;
+  if (!keypair) throw new Error(`No account keypair on this device — cannot open sealed keys for circle ${circleId}`);
 
   const keys = (await getCircleKeyMap(circleId)) ?? {};
   let added = false;

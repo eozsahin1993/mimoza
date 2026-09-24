@@ -18,6 +18,7 @@ const mockMe = x25519.keygen();
 jest.mock('@/core/services/keystore/account-keypair', () => ({ getAccountKeypair: jest.fn(async () => mockMe) }));
 
 const relay = jest.requireMock('@/features/circle/services/circle-relay') as { rewrapKeys: jest.Mock };
+const keystore = jest.requireMock('@/core/services/keystore/account-keypair') as { getAccountKeypair: jest.Mock };
 
 const CONTENT_V1 = new Uint8Array(32).fill(1);
 const CONTENT_V2 = new Uint8Array(32).fill(2);
@@ -68,6 +69,25 @@ describe('taking in the keys sealed to this account', () => {
     await storeSealedKeys('c1', { 1: b64(sealToPublicKey(new Uint8Array(32).fill(9), mockMe.publicKey)) }, 'me');
 
     expect(mockKeys.c1[1]).toEqual(CONTENT_V1);
+  });
+
+  // A device with no local keypair yet (a fresh iCloud/Block Store
+  // restore still in flight, or any other reason ensureAccountKeypair
+  // couldn't hand one back) cannot open anything sealed to it this pass.
+  // Silently succeeding here would tell sync-circles.ts the roster/key
+  // fetch it wraps landed cleanly, when the one thing that actually
+  // needed the new key version — reading it — never happened. Since
+  // that only retries when rosterVersion or keyVersion move again, a
+  // silent no-op here would leave this circle's content permanently
+  // unsynced rather than retried on the next pass.
+  test('throws when there is no local keypair to open sealed keys with, so the caller retries', async () => {
+    keystore.getAccountKeypair.mockResolvedValueOnce(null);
+
+    await expect(
+      storeSealedKeys('c1', { 1: b64(sealToPublicKey(CONTENT_V1, mockMe.publicKey)) }, 'me')
+    ).rejects.toThrow();
+
+    expect(mockKeys.c1).toBeUndefined();
   });
 });
 
