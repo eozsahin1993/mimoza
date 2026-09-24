@@ -42,6 +42,7 @@
     "plugins": [
       "expo-router",
       "./plugins/with-splash-wordmark",
+      "./plugins/with-android-default-push-strings",
       [
         "expo-splash-screen",
         {
