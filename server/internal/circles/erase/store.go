@@ -54,7 +54,12 @@ func (s *Store) Account(ctx context.Context, accountID, name string) (Erased, er
 			return erased, err
 		}
 		// The last member out takes the circle: nobody could read it.
-		if len(roster) <= 1 {
+		// Checked by who, not just by count — circlesOf and this read are
+		// two separate queries, so accountID can have already been
+		// removed or left by the time this runs. A bare count would then
+		// see a genuine one-member roster that does not contain accountID
+		// at all, and delete a circle nobody asked to erase.
+		if takesWholeCircle(roster, accountID) {
 			if err := s.deleteCircle(ctx, circleID); err != nil {
 				return erased, err
 			}
@@ -66,6 +71,17 @@ func (s *Store) Account(ctx context.Context, accountID, name string) (Erased, er
 		}
 	}
 	return erased, s.forgetRequests(ctx, accountID)
+}
+
+// takesWholeCircle is true only when accountID is the very last member —
+// an empty roster (already gone) or a roster of exactly one, and that
+// one is accountID itself. Anyone else remaining, however few, means
+// their circle stays and this account instead just leaves it.
+func takesWholeCircle(roster []circles.Member, accountID string) bool {
+	if len(roster) == 0 {
+		return true
+	}
+	return len(roster) == 1 && roster[0].AccountID == accountID
 }
 
 func (s *Store) circlesOf(ctx context.Context, accountID string) ([]string, error) {

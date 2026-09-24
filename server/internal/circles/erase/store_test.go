@@ -277,7 +277,7 @@ func addMemberAt(t *testing.T, table *dynamo.Table, circleID, accountID, role st
 	}
 	err := store.ApproveRequest(ctx, circleID, request.ID, "system",
 		circles.Member{AccountID: accountID, Role: role, NotifyLevel: circles.NotifyAll, JoinedAt: joined},
-		circles.SealedKeys{1: []byte("sealed")}, "")
+		circles.SealedKeys{1: []byte("sealed")}, "", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
