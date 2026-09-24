@@ -3,6 +3,7 @@ import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useFonts } from 'expo-font';
+import { setNotificationHandler } from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -28,6 +29,19 @@ import { startSyncScheduler } from '@/core/sync/scheduler';
 global.Buffer = global.Buffer ?? Buffer;
 
 SplashScreen.preventAutoHideAsync();
+
+// Module scope, not an effect: without a handler at all, expo-notifications'
+// own default is to show nothing while the app is foregrounded, which is
+// indistinguishable from push being broken. Set as early as possible, since
+// a notification can arrive before RootLayout's first effect runs.
+setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 // Deep-linking straight into a route like join/[code] would otherwise make
 // it the *only* stack entry — nothing behind it for a sheet to sit over,
