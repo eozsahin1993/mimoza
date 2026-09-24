@@ -2,6 +2,7 @@ import {
   AttachmentKinds,
   AttachmentStatuses,
   coverEntryId,
+  forgetProfile,
   getAttachment,
   getCircle,
   initDatabase,
@@ -86,13 +87,27 @@ beforeEach(() => {
 });
 
 describe('a sync pass', () => {
+  // Sign-in saves the auth token, which is the scheduler's only gate,
+  // before profile setup ever writes this row — so a foreground trigger
+  // can land in that gap. Nothing here knows which account this device
+  // is yet, so the pass must do nothing rather than guess.
+  test('with no local profile yet, does nothing and calls the relay for nothing', async () => {
+    await forgetProfile('me');
+    try {
+      expect(await syncCircles()).toBe(0);
+      expect(relay.listCircles).not.toHaveBeenCalled();
+    } finally {
+      await saveProfile({ accountId: 'me', name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+    }
+  });
+
   test('takes the roster and keys for a circle it has not seen', async () => {
     const id = circleId();
     relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
 
     expect(await syncCircles()).toBe(0);
 
-    expect(keys.storeSealedKeys).toHaveBeenCalledWith(id, { 1: 'sealed' });
+    expect(keys.storeSealedKeys).toHaveBeenCalledWith(id, { 1: 'sealed' }, 'me');
     expect((await getCircle(id))?.name).toBe('Family');
     expect(await listMembers(id)).toHaveLength(1);
   });
@@ -202,6 +217,39 @@ describe('a sync pass', () => {
 
     expect(await syncCircles()).toBe(1);
     expect(await listMembers(good)).toHaveLength(1);
+  });
+
+  // applyCircle commits the relay's new versions locally before the
+  // roster fetch they gate has even run. Left uncorrected on failure,
+  // the next pass's rosterMoved check compares the local row against
+  // itself and finds nothing moved — silently and permanently skipping
+  // a roster/key fetch that never actually succeeded.
+  test('a failed roster fetch does not stop the next pass from retrying', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
+    relay.getRoster.mockRejectedValueOnce(new Error('offline'));
+
+    expect(await syncCircles()).toBe(1);
+    expect(await listMembers(id)).toHaveLength(0);
+
+    relay.getRoster.mockResolvedValue(roster({ rosterVersion: 2 }));
+    expect(await syncCircles()).toBe(0);
+    expect(await listMembers(id)).toHaveLength(1);
+  });
+
+  // Same failure, but on a circle this device has never seen before —
+  // there is no prior local row to roll back to, so the rollback must
+  // use a sentinel no real relay version can ever equal.
+  test('a failed roster fetch on a brand-new circle still retries next pass', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+    relay.getRoster.mockRejectedValueOnce(new Error('offline'));
+
+    expect(await syncCircles()).toBe(1);
+
+    relay.getRoster.mockResolvedValue(roster());
+    expect(await syncCircles()).toBe(0);
+    expect(await listMembers(id)).toHaveLength(1);
   });
 
   test('a cover with a key version becomes a pending attachment other devices can fetch', async () => {

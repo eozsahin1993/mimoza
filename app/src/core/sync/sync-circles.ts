@@ -5,6 +5,7 @@ import {
   applyRoster,
   coverEntryId,
   getCircle,
+  getProfile,
   dropRequest,
   insertAttachment,
   listCircles as listLocalCircles,
@@ -30,6 +31,13 @@ import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-excha
  * straight down.
  */
 export async function syncCircles(): Promise<number> {
+  // Sign-in saves the auth token before profile setup writes this row, and
+  // the scheduler's only gate is the token — so a pass can land in that
+  // gap. Nothing below can run without knowing which account this device
+  // is, so there is nothing to do yet.
+  const profile = await getProfile();
+  if (!profile) return 0;
+
   const { circles, requests } = await timed('sync.me', () => listCircles());
   const now = Date.now();
 
@@ -61,7 +69,7 @@ export async function syncCircles(): Promise<number> {
   let failed = 0;
   for (const circle of circles) {
     try {
-      await syncCircle(circle, now);
+      await syncCircle(circle, now, profile.accountId);
     } catch (err) {
       console.error(`Failed to sync circle ${circle.circleId}`, err);
       failed += 1;
@@ -80,7 +88,7 @@ export async function syncCircles(): Promise<number> {
  * a page encrypted under a version this device has not been given yet
  * would be skipped and never revisited — cursors do not rewind.
  */
-async function syncCircle(circle: Circle, now: number): Promise<void> {
+async function syncCircle(circle: Circle, now: number, myAccountId: string): Promise<void> {
   const before = await getCircle(circle.circleId);
   await applyCircle(circle, now);
 
@@ -109,34 +117,46 @@ async function syncCircle(circle: Circle, now: number): Promise<void> {
     before.rosterVersion !== circle.rosterVersion ||
     before.keyVersion !== circle.keyVersion;
   if (rosterMoved) {
-    const roster = await timed('sync.roster', () => getRoster(circle.circleId));
-    await storeSealedKeys(circle.circleId, roster.keys);
-    await applyRoster(
-      circle.circleId,
-      roster.members.map((member) => ({
-        circleId: circle.circleId,
-        accountId: member.accountId,
-        name: member.name ?? '',
-        avatarId: member.avatarId ?? null,
-        avatarKeyVersion: member.avatarKeyVersion ?? null,
-        publicKey: member.publicKey ?? '',
-        role: member.role,
-        joinedAt: member.joinedAt,
-        needsRewrap: member.needsRewrap ?? false,
-      })),
-      now
-    );
+    try {
+      const roster = await timed('sync.roster', () => getRoster(circle.circleId));
+      await storeSealedKeys(circle.circleId, roster.keys, myAccountId);
+      await applyRoster(
+        circle.circleId,
+        roster.members.map((member) => ({
+          circleId: circle.circleId,
+          accountId: member.accountId,
+          name: member.name ?? '',
+          avatarId: member.avatarId ?? null,
+          avatarKeyVersion: member.avatarKeyVersion ?? null,
+          publicKey: member.publicKey ?? '',
+          role: member.role,
+          joinedAt: member.joinedAt,
+          needsRewrap: member.needsRewrap ?? false,
+        })),
+        now
+      );
 
-    // Someone replaced their keypair and can read nothing until a member
-    // who holds the keys seals them again. Whoever syncs first does it,
-    // and a repeat is harmless. Never this account: its own flag is
-    // cleared by somebody else, and it has nothing to seal from.
-    if (!circle.needsRewrap) {
-      for (const member of roster.members.filter((member) => member.needsRewrap)) {
-        await resealFor(circle.circleId, member).catch((err) =>
-          console.error(`Failed to reseal keys for ${member.accountId} in ${circle.circleId}`, err)
-        );
+      // Someone replaced their keypair and can read nothing until a member
+      // who holds the keys seals them again. Whoever syncs first does it,
+      // and a repeat is harmless. Never this account: its own flag is
+      // cleared by somebody else, and it has nothing to seal from.
+      if (!circle.needsRewrap) {
+        for (const member of roster.members.filter((member) => member.needsRewrap)) {
+          await resealFor(circle.circleId, member).catch((err) =>
+            console.error(`Failed to reseal keys for ${member.accountId} in ${circle.circleId}`, err)
+          );
+        }
       }
+    } catch (err) {
+      // applyCircle above already committed the relay's new versions
+      // locally. Left in place, the next pass's rosterMoved check would
+      // compare the local row against itself and find nothing moved —
+      // permanently skipping a roster/key fetch that never actually
+      // succeeded. Roll the two version fields back to whatever was last
+      // confirmed (or 0, a circle this device has never synced) so the
+      // next pass sees this as still-stale and tries again.
+      await applyCircle({ ...circle, rosterVersion: before?.rosterVersion ?? 0, keyVersion: before?.keyVersion ?? 0 }, now);
+      throw err;
     }
   }
 
