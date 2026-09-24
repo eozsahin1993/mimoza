@@ -362,8 +362,8 @@
     "justJoinedBody": "Content will sync soon.",
     "approveRequestFailed": "Could not let them in",
     "denyRequestFailed": "Could not dismiss the request",
-    "requestGoneTitle": "Already answered",
-    "requestGoneMessage": "Someone already answered this request.",
+    "requestGoneTitle": "Request already closed",
+    "requestGoneMessage": "Another admin got to it first, or it expired.",
     "refreshFailed": "Could not refresh the feed",
     "membership": {
       "created": "{{subject}} created this circle",

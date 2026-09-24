@@ -362,8 +362,8 @@
     "justJoinedBody": "Le contenu va bientôt arriver.",
     "approveRequestFailed": "Impossible d’accepter la demande",
     "denyRequestFailed": "Impossible de refuser la demande",
-    "requestGoneTitle": "Déjà traitée",
-    "requestGoneMessage": "Quelqu’un a déjà répondu à cette demande.",
+    "requestGoneTitle": "Demande déjà close",
+    "requestGoneMessage": "Un autre administrateur y a déjà répondu, ou elle a expiré.",
     "refreshFailed": "Impossible d’actualiser",
     "membership": {
       "created": "{{subject}} a créé ce cercle",

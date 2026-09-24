@@ -362,8 +362,8 @@
     "justJoinedBody": "El contenido llegará en un momento.",
     "approveRequestFailed": "No se ha podido aprobar la solicitud",
     "denyRequestFailed": "No se ha podido descartar la solicitud",
-    "requestGoneTitle": "Ya respondida",
-    "requestGoneMessage": "Alguien ya ha respondido a esta solicitud.",
+    "requestGoneTitle": "Solicitud ya cerrada",
+    "requestGoneMessage": "Otro administrador ya la ha respondido, o ha caducado.",
     "refreshFailed": "No se ha podido actualizar",
     "membership": {
       "created": "{{subject}} creó este círculo",

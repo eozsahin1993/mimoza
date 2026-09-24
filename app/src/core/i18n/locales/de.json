@@ -362,8 +362,8 @@
     "justJoinedBody": "Die Inhalte kommen gleich.",
     "approveRequestFailed": "Anfrage konnte nicht angenommen werden",
     "denyRequestFailed": "Anfrage konnte nicht abgelehnt werden",
-    "requestGoneTitle": "Bereits beantwortet",
-    "requestGoneMessage": "Diese Anfrage wurde bereits beantwortet.",
+    "requestGoneTitle": "Anfrage bereits abgeschlossen",
+    "requestGoneMessage": "Ein anderer Admin war schneller, oder die Anfrage ist abgelaufen.",
     "refreshFailed": "Aktualisieren fehlgeschlagen",
     "membership": {
       "created": "{{subject}} hat diesen Kreis erstellt",
