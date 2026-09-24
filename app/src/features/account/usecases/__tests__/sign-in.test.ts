@@ -79,7 +79,10 @@ describe('publishing the account keypair', () => {
     expect(publishPublicKey).not.toHaveBeenCalled();
   });
 
-  test('a local key that does not match what the relay has on file is republished, not reset', async () => {
+  // The case an earlier version got wrong: created is false (the mint
+  // already happened), but the key still isn't what's on file, so every
+  // circle sealed to the old one still needs a reseal, same as a fresh mint.
+  test('a local key that does not match what the relay has on file is republished as a reset', async () => {
     await signInWithGoogle();
     (publishPublicKey as jest.Mock).mockClear();
     (getProfile as jest.Mock).mockResolvedValue({ ...RELAY_PROFILE, publicKey: 'something-else' });
@@ -87,7 +90,7 @@ describe('publishing the account keypair', () => {
     await signInWithGoogle();
 
     const [, reset] = (publishPublicKey as jest.Mock).mock.calls[0];
-    expect(reset).toBe(false);
+    expect(reset).toBe(true);
   });
 
   test('the relay profile comes back to the caller either way', async () => {

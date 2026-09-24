@@ -16,6 +16,28 @@ import { getProfile as getRelayProfile, publishPublicKey } from '@/features/acco
 export type SignInOutcome = 'success' | 'cancelled';
 
 /**
+ * Thrown only by ensurePublishedKeypair, and only after the session
+ * itself is already established (saveAuthToken has already run by the
+ * time either caller reaches it) — so signInWithGoogle/signInWithApple
+ * can tell "the sign-in itself failed" apart from "signed in fine, but
+ * the keypair step didn't" instead of both looking like the same thrown
+ * error. The account keypair is not required to use the app; a stale
+ * server-side key is.
+ */
+export class KeypairPublishError extends Error {
+  readonly accountId: string;
+  readonly relayName: string;
+
+  constructor(accountId: string, relayName: string, cause: unknown) {
+    super('Signed in, but could not publish this device’s key.');
+    this.name = 'KeypairPublishError';
+    this.accountId = accountId;
+    this.relayName = relayName;
+    this.cause = cause;
+  }
+}
+
+/**
  * suggestedName/suggestedPictureUrl are purely a profile-setup UX
  * convenience — never sent anywhere, just handed to the caller so it can
  * pre-fill the form instead of asking someone to retype what their sign-in
@@ -60,36 +82,65 @@ function ensureGoogleConfigured(): void {
 
 /**
  * Ensures this device has an account keypair and the relay has its public
- * half — without that, nothing can ever be sealed to this device. `reset`
- * follows `created`: a freshly minted keypair means every circle's
- * sealed keys need resealing, which is what `reset: true` tells the relay
- * to flag.
+ * half. `reset` is true whenever this publish overwrites a *different* key
+ * already on file — not whenever this call minted the keypair, since a
+ * mint can happen on one sign-in and be left unpublished (see
+ * ambiguousRestore below), with the actual publish landing on a later
+ * call where `created` is already false.
  *
  * Runs after every successful sign-in, not just the first — cheap when
- * nothing changed (the relay's SetPublicKey is a plain idempotent write
- * when `reset` is false), and it's what lets a returning device confirm
- * its key still matches what the relay has on file.
+ * nothing changed, and it's what lets a returning device confirm its key
+ * still matches the relay's.
+ *
+ * `onRecovering` fires once this account is known to have a profile
+ * already — a missing local key then means this device is waiting on
+ * iCloud Keychain/Block Store, not a fresh signup (which mints instantly
+ * and never reaches this call).
  */
-async function ensurePublishedKeypair(): Promise<{ accountId: string; name: string }> {
+async function ensurePublishedKeypair(onRecovering?: () => void): Promise<{ accountId: string; name: string }> {
   const relayProfile = await getRelayProfile();
-  const { keypair, created } = await ensureAccountKeypair(relayProfile.accountId);
-  const publicKey = toWire(keypair.publicKey);
+  if (relayProfile.name) onRecovering?.();
+  try {
+    const { keypair, created } = await ensureAccountKeypair(relayProfile.accountId);
+    const publicKey = toWire(keypair.publicKey);
+    const keyChanged = relayProfile.publicKey !== publicKey;
 
-  // A mint that contradicts a key the relay already has on file is the
-  // possibility ensureAccountKeypair's own doc comment warns about, not
-  // a confirmed loss: synced-store's retries shrink but do not close the
-  // window where a still-restoring device reads empty before iCloud
-  // Keychain/Block Store actually delivers the real key. Publishing this
-  // as `reset` would be effectively irreversible — every circle this
-  // account is in would have its members reseal to a key that gets
-  // discarded the moment the real one shows up — so it is left
-  // unpublished for this attempt; the next sign-in or launch gets
-  // another chance to read the real key before anything commits.
-  const ambiguousRestore = created && !!relayProfile.publicKey;
-  if (!ambiguousRestore && (created || relayProfile.publicKey !== publicKey)) {
-    await publishPublicKey(publicKey, created);
+    // Might be a restore still in flight, not a confirmed loss (see
+    // ensureAccountKeypair) — publishing as reset here would be
+    // irreversible if so, so this is left unpublished for another chance.
+    const ambiguousRestore = created && !!relayProfile.publicKey;
+    if (ambiguousRestore) {
+      console.warn(
+        `ensurePublishedKeypair: minted a keypair for ${relayProfile.accountId} but left it unpublished — the relay already has a different key on file, and this may just be a restore still in flight.`
+      );
+    }
+    if (!ambiguousRestore && (created || keyChanged)) {
+      await publishPublicKey(publicKey, keyChanged);
+    }
+  } catch (err) {
+    throw new KeypairPublishError(relayProfile.accountId, relayProfile.name, err);
   }
   return { accountId: relayProfile.accountId, name: relayProfile.name };
+}
+
+/**
+ * Both callers use this instead of calling ensurePublishedKeypair
+ * directly: by the time either reaches it, saveAuthToken has already
+ * landed, so a keypair-specific failure here must not make a sign-in
+ * that already succeeded look like it didn't. Anything else thrown
+ * (a network error, the relay itself refusing) is a real sign-in
+ * failure and still propagates.
+ */
+async function ensurePublishedKeypairOrDegrade(onRecovering?: () => void): Promise<{ accountId: string; name: string }> {
+  try {
+    return await ensurePublishedKeypair(onRecovering);
+  } catch (err) {
+    if (err instanceof KeypairPublishError) {
+      console.error(err.message, err.cause);
+      return { accountId: err.accountId, name: err.relayName };
+    }
+    throw err;
+  }
 }
 
 /**
@@ -98,7 +149,7 @@ async function ensurePublishedKeypair(): Promise<{ accountId: string; name: stri
  * (a plain async function, not a React hook the way expo-auth-session's
  * Google prompt was) makes that possible.
  */
-export async function signInWithGoogle(): Promise<SignInResult> {
+export async function signInWithGoogle(onRecovering?: () => void): Promise<SignInResult> {
   ensureGoogleConfigured();
 
   try {
@@ -116,7 +167,7 @@ export async function signInWithGoogle(): Promise<SignInResult> {
     }
     const token = await relaySignInWithGoogle(idToken);
     await saveAuthToken(token);
-    const relayProfile = await ensurePublishedKeypair();
+    const relayProfile = await ensurePublishedKeypairOrDegrade(onRecovering);
     return {
       outcome: 'success',
       // .name is the combined display name — givenName/familyName are
@@ -141,7 +192,7 @@ export async function signInWithGoogle(): Promise<SignInResult> {
  * AppleAuthenticationCredential's shape or expo-apple-authentication's
  * own cancel error code.
  */
-export async function signInWithApple(): Promise<SignInResult> {
+export async function signInWithApple(onRecovering?: () => void): Promise<SignInResult> {
   let credential;
   try {
     credential = await AppleAuthentication.signInAsync({
@@ -163,7 +214,7 @@ export async function signInWithApple(): Promise<SignInResult> {
   }
   const token = await relaySignInWithApple(credential.identityToken, credential.authorizationCode);
   await saveAuthToken(token);
-  const relayProfile = await ensurePublishedKeypair();
+  const relayProfile = await ensurePublishedKeypairOrDegrade(onRecovering);
 
   const suggestedName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
   return { outcome: 'success', suggestedName: suggestedName || undefined, relayProfile };
