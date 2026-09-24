@@ -171,21 +171,28 @@ belong to the same handshake beyond sharing a tag.
 The relay runs against LocalStack (DynamoDB, S3, SSM) instead of real AWS.
 All commands are from `server/`.
 
-**1. Start LocalStack** (once per machine boot; `docker start localstack`
-after the first time):
+**1. Start LocalStack and provision its tables:**
+
+```
+provision/local-setup.sh
+```
+
+Re-run it any time LocalStack looks wrong — a missing table
+(`ResourceNotFoundException: Cannot do operations on a non-existent
+table`), `provision/modules` having changed, or LocalStack having lost
+its state across a machine restart. It always removes and recreates the
+`localstack` container: there's nothing local dev needs preserved across
+a reset, and it's a more reliable fix than guessing at what's stale.
+
+That one command is exactly these two steps, run separately if you want
+to see each on its own:
 
 ```
 docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,ssm localstack/localstack:4.4.0
-```
-
-**2. Provision the tables and bucket** (again whenever `provision/modules`
-changes, or after LocalStack's container is recreated):
-
-```
 (cd provision/envs/local && terraform init && terraform apply)
 ```
 
-**3. Create `local.env`** from the example and point it at LocalStack:
+**2. Create `local.env`** from the example and point it at LocalStack:
 
 ```
 cp .env.example local.env
@@ -202,7 +209,7 @@ which ship commented out — point `FCM_CREDENTIAL_FILE`,
 `APPLE_SIGNIN_KEY_FILE` at the key files in this directory. `.gitignore`
 keeps every `*.env` and every key out of the repo.
 
-**4. Run it with `local.env` loaded.** Go doesn't read env files itself, so export
+**3. Run it with `local.env` loaded.** Go doesn't read env files itself, so export
 it into the shell first:
 
 ```
