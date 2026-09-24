@@ -17,6 +17,7 @@ import { AppSettingsProvider, useAppSettings } from '@/ui/theme/hooks/use-app-se
 import { useMessages } from '@/core/hooks/use-messages';
 import { useSessionExpiry } from '@/core/hooks/use-session-expiry';
 import { getAppSettings, type AppSettings } from '@/core/services/settings';
+import { installDebugKeystore } from '@/core/services/keystore/debug-keystore';
 import { applyLanguage } from '@/core/i18n/i18n';
 import { startJankMonitor } from '@/core/utils/timing';
 import { startSyncScheduler } from '@/core/sync/scheduler';
@@ -27,6 +28,8 @@ import { startSyncScheduler } from '@/core/sync/scheduler';
 // read/write throws `ReferenceError: Property 'Buffer' doesn't exist` without
 // this polyfill.
 global.Buffer = global.Buffer ?? Buffer;
+
+installDebugKeystore();
 
 SplashScreen.preventAutoHideAsync();
 
