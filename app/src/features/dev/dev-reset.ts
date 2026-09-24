@@ -23,8 +23,12 @@ export async function resetLocalDataForTesting(): Promise<void> {
   // Read before resetAllLocalData below removes the row the account id
   // comes from — the keypair is scoped per account, so forgetting it
   // needs to happen first, or not at all if this device never got as
-  // far as profile setup.
-  const profile = await getProfile();
+  // far as profile setup. Also tolerates the read itself failing: this
+  // is the __DEV__ menu's escape hatch for a local schema stuck behind a
+  // migration-index collision (see AGENTS.md), where device_profile can
+  // genuinely not exist yet — the one action meant to recover from that
+  // must not be what a broken schema blocks.
+  const profile = await getProfile().catch(() => null);
   const circleIds = await getAllCircleIds();
   for (const circleId of circleIds) {
     await deleteCircleKeys(circleId);

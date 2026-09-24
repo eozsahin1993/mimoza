@@ -10,7 +10,7 @@ jest.mock('@/core/services/keystore/account-keypair', () => ({ forgetAccountKeyp
 jest.mock('@/core/services/keystore/auth-token', () => ({ deleteAuthToken: jest.fn(async () => undefined) }));
 jest.mock('@/core/photo/photo-cache', () => ({ deleteCirclePhotoFiles: jest.fn() }));
 
-import { getAllCircleIds, getProfile } from '@/data/db';
+import { getAllCircleIds, getProfile, resetAllLocalData } from '@/data/db';
 import { forgetAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
@@ -41,6 +41,20 @@ describe('resetLocalDataForTesting', () => {
     await resetLocalDataForTesting();
 
     expect(forgetAccountKeypair).not.toHaveBeenCalled();
+  });
+
+  // The __DEV__ menu's whole reason to exist is recovering a device whose
+  // local schema is broken or behind — including the migration-index trap
+  // AGENTS.md describes, where a stale device_profile means the table
+  // genuinely does not exist yet. Reading it must not be what stops the
+  // one action meant to fix that.
+  test('a broken local schema does not stop the reset from completing', async () => {
+    (getProfile as jest.Mock).mockRejectedValue(new Error('no such table: device_profile'));
+
+    await expect(resetLocalDataForTesting()).resolves.toBeUndefined();
+
+    expect(forgetAccountKeypair).not.toHaveBeenCalled();
+    expect(resetAllLocalData).toHaveBeenCalled();
   });
 
   test('with no circles, nothing is purged', async () => {
