@@ -22,7 +22,7 @@ export type CreateCircleInput = {
 export async function createCircle(input: CreateCircleInput): Promise<{ id: string }> {
   const profile = await getProfile();
   if (!profile) throw new Error('No profile on this device.');
-  const keypair = await getAccountKeypair();
+  const keypair = await getAccountKeypair(profile.accountId);
   if (!keypair) throw new Error('No account keypair on this device.');
 
   const contentKey = generateContentKey();

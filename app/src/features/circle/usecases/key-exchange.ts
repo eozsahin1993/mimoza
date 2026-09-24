@@ -11,8 +11,8 @@ import { rewrapKeys, type RosterMember } from '@/features/circle/services/circle
  */
 
 /** Sealed copies from the roster, by version. One that will not open is skipped rather than failing the sync. */
-export async function storeSealedKeys(circleId: string, sealed: Record<string, string>): Promise<void> {
-  const keypair = await getAccountKeypair();
+export async function storeSealedKeys(circleId: string, sealed: Record<string, string>, accountId: string): Promise<void> {
+  const keypair = await getAccountKeypair(accountId);
   if (!keypair) return;
 
   const keys = (await getCircleKeyMap(circleId)) ?? {};

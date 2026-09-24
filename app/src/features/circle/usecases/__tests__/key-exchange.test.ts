@@ -30,10 +30,14 @@ beforeEach(() => {
 
 describe('taking in the keys sealed to this account', () => {
   test('opens every version the roster carried', async () => {
-    await storeSealedKeys('c1', {
-      1: b64(sealToPublicKey(CONTENT_V1, mockMe.publicKey)),
-      2: b64(sealToPublicKey(CONTENT_V2, mockMe.publicKey)),
-    });
+    await storeSealedKeys(
+      'c1',
+      {
+        1: b64(sealToPublicKey(CONTENT_V1, mockMe.publicKey)),
+        2: b64(sealToPublicKey(CONTENT_V2, mockMe.publicKey)),
+      },
+      'me'
+    );
 
     expect(mockKeys.c1[1]).toEqual(CONTENT_V1);
     expect(mockKeys.c1[2]).toEqual(CONTENT_V2);
@@ -45,10 +49,14 @@ describe('taking in the keys sealed to this account', () => {
   test('a version that will not open is skipped, and the rest still land', async () => {
     const someoneElse = x25519.keygen();
 
-    await storeSealedKeys('c1', {
-      1: b64(sealToPublicKey(CONTENT_V1, mockMe.publicKey)),
-      2: b64(sealToPublicKey(CONTENT_V2, someoneElse.publicKey)),
-    });
+    await storeSealedKeys(
+      'c1',
+      {
+        1: b64(sealToPublicKey(CONTENT_V1, mockMe.publicKey)),
+        2: b64(sealToPublicKey(CONTENT_V2, someoneElse.publicKey)),
+      },
+      'me'
+    );
 
     expect(mockKeys.c1[1]).toEqual(CONTENT_V1);
     expect(mockKeys.c1[2]).toBeUndefined();
@@ -57,7 +65,7 @@ describe('taking in the keys sealed to this account', () => {
   test('a version already held is left alone', async () => {
     mockKeys.c1 = { 1: CONTENT_V1 };
 
-    await storeSealedKeys('c1', { 1: b64(sealToPublicKey(new Uint8Array(32).fill(9), mockMe.publicKey)) });
+    await storeSealedKeys('c1', { 1: b64(sealToPublicKey(new Uint8Array(32).fill(9), mockMe.publicKey)) }, 'me');
 
     expect(mockKeys.c1[1]).toEqual(CONTENT_V1);
   });

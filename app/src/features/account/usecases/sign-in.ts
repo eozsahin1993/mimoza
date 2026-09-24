@@ -71,10 +71,22 @@ function ensureGoogleConfigured(): void {
  * its key still matches what the relay has on file.
  */
 async function ensurePublishedKeypair(): Promise<{ accountId: string; name: string }> {
-  const { keypair, created } = await ensureAccountKeypair();
-  const publicKey = toWire(keypair.publicKey);
   const relayProfile = await getRelayProfile();
-  if (created || relayProfile.publicKey !== publicKey) {
+  const { keypair, created } = await ensureAccountKeypair(relayProfile.accountId);
+  const publicKey = toWire(keypair.publicKey);
+
+  // A mint that contradicts a key the relay already has on file is the
+  // possibility ensureAccountKeypair's own doc comment warns about, not
+  // a confirmed loss: synced-store's retries shrink but do not close the
+  // window where a still-restoring device reads empty before iCloud
+  // Keychain/Block Store actually delivers the real key. Publishing this
+  // as `reset` would be effectively irreversible — every circle this
+  // account is in would have its members reseal to a key that gets
+  // discarded the moment the real one shows up — so it is left
+  // unpublished for this attempt; the next sign-in or launch gets
+  // another chance to read the real key before anything commits.
+  const ambiguousRestore = created && !!relayProfile.publicKey;
+  if (!ambiguousRestore && (created || relayProfile.publicKey !== publicKey)) {
     await publishPublicKey(publicKey, created);
   }
   return { accountId: relayProfile.accountId, name: relayProfile.name };

@@ -1,29 +1,36 @@
-import { getAllCircleIds, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
+import { getAllCircleIds, getProfile, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
 import { clearOwnColorSeedCache } from '@/ui/theme/hooks/use-own-color-seed';
 import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
+import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
 import { forgetAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { deleteAuthToken } from '@/core/services/keystore/auth-token';
 
 /**
  * Wipes every circle key in the Keychain, the account keypair, the auth
- * token, and all local circle/post/etc. data.
+ * token, the decrypted photo cache, and all local circle/post/etc. data.
  *
- * Two callers, deliberately different safety levels. `finishAccountDeletionIfPending`
- * (`delete-account.ts`) calls this for real, as the last step of an
- * account deletion the user already confirmed through its own screen —
- * by then `getAllCircleIds` is already empty (each circle purged as its
- * departure drained), so this call's real job is the account keypair and
- * auth token. The `__DEV__` menu also calls it directly, with none of
- * that safety net, to let a fresh sign-in be exercised repeatedly without
+ * Two callers, deliberately different safety levels.
+ * `finishAccountDeletionIfPending` (`delete-account.ts`) calls this for
+ * real, as the last step of an account deletion the user already
+ * confirmed through its own screen — `getAllCircleIds` is still the full
+ * list at that point, since nothing purges a circle locally before this
+ * runs. The `__DEV__` menu also calls it directly, with none of that
+ * safety net, to let a fresh sign-in be exercised repeatedly without
  * reinstalling — deliberately kept out of sign-in.ts's signOut(), which
  * touches none of this.
  */
 export async function resetLocalDataForTesting(): Promise<void> {
+  // Read before resetAllLocalData below removes the row the account id
+  // comes from — the keypair is scoped per account, so forgetting it
+  // needs to happen first, or not at all if this device never got as
+  // far as profile setup.
+  const profile = await getProfile();
   const circleIds = await getAllCircleIds();
   for (const circleId of circleIds) {
     await deleteCircleKeys(circleId);
+    deleteCirclePhotoFiles(circleId);
   }
-  await forgetAccountKeypair();
+  if (profile) await forgetAccountKeypair(profile.accountId);
   await deleteAuthToken();
   await resetAllLocalData();
   // The next sign-in's own avatar colour would otherwise keep showing this

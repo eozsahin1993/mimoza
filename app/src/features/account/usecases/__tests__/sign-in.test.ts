@@ -27,7 +27,7 @@ const RELAY_PROFILE = { accountId: 'acc-1', name: '', createdAt: 0 };
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  await forgetAccountKeypair();
+  await forgetAccountKeypair(RELAY_PROFILE.accountId);
   (relaySignInWithGoogle as jest.Mock).mockResolvedValue('session-token');
   (getProfile as jest.Mock).mockResolvedValue({ ...RELAY_PROFILE });
   (publishPublicKey as jest.Mock).mockResolvedValue({ awaitingRewrap: [] });
@@ -44,17 +44,31 @@ describe('publishing the account keypair', () => {
   test('a device with no keypair mints one and publishes it as a reset', async () => {
     await signInWithGoogle();
 
-    const keypair = await getAccountKeypair();
+    const keypair = await getAccountKeypair(RELAY_PROFILE.accountId);
     expect(keypair).not.toBeNull();
     const [publishedKey, reset] = (publishPublicKey as jest.Mock).mock.calls[0];
     expect(reset).toBe(true);
     expect(typeof publishedKey).toBe('string');
   });
 
+  // A restore reading empty before iCloud/Block Store actually delivers
+  // the real key is indistinguishable, locally, from a genuinely lost
+  // key — but the relay already having a publicKey on file is exactly
+  // the signal that there is a real key to wait for. Publishing this as
+  // a reset would force every circle this account is in through a
+  // rewrap for a key that was about to show up on its own.
+  test('a fresh mint when the relay already has a key on file is not published as a reset', async () => {
+    (getProfile as jest.Mock).mockResolvedValue({ ...RELAY_PROFILE, publicKey: 'existing-key-on-relay' });
+
+    await signInWithGoogle();
+
+    expect(publishPublicKey).not.toHaveBeenCalled();
+  });
+
   test('a device that already has a keypair matching the relay publishes nothing', async () => {
     await signInWithGoogle();
     (publishPublicKey as jest.Mock).mockClear();
-    const keypair = await getAccountKeypair();
+    const keypair = await getAccountKeypair(RELAY_PROFILE.accountId);
     (getProfile as jest.Mock).mockResolvedValue({
       ...RELAY_PROFILE,
       publicKey: Buffer.from(keypair!.publicKey).toString('base64'),
@@ -93,7 +107,7 @@ describe('publishing the account keypair', () => {
 
     await signInWithApple();
 
-    expect(await getAccountKeypair()).not.toBeNull();
+    expect(await getAccountKeypair(RELAY_PROFILE.accountId)).not.toBeNull();
     expect(publishPublicKey).toHaveBeenCalled();
   });
 });
@@ -104,6 +118,6 @@ test('a cancelled sign-in never touches the keypair', async () => {
   const result = await signInWithGoogle();
 
   expect(result.outcome).toBe('cancelled');
-  expect(await getAccountKeypair()).toBeNull();
+  expect(await getAccountKeypair(RELAY_PROFILE.accountId)).toBeNull();
   expect(publishPublicKey).not.toHaveBeenCalled();
 });
