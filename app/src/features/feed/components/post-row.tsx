@@ -65,8 +65,13 @@ export function usePostRows({
   const actions = useMemo<PostRowActions>(
     () => ({
       onToggleReaction: async (postId, emoji) => {
-        await toggleReaction(circleId, postId, emoji);
-        patchPost(postId, { reactions: await getReactions(postId) });
+        try {
+          await toggleReaction(circleId, postId, emoji);
+          patchPost(postId, { reactions: await getReactions(postId) });
+        } catch (err) {
+          console.error('Failed to toggle reaction', err);
+          showError(i18n.t('post.reactionFailed'));
+        }
       },
       onAddComment: async (postId, body) => {
         const commentId = await commentOnPost(circleId, postId, body);

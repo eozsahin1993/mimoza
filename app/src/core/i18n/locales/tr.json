@@ -319,6 +319,7 @@
     "reactionCount_one": "{{count}} tepki",
     "reactionCount_other": "{{count}} tepki",
     "addReaction": "Tepki ekle",
+    "reactionFailed": "Tepki kaydedilemedi",
     "showAllComments_one": "Yorumu gör",
     "showAllComments_other": "Tüm yorumları gör ({{count}})",
     "addComment": "Yorum ekle",

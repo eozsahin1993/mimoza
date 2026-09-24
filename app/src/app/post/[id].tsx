@@ -152,11 +152,16 @@ export default function PostDetailsScreen() {
 
   async function handleSelectReaction(emoji: string) {
     if (!circleId || !postId) return;
-    await toggleReaction(circleId, postId, emoji);
-    setShowPicker(false);
-    // Re-read rather than patch: summarise already folds the queued tap
-    // into the relay's counts, so this is the same number the wall shows.
-    await load();
+    try {
+      await toggleReaction(circleId, postId, emoji);
+      setShowPicker(false);
+      // Re-read rather than patch: summarise already folds the queued tap
+      // into the relay's counts, so this is the same number the wall shows.
+      await load();
+    } catch (err) {
+      console.error('Failed to toggle reaction', err);
+      showError(t('post.reactionFailed'));
+    }
   }
 
   async function handleToggleAlbum() {

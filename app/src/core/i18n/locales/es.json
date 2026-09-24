@@ -319,6 +319,7 @@
     "reactionCount_one": "{{count}} reacción",
     "reactionCount_other": "{{count}} reacciones",
     "addReaction": "Añadir reacción",
+    "reactionFailed": "No se ha podido guardar la reacción",
     "showAllComments_one": "Ver {{count}} comentario",
     "showAllComments_other": "Ver los {{count}} comentarios",
     "addComment": "Añadir comentario",

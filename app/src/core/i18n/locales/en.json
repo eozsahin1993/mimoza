@@ -319,6 +319,7 @@
     "reactionCount_one": "{{count}} reaction",
     "reactionCount_other": "{{count}} reactions",
     "addReaction": "Add a reaction",
+    "reactionFailed": "Could not save the reaction",
     "showAllComments_one": "Show all {{count}} comment",
     "showAllComments_other": "Show all {{count}} comments",
     "addComment": "Add a comment",
