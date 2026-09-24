@@ -102,11 +102,6 @@ export default function RootLayout() {
     initDatabase()
       .then(() => {
         setDbReady(true);
-        // Best-effort and chained rather than awaited, so it never holds
-        // up the first screen — but it still has to run after the
-        // database is actually ready. Firing it alongside initDatabase()
-        // races push registration's own read against the migrations that
-        // create the tables it reads, on a fresh install.
         enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
       })
       .catch((error) => console.error('Failed to initialize database', error));
