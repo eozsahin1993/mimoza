@@ -20,10 +20,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "aps-environment": "development",
-        "com.apple.security.application-groups": [
-          "group.com.eozsahin.mimoza"
-        ]
+        "aps-environment": "development"
       },
       "buildNumber": "1"
     },

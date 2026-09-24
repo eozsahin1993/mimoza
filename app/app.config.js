@@ -57,21 +57,23 @@ module.exports = ({ config }) => {
   if (!env.idSuffix) return withBuildNumber(withGoogleScheme(withEnv(withPushEnvironment(config), name, env)));
 
   const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
-  const appGroup = `group.${bundleIdentifier}`;
+  // Built from this, not from `config` directly: a plain `...config.ios`
+  // below would silently discard whatever this set on `entitlements`,
+  // since a later key in the same object literal always wins over an
+  // earlier spread — which is exactly what happened here before, and
+  // left every staging/production build registering against the sandbox
+  // APNs regardless of APNS_PRODUCTION.
+  const pushed = withPushEnvironment(config);
 
   return withBuildNumber(withGoogleScheme(withEnv({
-    ...withPushEnvironment(config),
+    ...pushed,
     name: `${config.name}${env.nameSuffix}`,
     scheme: env.scheme,
     icon: env.icon ?? config.icon,
     ios: {
-      ...config.ios,
+      ...pushed.ios,
       icon: env.icon ?? config.ios.icon,
       bundleIdentifier,
-      entitlements: {
-        ...config.ios.entitlements,
-        'com.apple.security.application-groups': [appGroup],
-      },
     },
     android: {
       ...config.android,

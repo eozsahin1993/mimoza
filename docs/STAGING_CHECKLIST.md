@@ -1,8 +1,8 @@
 # Staging build checklist
 
 Cutting an internal build and getting it onto a phone. Staging is a
-separate app, not a flag inside one — its own bundle id, App Group,
-Firebase project and relay (`app/app.config.js`) — so most of what goes
+separate app, not a flag inside one — its own bundle id, Firebase
+project and relay (`app/app.config.js`) — so most of what goes
 wrong here is a build that carries one environment's identity and another
 one's configuration.
 
@@ -51,11 +51,11 @@ rebuild, not a retry.
       generated output; regenerate them rather than editing in place, or
       the fix disappears on the next prebuild.
 - [ ] Confirm the build took staging's identity, not prod's: bundle id
-      `com.eozsahin.mimoza.staging`, App Group
-      `group.com.eozsahin.mimoza.staging`, `google-services.staging.json`
-      (Firebase project `mimoza-staging`). The App Group is the one that
-      matters — a shared group would mean staging reading prod's account
-      keypair and content keys.
+      `com.eozsahin.mimoza.staging`, `google-services.staging.json`
+      (Firebase project `mimoza-staging`). The bundle id is what matters
+      most — iOS keys each app's default Keychain access group to it, so
+      a mismatch is the one thing that would let staging read prod's
+      account keypair and content keys.
 - [ ] iOS: `npm run ios:staging`. Android: `npm run android:staging`.
       Both load `.env.staging` through `dotenv`; a bundler started
       without it now fails the build instead of quietly inlining dev's
