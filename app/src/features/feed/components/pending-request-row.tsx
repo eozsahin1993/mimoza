@@ -23,6 +23,12 @@ type RequestRowActions = {
 
 export type PendingRequestRowsInput = {
   circleId: string;
+  /**
+   * Only admins can list or answer asks — the relay refuses everyone else
+   * with a 403 — so a member's feed never asks. False until the feed's
+   * meta has loaded, which just defers the first read.
+   */
+  ownIsAdmin: boolean;
   /** Approving admits a member, which changes the roster — see the feed controller. */
   onRosterChanged: () => void;
 };
@@ -33,19 +39,26 @@ export type PendingRequestRowsInput = {
  * Create), so scoping this to the invite's own creator would leave the
  * others notified of something they can't see or answer.
  */
-export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequestRowsInput): FeedRows {
+export function usePendingRequestRows({ circleId, ownIsAdmin, onRosterChanged }: PendingRequestRowsInput): FeedRows {
   const { t } = useTranslation();
   const [requests, setRequests] = useState<PendingRequestRow[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!circleId) return;
+    if (!ownIsAdmin) {
+      // A demotion must also take the rows away, or they'd sit there with
+      // approve/deny buttons the relay now refuses. Bails out when already
+      // empty so a member's every feed open isn't a re-render.
+      setRequests((current) => (current.length === 0 ? current : []));
+      return;
+    }
     try {
       setRequests(await discoverPendingRequests(circleId));
     } catch (err) {
       console.error('Failed to load pending join requests', err);
     }
-  }, [circleId]);
+  }, [circleId, ownIsAdmin]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

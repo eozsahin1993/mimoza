@@ -150,7 +150,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     [circleId, patchPost],
   );
 
-  const requests = usePendingRequestRows({ circleId, onRosterChanged: reload });
+  const requests = usePendingRequestRows({ circleId, ownIsAdmin: feed?.meta.ownIsAdmin ?? false, onRosterChanged: reload });
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
   const language = useLanguage();
   const posts = usePostRows({
