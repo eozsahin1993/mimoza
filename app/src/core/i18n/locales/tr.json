@@ -362,6 +362,8 @@
     "justJoinedBody": "İçerikler birazdan gelecek.",
     "approveRequestFailed": "Katılma isteği onaylanamadı",
     "denyRequestFailed": "Katılma isteği reddedilemedi",
+    "requestGoneTitle": "Çoktan yanıtlanmış",
+    "requestGoneMessage": "Bu istek çoktan yanıtlanmış.",
     "refreshFailed": "Akış yenilenemedi",
     "membership": {
       "created": "{{subject}} bu çevreyi oluşturdu",

@@ -5,8 +5,11 @@ import {
   type NotificationResponse,
 } from 'expo-notifications';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 
 import { initDatabase, getPost } from '@/data/db';
+import { i18n } from '@/core/i18n/i18n';
+import { discoverPendingRequests } from '@/features/invite/usecases/invite-to-circle';
 
 /**
  * Routes a tapped notification to its content. Call once from the root
@@ -37,7 +40,9 @@ export function startPushTapRouting(): void {
 }
 
 /** The push's data fields, from wherever each platform puts them for a delivered, OS-rendered alert. */
-function tapData(response: NotificationResponse): { circleId?: string; entryId?: string; parentEntryId?: string } {
+function tapData(
+  response: NotificationResponse
+): { circleId?: string; entryId?: string; parentEntryId?: string; requestId?: string } {
   const content = response.notification.request.content;
   const trigger = response.notification.request.trigger as { payload?: Record<string, unknown> } | null;
   const data = (content.data ?? trigger?.payload ?? {}) as Record<string, unknown>;
@@ -45,6 +50,7 @@ function tapData(response: NotificationResponse): { circleId?: string; entryId?:
     circleId: typeof data.circleId === 'string' ? data.circleId : undefined,
     entryId: typeof data.entryId === 'string' ? data.entryId : undefined,
     parentEntryId: typeof data.parentEntryId === 'string' ? data.parentEntryId : undefined,
+    requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
   };
 }
 
@@ -53,7 +59,7 @@ async function openDestination(response: NotificationResponse): Promise<void> {
     // A cold start by tap may run before anything else opened the database.
     await initDatabase();
 
-    const { circleId, entryId, parentEntryId } = tapData(response);
+    const { circleId, entryId, parentEntryId, requestId } = tapData(response);
     if (!circleId) return;
 
     // The feed goes under the post so back walks post -> feed -> wherever
@@ -68,6 +74,17 @@ async function openDestination(response: NotificationResponse): Promise<void> {
     const postId = parentEntryId ?? entryId;
     if (postId && (await getPost(postId))) {
       router.push({ pathname: '/post/[id]', params: { id: postId, circleId } });
+    }
+
+    // A join-request notification can outlive the request it's about —
+    // another admin may have already approved or denied it by the time
+    // this one is tapped. The feed simply won't show that row any more;
+    // say so, rather than leaving whoever tapped it looking for it.
+    if (requestId) {
+      const stillPending = (await discoverPendingRequests(circleId)).some((request) => request.requestId === requestId);
+      if (!stillPending) {
+        Alert.alert(i18n.t('feed.requestGoneTitle'), i18n.t('feed.requestGoneMessage'));
+      }
     }
   } catch (err) {
     console.error('Failed to open a notification', err);
