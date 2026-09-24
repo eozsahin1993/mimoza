@@ -3,7 +3,7 @@ import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useFonts } from 'expo-font';
-import { setNotificationHandler } from 'expo-notifications';
+import { AndroidNotificationPriority, setNotificationHandler } from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -36,10 +36,11 @@ SplashScreen.preventAutoHideAsync();
 // a notification can arrive before RootLayout's first effect runs.
 setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,
+    shouldShowBanner: false,
     shouldShowList: true,
-    shouldPlaySound: true,
+    shouldPlaySound: false,
     shouldSetBadge: true,
+    priority: AndroidNotificationPriority.DEFAULT,
   }),
 });
 
