@@ -153,7 +153,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		deleteAccountService.RevokeApple = deps.AppleID.Revoke
 	}
 	deletion.Register(mux, deleteAccountService, func(h http.Handler) http.Handler {
-		return auth.RequireSession(deps.Auth, h)
+		return auth.RequireSession(deps.Auth, writeLimit(h))
 	})
 
 	google.Register(mux, &google.Service{AuthStore: deps.Auth, Verifier: deps.Google, Accounts: deps.Accounts})
