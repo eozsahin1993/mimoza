@@ -79,6 +79,19 @@ test('a member who comes back is present again', async () => {
   expect((await getMember(circle, 'acc-1'))?.leftAt).toBeNull();
 });
 
+// A stale joinedAt would make the next departure look like the one being
+// replayed from before this rejoin, per SYNC_DESIGN.md's use of joinedAt
+// to tell a stale "left" activity entry apart from a real one.
+test('a member who comes back gets their new joinedAt, not the old one', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1', { joinedAt: NOW })], NOW);
+  await applyRoster(circle, [], NOW + 100);
+  await applyRoster(circle, [member('acc-1', { joinedAt: NOW + 200 })], NOW + 200);
+
+  expect((await getMember(circle, 'acc-1'))?.joinedAt).toBe(NOW + 200);
+});
+
 // A deleted account never appears on a roster again, so the name comes
 // from the activity row that recorded it.
 test('a departed account can be remembered by name alone', async () => {

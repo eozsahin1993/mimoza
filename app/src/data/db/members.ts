@@ -27,6 +27,7 @@ export async function applyRoster(circleId: string, roster: NewMember[], now: nu
           publicKey: member.publicKey,
           role: member.role,
           needsRewrap: member.needsRewrap ?? false,
+          joinedAt: member.joinedAt,
           leftAt: null,
         },
       });
