@@ -81,6 +81,8 @@ func AWSDeps(cfg config.Config, awsCfg aws.Config) Deps {
 
 	// Each sender gates on its own platform, so calling both is a no-op
 	// for whichever one a device is not on.
+	logCredentialSource("android push (FCM)", cfg.FCMCredentialFile, cfg.FCMCredentialParameter)
+	logCredentialSource("ios push (APNs)", cfg.APNSAuthKeyFile, cfg.APNSAuthKeyParameter)
 	toAndroid := fcm.NewSender(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile)
 	toIOS := apns.NewSender(awsCfg, cfg.APNSAuthKeyParameter, cfg.APNSAuthKeyFile, cfg.APNSKeyID, cfg.APNSTeamID, cfg.APNSTopic, cfg.APNSProduction)
 	send := func(ctx context.Context, token, platform string, message push.Message) error {
