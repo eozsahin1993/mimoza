@@ -89,10 +89,7 @@ export function Avatar({ size = 44, ringColor, uri, name, colorSeed, radius }: A
         <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(colorSeed ?? name) }]}>
           {/* No scheme here, unlike the hatch: see AvatarTints. Font
               scaling off because the disc can't grow with it. */}
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={[styles.initialsText, { fontSize: Math.round(size * 0.4), lineHeight: Math.round(size * 0.4 * 1.15) }]}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.initialsText, { fontSize: Math.round(size * 0.4) }]}>
             {initials}
           </Text>
         </View>
@@ -115,5 +112,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansSemiBold,
     // Two capitals set tight read as one glyph at 34px.
     letterSpacing: 0.5,
+    // No explicit lineHeight: Outfit's box sits high in an inflated one
+    // on iOS, off-centering the initials in the circle.
   },
 });
