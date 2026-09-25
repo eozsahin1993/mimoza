@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
 import { activity, circles, posts } from '@/data/db/schema';
@@ -100,19 +100,32 @@ export async function markCircleViewed(circleId: string, at: number): Promise<vo
   await db.update(circles).set({ lastViewedAt: at }).where(eq(circles.id, circleId));
 }
 
-/** Posts and activity newer than the last time this circle was opened. */
-export async function getUnreadCount(circleId: string): Promise<number> {
+/**
+ * Posts and activity newer than the last time this circle was opened,
+ * excluding this account's own — posting or renaming a circle yourself is
+ * not news to you, and would otherwise badge a circle you just touched.
+ */
+export async function getUnreadCount(circleId: string, myAccountId: string): Promise<number> {
   const circle = await getCircle(circleId);
   if (!circle) return 0;
 
   const [newPosts] = await db
     .select({ n: sql<number>`count(*)` })
     .from(posts)
-    .where(and(eq(posts.circleId, circleId), gt(posts.createdAt, circle.lastViewedAt), isNull(posts.deletedAt)));
+    .where(
+      and(
+        eq(posts.circleId, circleId),
+        gt(posts.createdAt, circle.lastViewedAt),
+        isNull(posts.deletedAt),
+        ne(posts.authorId, myAccountId)
+      )
+    );
   const [newActivity] = await db
     .select({ n: sql<number>`count(*)` })
     .from(activity)
-    .where(and(eq(activity.circleId, circleId), gt(activity.receivedAt, circle.lastViewedAt)));
+    .where(
+      and(eq(activity.circleId, circleId), gt(activity.receivedAt, circle.lastViewedAt), ne(activity.actorId, myAccountId))
+    );
 
   return (newPosts?.n ?? 0) + (newActivity?.n ?? 0);
 }

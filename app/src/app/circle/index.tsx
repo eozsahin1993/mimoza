@@ -62,12 +62,11 @@ type CircleListItem = Circle & {
 };
 
 /**
- * The unread badge's count — 0 (not shown at all) whenever this device has
- * Everything newer than the last time this circle was opened — posts and
- * roster changes alike, which is what the row's dot counts.
+ * The badge's count: posts and roster changes since this circle was last
+ * opened, minus this account's own — see getUnreadCount.
  */
-async function resolveUnreadCount(circle: Circle): Promise<number> {
-  return getUnreadCount(circle.id);
+async function resolveUnreadCount(circle: Circle, myAccountId: string): Promise<number> {
+  return getUnreadCount(circle.id, myAccountId);
 }
 
 export default function CircleListScreen() {
@@ -103,6 +102,11 @@ export default function CircleListScreen() {
     const profile = await getProfile();
     setAvatarUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
     setProfileName(profile?.name);
+    // Empty rather than skipping the load: every current path into this
+    // screen saves a local profile first, so this never actually matches
+    // an authorId/actorId, but the list still has to render if it somehow
+    // ran ahead of that.
+    const myAccountId = profile?.accountId ?? '';
 
     // listCircles rather than getAllCircles: the latter is select(), so it
     // drags every circle's cover blob into JS on each focus. See circles.ts.
@@ -112,7 +116,7 @@ export default function CircleListScreen() {
         const [memberCount, photoUri, newCount, newest] = await Promise.all([
           countMembers(circle.id),
           resolveCircleCoverUri(circle.id),
-          resolveUnreadCount(circle),
+          resolveUnreadCount(circle, myAccountId),
           getFeed(circle.id, 1),
         ]);
         // The newest post's own clock, for the row's timestamp. The

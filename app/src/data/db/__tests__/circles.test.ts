@@ -106,10 +106,47 @@ test('unread counts posts and activity since the last look', async () => {
     receivedAt: NOW + 200,
   });
 
-  expect(await getUnreadCount(circle)).toBe(2);
+  expect(await getUnreadCount(circle, 'me')).toBe(2);
 
   await markCircleViewed(circle, NOW + 300);
-  expect(await getUnreadCount(circle)).toBe(0);
+  expect(await getUnreadCount(circle, 'me')).toBe(0);
+});
+
+// Posting a photo or renaming the circle yourself is not news to you —
+// without this, every action you take badges your own circle.
+test('unread excludes this account\'s own posts and activity', async () => {
+  const circle = circleId();
+  await applyCircle(membership(circle), NOW);
+  await markCircleViewed(circle, NOW);
+
+  await applyPost({
+    id: 'post-mine',
+    circleId: circle,
+    authorId: 'me',
+    caption: 'mine',
+    createdAt: NOW + 100,
+    receivedAt: NOW + 100,
+  });
+  await insertActivity({
+    id: 'activity-mine',
+    circleId: circle,
+    event: 'renamed',
+    actorId: 'me',
+    receivedAt: NOW + 100,
+  });
+
+  expect(await getUnreadCount(circle, 'me')).toBe(0);
+
+  await applyPost({
+    id: 'post-theirs',
+    circleId: circle,
+    authorId: 'acc-2',
+    caption: 'theirs',
+    createdAt: NOW + 200,
+    receivedAt: NOW + 200,
+  });
+
+  expect(await getUnreadCount(circle, 'me')).toBe(1);
 });
 
 // A deleted post is still a row, so it must not be counted as news.
@@ -127,7 +164,7 @@ test('a deleted post does not count as unread', async () => {
     deletedAt: NOW + 150,
   });
 
-  expect(await getUnreadCount(circle)).toBe(0);
+  expect(await getUnreadCount(circle, 'me')).toBe(0);
 });
 
 test('deleting a circle takes its rows with it', async () => {
