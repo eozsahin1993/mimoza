@@ -59,7 +59,6 @@ export type CircleFeedController = {
 
 /** Everything paginated so far, accumulated across `loadMore` calls. */
 type LoadedFeed = {
-  meta: CircleFeedMeta;
   posts: FeedPostView[];
   events: MemberEvent[];
   cursor: FeedCursor | null;
@@ -78,6 +77,7 @@ type LoadedFeed = {
  * else in the feed changes, and nothing here grows a branch.
  */
 export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): CircleFeedController {
+  const [meta, setMeta] = useState<CircleFeedMeta | null>(null);
   const [feed, setFeed] = useState<LoadedFeed | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -107,9 +107,10 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
 
   const reload = useCallback(async () => {
     if (!circleId) return;
-    const meta = await loadCircleFeedMeta(circleId);
-    const page = await loadCircleFeedPage(circleId, meta, null);
-    setFeed({ meta, posts: page.posts, events: page.events, cursor: page.nextCursor });
+    const freshMeta = await loadCircleFeedMeta(circleId);
+    setMeta(freshMeta);
+    const page = await loadCircleFeedPage(circleId, freshMeta, null);
+    setFeed({ posts: page.posts, events: page.events, cursor: page.nextCursor });
     // Whichever kinds own state the feed's read doesn't cover refresh it
     // themselves — this doesn't need to know which those are.
     sourcesRef.current.forEach((source) => source.reload?.());
@@ -123,10 +124,10 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
    * beyond what's already on screen.
    */
   const loadMore = useCallback(async () => {
-    if (!circleId || !feed || feed.cursor === null || loadingMore) return;
+    if (!circleId || !meta || !feed || feed.cursor === null || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await loadCircleFeedPage(circleId, feed.meta, feed.cursor);
+      const page = await loadCircleFeedPage(circleId, meta, feed.cursor);
       setFeed((current) =>
         current
           ? { ...current, posts: [...current.posts, ...page.posts], events: mergeEvents(current.events, page.events), cursor: page.nextCursor }
@@ -137,7 +138,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     } finally {
       setLoadingMore(false);
     }
-  }, [circleId, feed, loadingMore]);
+  }, [circleId, meta, feed, loadingMore]);
 
   // A photo landing while its placeholder is on screen patches that one
   // row rather than reloading — a backlog of many photos landing one by
@@ -150,16 +151,16 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     [circleId, patchPost],
   );
 
-  const requests = usePendingRequestRows({ circleId, ownIsAdmin: feed?.meta.ownIsAdmin ?? false, onRosterChanged: reload });
+  const requests = usePendingRequestRows({ circleId, ownIsAdmin: meta?.ownIsAdmin ?? false, onRosterChanged: reload });
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
   const language = useLanguage();
   const posts = usePostRows({
     circleId,
     patchPost,
     posts: feed?.posts ?? [],
-    profile: feed?.meta.profile ?? null,
-    ownPublicKey: feed?.meta.ownPublicKey ?? null,
-    ownIsAdmin: feed?.meta.ownIsAdmin ?? false,
+    profile: meta?.profile ?? null,
+    ownPublicKey: meta?.ownPublicKey ?? null,
+    ownIsAdmin: meta?.ownIsAdmin ?? false,
     language,
   });
   // The only other thing roster changes share a timeline with — see
@@ -168,7 +169,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
   const rosterChanges = useRosterChangeRows({
     events: feed?.events ?? [],
     postTimestamps,
-    ownPublicKey: feed?.meta.ownPublicKey ?? null,
+    ownPublicKey: meta?.ownPublicKey ?? null,
     language,
   });
 
@@ -217,8 +218,8 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
 
   return {
     rows,
-    circleName: feed?.meta.circleName ?? '',
-    memberCount: feed?.meta.memberCount ?? 0,
+    circleName: meta?.circleName ?? '',
+    memberCount: meta?.memberCount ?? 0,
     loaded: feed !== null,
     refreshing,
     hasMore: feed !== null && feed.cursor !== null,
