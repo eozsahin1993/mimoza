@@ -32,6 +32,7 @@ import {
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { takePendingInviteCode } from '@/features/invite/services/pending-invite';
 import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative } from '@/core/utils/time';
@@ -75,6 +76,7 @@ async function resolveUnreadCount(circle: Circle, myAccountId: string): Promise<
 export default function CircleListScreen() {
   const { t } = useTranslation();
   const language = useLanguage();
+  const theme = useTheme();
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   // Only for the header avatar's initials — the name isn't shown here.
   const [profileName, setProfileName] = useState<string | undefined>();
@@ -261,7 +263,14 @@ export default function CircleListScreen() {
         <FlatList
           data={loaded ? items : []}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.accent}
+              colors={[theme.accent]}
+            />
+          }
           keyExtractor={(item) => item.key}
           ListHeaderComponent={<PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />}
           contentContainerStyle={styles.list}

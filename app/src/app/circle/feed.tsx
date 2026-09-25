@@ -96,7 +96,14 @@ export default function FeedScreen() {
         <FlatList
           data={rows}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refresh}
+              tintColor={theme.accent}
+              colors={[theme.accent]}
+            />
+          }
           keyExtractor={(row) => row.key}
           renderItem={({ item }) => item.render()}
           stickyHeaderIndices={stickyIndices(rows)}
