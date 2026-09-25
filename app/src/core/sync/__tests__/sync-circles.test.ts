@@ -171,6 +171,32 @@ describe('a sync pass', () => {
     expect(posts.walkEntries).toHaveBeenCalledTimes(2);
   });
 
+  // Pull-to-refresh's whole point is not trusting the relay's version
+  // hints — a write that forgets to bump one (as a delete once did)
+  // would otherwise leave a manual refresh just as blind as the
+  // background pass it's meant to be a fallback for.
+  test('force walks posts and activity even when lastEntryAt has not moved', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { lastEntryAt: NOW })], requests: [] });
+    await syncCircles();
+    posts.walkEntries.mockClear();
+
+    await syncCircles({ force: true });
+
+    expect(posts.walkEntries).toHaveBeenCalledTimes(2);
+  });
+
+  test('force refetches the roster even when neither version moved', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+    await syncCircles();
+    relay.getRoster.mockClear();
+
+    await syncCircles({ force: true });
+
+    expect(relay.getRoster).toHaveBeenCalledWith(id);
+  });
+
   // Departures set leftAt rather than deleting, so a post by someone who
   // has gone still resolves to a name.
   test('a member who left the roster is kept, marked as gone', async () => {

@@ -124,6 +124,7 @@ func (s *Store) DeleteComment(ctx context.Context, circleID, postID, commentID, 
 					ConditionExpression:       aws.String("attribute_exists(sk)"),
 					ExpressionAttributeValues: values,
 				}},
+				{Update: s.TouchCircle(circleID, now)},
 			},
 		})
 		return err

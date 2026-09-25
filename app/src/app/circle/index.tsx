@@ -224,7 +224,7 @@ export default function CircleListScreen() {
       // it used to be the one gesture that couldn't complete a join.
       await completePendingJoins().catch((err) => console.error('Failed to complete pending joins', err));
 
-      const failed = await syncCircles();
+      const failed = await syncCircles({ force: true });
       nudgePhotoQueue();
       if (failed > 0) showError(t('circle.list.refreshFailed'));
     } finally {

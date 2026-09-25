@@ -55,19 +55,27 @@ func (s *Store) PutPost(ctx context.Context, circleID string, entry circles.Entr
 
 func (s *Store) SetVisibility(ctx context.Context, circleID, postID, visibility string) (circles.Entry, error) {
 	now := s.Now()
-	_, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(s.Name),
-		Key:       s.Key(dynamo.CirclePK(circleID), dynamo.EntryKey(postID)),
-		UpdateExpression: aws.String("SET " + dynamo.AttrVisibility + " = :visibility, " + dynamo.AttrUpdatedAt + " = :now, " +
-			dynamo.ByTypeUpdatedKey + " = :key"),
-		ConditionExpression: aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":visibility": dynamoutil.Str(visibility),
-			":now":        dynamoutil.Millis(now),
-			":key":        dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
-		},
+	err := dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{Update: &types.Update{
+					TableName: aws.String(s.Name),
+					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.EntryKey(postID)),
+					UpdateExpression: aws.String("SET " + dynamo.AttrVisibility + " = :visibility, " + dynamo.AttrUpdatedAt + " = :now, " +
+						dynamo.ByTypeUpdatedKey + " = :key"),
+					ConditionExpression: aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
+					ExpressionAttributeValues: map[string]types.AttributeValue{
+						":visibility": dynamoutil.Str(visibility),
+						":now":        dynamoutil.Millis(now),
+						":key":        dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
+					},
+				}},
+				{Update: s.TouchCircle(circleID, now)},
+			},
+		})
+		return err
 	})
-	if dynamoutil.ConditionFailed(err) {
+	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		return circles.Entry{}, circles.ErrEntryNotFound
 	}
 	if err != nil {
@@ -81,21 +89,29 @@ func (s *Store) SetVisibility(ctx context.Context, circleID, postID, visibility 
 // through the same walk everything else does.
 func (s *Store) DeletePost(ctx context.Context, circleID, postID string) (circles.Entry, error) {
 	now := s.Now()
-	_, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(s.Name),
-		Key:       s.Key(dynamo.CirclePK(circleID), dynamo.EntryKey(postID)),
-		UpdateExpression: aws.String("SET " + dynamo.AttrDeletedAt + " = :now, " + dynamo.AttrUpdatedAt + " = :now, " +
-			dynamo.ByTypeUpdatedKey + " = :key REMOVE " + dynamo.AttrCiphertext),
-		// Not already deleted: without this a repeat restamps deletedAt
-		// and the forward index key, which pushes a post nobody can read
-		// back to the head of every device's walk.
-		ConditionExpression: aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":now": dynamoutil.Millis(now),
-			":key": dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
-		},
+	err := dynamo.WithRetry(func() error {
+		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{Update: &types.Update{
+					TableName: aws.String(s.Name),
+					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.EntryKey(postID)),
+					UpdateExpression: aws.String("SET " + dynamo.AttrDeletedAt + " = :now, " + dynamo.AttrUpdatedAt + " = :now, " +
+						dynamo.ByTypeUpdatedKey + " = :key REMOVE " + dynamo.AttrCiphertext),
+					// Not already deleted: without this a repeat restamps deletedAt
+					// and the forward index key, which pushes a post nobody can read
+					// back to the head of every device's walk.
+					ConditionExpression: aws.String("attribute_exists(sk) AND attribute_not_exists(" + dynamo.AttrDeletedAt + ")"),
+					ExpressionAttributeValues: map[string]types.AttributeValue{
+						":now": dynamoutil.Millis(now),
+						":key": dynamoutil.Str(circles.IndexKey(circles.TypePost, now, postID)),
+					},
+				}},
+				{Update: s.TouchCircle(circleID, now)},
+			},
+		})
+		return err
 	})
-	if dynamoutil.ConditionFailed(err) {
+	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
 		// Either it was never there, or it is already gone — and a
 		// repeated deletion is the outcome the caller asked for.
 		return s.GetPost(ctx, circleID, postID, "")

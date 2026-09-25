@@ -59,6 +59,80 @@ func TestDeletePost_IsIdempotent(t *testing.T) {
 	}
 }
 
+// Other devices only walk a circle's posts when its lastEntryAt moves
+// (see sync-circles.ts on the client) — so a delete that doesn't bump it
+// is invisible to everyone but the deleter, however correctly the row
+// itself was written.
+func TestDeletePost_MovesTheCirclesLastEntryAt(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	store := posts.NewStore(table)
+
+	circleID := testsupport.UniqueCircleID(t)
+	author := testsupport.UniqueAccountID(t)
+	seedCircle(t, table, circleID, author)
+
+	if _, err := store.PutPost(ctx, circleID, circles.Entry{
+		ID: "post-1", AuthorID: author, KeyVersion: 1, Ciphertext: []byte("caption"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterPut, err := table.GetCircle(ctx, circleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table.Now = func() time.Time { return time.Now().Add(time.Hour) }
+	if _, err := store.DeletePost(ctx, circleID, "post-1"); err != nil {
+		t.Fatal(err)
+	}
+
+	afterDelete, err := table.GetCircle(ctx, circleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !afterDelete.LastEntryAt.After(afterPut.LastEntryAt) {
+		t.Fatalf("lastEntryAt did not move on delete: still %v (was %v) — other members' sync would never walk this circle's posts and would keep the deleted post",
+			afterDelete.LastEntryAt, afterPut.LastEntryAt)
+	}
+}
+
+// Moving a post to or from the album is a write like any other that
+// should reach every member's next walk.
+func TestSetVisibility_MovesTheCirclesLastEntryAt(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	store := posts.NewStore(table)
+
+	circleID := testsupport.UniqueCircleID(t)
+	author := testsupport.UniqueAccountID(t)
+	seedCircle(t, table, circleID, author)
+
+	if _, err := store.PutPost(ctx, circleID, circles.Entry{
+		ID: "post-1", AuthorID: author, KeyVersion: 1, Ciphertext: []byte("caption"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterPut, err := table.GetCircle(ctx, circleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table.Now = func() time.Time { return time.Now().Add(time.Hour) }
+	if _, err := store.SetVisibility(ctx, circleID, "post-1", "album"); err != nil {
+		t.Fatal(err)
+	}
+
+	afterVisibility, err := table.GetCircle(ctx, circleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !afterVisibility.LastEntryAt.After(afterPut.LastEntryAt) {
+		t.Fatalf("lastEntryAt did not move on a visibility change: still %v (was %v)",
+			afterVisibility.LastEntryAt, afterPut.LastEntryAt)
+	}
+}
+
 // A post that never existed is still nothing to delete.
 func TestDeletePost_OnAPostThatWasNeverThere(t *testing.T) {
 	ctx := context.Background()

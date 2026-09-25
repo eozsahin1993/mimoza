@@ -23,6 +23,14 @@ import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getRoster, listCircles, type Circle } from '@/features/circle/services/circle-relay';
 import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-exchange';
 
+export type SyncOptions = {
+  /**
+   * Pull-to-refresh's escape hatch: walk roster and entries regardless
+   * of what the relay's version hints say moved. 
+   */
+  force?: boolean;
+};
+
 /**
  * What a sync is now: ask the relay what this account is in, take the
  * roster and keys for anything that moved, push what is queued, then
@@ -32,7 +40,7 @@ import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-excha
  * verify — a pass is a handful of reads whose results are written
  * straight down.
  */
-export async function syncCircles(): Promise<number> {
+export async function syncCircles(options: SyncOptions = {}): Promise<number> {
   // Sign-in saves the auth token before profile setup writes this row, and
   // the scheduler's only gate is the token — so a pass can land in that
   // gap. Nothing below can run without knowing which account this device
@@ -71,7 +79,7 @@ export async function syncCircles(): Promise<number> {
   let failed = 0;
   for (const circle of circles) {
     try {
-      await syncCircle(circle, now, profile.accountId);
+      await syncCircle(circle, now, profile.accountId, options.force ?? false);
     } catch (err) {
       console.error(`Failed to sync circle ${circle.circleId}`, err);
       failed += 1;
@@ -90,11 +98,12 @@ export async function syncCircles(): Promise<number> {
  * a page encrypted under a version this device has not been given yet
  * would be skipped and never revisited — cursors do not rewind.
  */
-async function syncCircle(circle: Circle, now: number, myAccountId: string): Promise<void> {
+async function syncCircle(circle: Circle, now: number, myAccountId: string, force: boolean): Promise<void> {
   const before = await getCircle(circle.circleId);
   await applyCircle(circle, now);
 
   const rosterMoved =
+    force ||
     !before ||
     before.rosterVersion !== circle.rosterVersion ||
     before.keyVersion !== circle.keyVersion;
@@ -164,7 +173,7 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string): Pro
   // lastEntryAt rides on every post, comment, reaction, roster and meta
   // write (see the relay's TouchCircle) — unchanged means nothing here
   // needs a page walked, so this is what skips the two calls below.
-  const entriesMoved = !before || before.lastEntryAt !== (circle.lastEntryAt ?? 0);
+  const entriesMoved = force || !before || before.lastEntryAt !== (circle.lastEntryAt ?? 0);
   if (!entriesMoved) return;
 
   const ctx = await entryContext(circle.circleId);

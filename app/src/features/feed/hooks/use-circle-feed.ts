@@ -202,7 +202,9 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     try {
       // Account-wide now — the relay owns membership, so a sync pass is
       // every circle at once rather than one this screen could target.
-      await syncCircles();
+      // Forced: an explicit pull is the user saying the relay's version
+      // hints aren't trusted, so this walks regardless of what moved.
+      await syncCircles({ force: true });
       nudgePhotoQueue();
     } catch (err) {
       // Reported, then re-read below anyway: a pull that couldn't reach

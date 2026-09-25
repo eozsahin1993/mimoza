@@ -78,6 +78,44 @@ func TestDeleteComment_TheDeletingAccountStillSeesItsOwnState(t *testing.T) {
 	}
 }
 
+func TestDeleteComment_MovesTheCirclesLastEntryAt(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	postStore, commentStore := posts.NewStore(table), comments.NewStore(table)
+
+	circleID := testsupport.UniqueCircleID(t)
+	author := testsupport.UniqueAccountID(t)
+	seedCircle(t, table, circleID, author)
+
+	post, err := postStore.PutPost(ctx, circleID, circles.Entry{ID: "post-1", AuthorID: author, KeyVersion: 1, Ciphertext: []byte("x")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := commentStore.AddComment(ctx, circleID, circles.Comment{
+		ID: "comment-1", PostID: post.ID, AuthorID: author, KeyVersion: 1, Ciphertext: []byte("hi"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterAdd, err := table.GetCircle(ctx, circleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table.Now = func() time.Time { return time.Now().Add(time.Hour) }
+	if _, err := commentStore.DeleteComment(ctx, circleID, post.ID, "comment-1", author); err != nil {
+		t.Fatal(err)
+	}
+
+	afterDelete, err := table.GetCircle(ctx, circleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !afterDelete.LastEntryAt.After(afterAdd.LastEntryAt) {
+		t.Fatalf("lastEntryAt did not move on a comment delete: still %v (was %v)",
+			afterDelete.LastEntryAt, afterAdd.LastEntryAt)
+	}
+}
+
 func seedCircle(t *testing.T, table *dynamo.Table, circleID, founder string) {
 	t.Helper()
 	err := circle.NewStore(table).CreateCircle(context.Background(), circles.Circle{
