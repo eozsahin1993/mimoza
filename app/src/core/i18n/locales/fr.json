@@ -473,7 +473,7 @@
     },
     "request": {
       "someone": "Quelqu’un",
-      "tappedLink": "A ouvert ton lien · {{ago}}",
+      "wantsToJoin": "Veut rejoindre",
       "letIn": "Laisser entrer",
       "notNow": "Pas maintenant"
     }

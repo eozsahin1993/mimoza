@@ -473,7 +473,7 @@
     },
     "request": {
       "someone": "Biri",
-      "tappedLink": "Bağlantına dokundu · {{ago}}",
+      "wantsToJoin": "Katılmak istiyor",
       "letIn": "Kabul et",
       "notNow": "Şimdi değil"
     }
