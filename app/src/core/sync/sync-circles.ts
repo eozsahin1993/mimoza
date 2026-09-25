@@ -161,6 +161,12 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string): Pro
 
   await timed('sync.push', () => drainOutbox(circle.circleId));
 
+  // lastEntryAt rides on every post, comment, reaction, roster and meta
+  // write (see the relay's TouchCircle) — unchanged means nothing here
+  // needs a page walked, so this is what skips the two calls below.
+  const entriesMoved = !before || before.lastEntryAt !== (circle.lastEntryAt ?? 0);
+  if (!entriesMoved) return;
+
   const ctx = await entryContext(circle.circleId);
   if (!ctx) return;
   await timed('sync.posts', () => pullNewEntries(ctx, 'post'));

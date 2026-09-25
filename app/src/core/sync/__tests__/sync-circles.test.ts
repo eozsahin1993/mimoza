@@ -48,6 +48,9 @@ const keys = jest.requireMock('@/features/circle/usecases/key-exchange') as {
 const circleKeys = jest.requireMock('@/core/services/keystore/circle-keys') as {
   getCircleKeyMap: jest.Mock;
 };
+const posts = jest.requireMock('@/features/post/services/post-relay') as {
+  walkEntries: jest.Mock;
+};
 
 const NOW = 1_700_000_000_000;
 
@@ -137,6 +140,35 @@ describe('a sync pass', () => {
     await syncCircles();
 
     expect(relay.getRoster).toHaveBeenCalledTimes(1);
+  });
+
+  // lastEntryAt rides on every post, comment, reaction, roster and meta
+  // write, so an unmoved value is the relay saying nothing happened here
+  // at all — walking the post/activity streams would just come back
+  // empty, same as this test's mock always does, but at the cost of two
+  // requests this pass had no reason to make.
+  test('does not walk posts or activity when lastEntryAt has not moved', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { lastEntryAt: NOW })], requests: [] });
+    await syncCircles();
+    posts.walkEntries.mockClear();
+
+    await syncCircles();
+
+    expect(posts.walkEntries).not.toHaveBeenCalled();
+  });
+
+  test('walks posts and activity again once lastEntryAt moves', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { lastEntryAt: NOW })], requests: [] });
+    await syncCircles();
+    posts.walkEntries.mockClear();
+
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { lastEntryAt: NOW + 1 })], requests: [] });
+    await syncCircles();
+
+    // Once for 'post', once for 'activity'.
+    expect(posts.walkEntries).toHaveBeenCalledTimes(2);
   });
 
   // Departures set leftAt rather than deleting, so a post by someone who
