@@ -257,6 +257,7 @@ export default function CircleListScreen() {
 
         <FlatList
           data={loaded ? items : []}
+          showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           keyExtractor={(item) => item.key}
           ListHeaderComponent={<PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />}
