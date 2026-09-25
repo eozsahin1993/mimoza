@@ -1,0 +1,32 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.pushlocalization'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.pushlocalization"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Pinned to match expo-notifications' own version exactly (see its
+  // android/build.gradle) — this module wraps that library's classes, so
+  // a drift between the two here would resolve to whichever Gradle picks,
+  // not necessarily either version's actual behavior.
+  implementation 'com.google.firebase:firebase-messaging:25.0.1'
+  // Not `project(':expo-notifications')` — autolinking publishes this one
+  // to the local Maven repo rather than including it as a sibling Gradle
+  // project (see its own entry under `npx expo-modules-autolinking
+  // resolve --platform android --json`), so a project path can't find it.
+  // Pinned to the app's own expo-notifications version (package.json).
+  implementation 'host.exp.exponent:expo.modules.notifications:57.0.17'
+}

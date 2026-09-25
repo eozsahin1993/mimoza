@@ -38,13 +38,17 @@ SplashScreen.preventAutoHideAsync();
 // indistinguishable from push being broken. Set as early as possible, since
 // a notification can arrive before RootLayout's first effect runs.
 setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: false,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: true,
-    priority: AndroidNotificationPriority.DEFAULT,
-  }),
+  handleNotification: async (notification) => {
+    const { title, body } = notification.request.content;
+    const hasContent = !!title || !!body;
+    return {
+      shouldShowBanner: false,
+      shouldShowList: hasContent,
+      shouldPlaySound: false,
+      shouldSetBadge: true,
+      priority: AndroidNotificationPriority.DEFAULT,
+    };
+  },
 });
 
 // Deep-linking straight into a route like join/[code] would otherwise make

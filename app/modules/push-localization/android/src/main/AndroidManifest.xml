@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- No priority set (defaults to 0), ahead of expo-notifications' own
+         declaration of the same MESSAGING_EVENT intent at priority="-1" —
+         see LocalizingFirebaseMessagingService's own doc comment for why. -->
+    <service android:name="expo.modules.pushlocalization.LocalizingFirebaseMessagingService" android:exported="false">
+      <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+      </intent-filter>
+    </service>
+  </application>
+</manifest>
