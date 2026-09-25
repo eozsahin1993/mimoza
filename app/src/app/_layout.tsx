@@ -93,6 +93,7 @@ function AppShell() {
       <Stack
         screenOptions={{
           headerShown: false,
+          animation: 'ios_from_right',
           // iOS 26's scroll-edge material follows the trait collection, not
           // the app's theme — it can render light over a dark screen.
           scrollEdgeEffects: { bottom: 'hidden', top: 'hidden', left: 'hidden', right: 'hidden' },
