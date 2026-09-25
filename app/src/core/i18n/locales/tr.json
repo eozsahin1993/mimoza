@@ -481,7 +481,8 @@
   "ui": {
     "close": "Kapat",
     "photoArriving": "Fotoğraf yükleniyor",
-    "photoUnavailable": "Fotoğraf görüntülenemiyor"
+    "photoUnavailable": "Fotoğraf görüntülenemiyor",
+    "photoUnavailableRetry": "Fotoğraf yüklenemedi. Tekrar denemek için dokun."
   },
   "time": {
     "now": "şimdi",

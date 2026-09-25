@@ -1,5 +1,6 @@
 import {
   AttachmentKinds,
+  clearAttachmentBackoff,
   getFetchableAttachments,
   markAttachmentFailed,
   markAttachmentFetched,
@@ -129,4 +130,23 @@ export async function drainPhotoQueue(budget: DrainBudget = {}): Promise<void> {
     inFlight = null;
   });
   return inFlight;
+}
+
+/**
+ * The one thing a person can do about a photo marked unavailable: skip
+ * the backoff this attachment is currently sitting out and let the queue
+ * try it right now, rather than wait — up to a day, once it has failed
+ * enough times — for the schedule to come back around on its own.
+ *
+ * Awaits only the backoff clearing and the nudge, not the fetch itself —
+ * a caller that wants to know the outcome watches for onPhotoFetched, the
+ * same signal an ordinary background fetch reports through.
+ */
+export async function retryAttachment(circleId: string, entryId: string): Promise<void> {
+  try {
+    await clearAttachmentBackoff(circleId, entryId);
+    nudgePhotoQueue();
+  } catch (err) {
+    console.error(`Failed to queue a retry for ${entryId}`, err);
+  }
 }

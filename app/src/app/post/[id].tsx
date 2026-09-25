@@ -39,6 +39,7 @@ import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { showError, showMessage } from '@/core/services/messages';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { onPhotoFetched } from '@/core/photo/photo-events';
+import { retryAttachment } from '@/core/photo/photo-queue';
 import { formatDay, formatRelative, formatTimestamp } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
 
@@ -255,7 +256,11 @@ export default function PostDetailsScreen() {
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />
             ) : (
-              <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(photoStatus)} />
+              <PhotoPlaceholder
+                style={styles.photo}
+                missing={missingPhotoFor(photoStatus)}
+                onRetry={() => retryAttachment(circleId, postId)}
+              />
             )}
 
             {post ? (

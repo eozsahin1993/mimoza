@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
-import { StyleSheet, View, type ViewProps } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
@@ -32,13 +32,20 @@ export type PhotoPlaceholderProps = ViewProps & {
   missing?: MissingPhoto;
   /** Icon only, for a grid cell too small for a line of text. */
   compact?: boolean;
+  /**
+   * Retries a photo marked unavailable — the queue's own backoff can be
+   * a day long by then, so this is the only way to ask sooner. Has no
+   * effect on 'arriving' (already queued) or in a `compact` cell (no
+   * room to show it's tappable).
+   */
+  onRetry?: () => void;
 };
 
 /**
  * Stand-in for real photo content — diagonal hatch on `surface`. Every image
  * in the app is a placeholder until media upload/decrypt lands.
  */
-export function PhotoPlaceholder({ style, children, missing, compact, ...rest }: PhotoPlaceholderProps) {
+export function PhotoPlaceholder({ style, children, missing, compact, onRetry, ...rest }: PhotoPlaceholderProps) {
   const { t } = useTranslation();
   const { scheme } = useAppSettings();
   const theme = useTheme();
@@ -46,6 +53,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
   // Dark mode's hatch sits on `surface`; light mode has no surface dim
   // enough to read as a slot, hence the dedicated PhotoSlotLight.
   const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
+  const retryable = missing === 'unavailable' && !compact && !!onRetry;
 
   return (
     <View style={[styles.container, { backgroundColor: hatchFill }, style]} {...rest}>
@@ -75,14 +83,23 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
         </Svg>
       </View>
       {missing ? (
-        <View style={styles.note} pointerEvents="none">
-          <Icon icon={NOTES[missing].icon} size={compact ? 15 : 18} color={theme.muted} />
+        // Always a Pressable, retryable or not, so a photo that arrives
+        // mid-download doesn't swap this element's host type out from
+        // under it — disabled plus pointerEvents="none" is inert enough
+        // to be indistinguishable from the plain View this used to be.
+        <Pressable
+          style={styles.note}
+          pointerEvents={retryable ? 'auto' : 'none'}
+          disabled={!retryable}
+          onPress={onRetry}
+          hitSlop={12}>
+          <Icon icon={retryable ? Icons.retryPhoto : NOTES[missing].icon} size={compact ? 15 : 18} color={theme.muted} />
           {compact ? null : (
             <ThemedText type="labelSmall" themeColor="muted">
-              {t(NOTES[missing].label)}
+              {t(retryable ? 'ui.photoUnavailableRetry' : NOTES[missing].label)}
             </ThemedText>
           )}
-        </View>
+        </Pressable>
       ) : null}
       {children}
     </View>

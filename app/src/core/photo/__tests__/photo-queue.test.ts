@@ -8,6 +8,7 @@ import {
   AttachmentStatuses,
   applyCircle,
   applyPost,
+  clearAttachmentBackoff,
   getAttachment,
   getFetchableAttachments,
   initDatabase,
@@ -16,7 +17,7 @@ import {
 import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
 import { getBlob } from '@/core/services/blob-relay';
-import { drainPhotoQueue } from '@/core/photo/photo-queue';
+import { drainPhotoQueue, retryAttachment } from '@/core/photo/photo-queue';
 
 const NOW = 1_700_000_000_000;
 const KEY = new Uint8Array(32).fill(1);
@@ -174,4 +175,37 @@ test('stops at the budget, for a background window that cannot run long', async 
 
   expect((getBlob as jest.Mock).mock.calls.length).toBe(2);
   expect(await getFetchableAttachments(Date.now(), 5)).toHaveLength(1);
+});
+
+// The post screen's manual retry: a photo that failed enough to be
+// backed off for up to a day should not have to wait that out.
+test('clearAttachmentBackoff makes a failed photo fetchable again immediately', async () => {
+  const circleId = await makeCircle();
+  const postId = await makePendingPost(circleId, new Uint8Array([1]), 1000);
+  (getBlob as jest.Mock).mockRejectedValue(new Error('offline'));
+  await drainPhotoQueue();
+  expect(await getFetchableAttachments(Date.now(), 1)).toHaveLength(0);
+
+  await clearAttachmentBackoff(circleId, postId);
+
+  expect(await getFetchableAttachments(Date.now(), 1)).toHaveLength(1);
+});
+
+test('retryAttachment gets a failed photo without waiting for its backoff', async () => {
+  const circleId = await makeCircle();
+  const photo = new Uint8Array([9]);
+  const postId = await makePendingPost(circleId, photo, 1000);
+  (getBlob as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+  await drainPhotoQueue();
+  expect((await getAttachment(circleId, postId))?.status).toBe('failed');
+
+  // Whatever the earlier failure backed it off to is beside the point —
+  // retryAttachment is the one path that doesn't wait it out.
+  (getBlob as jest.Mock).mockResolvedValueOnce(encrypt(photo, KEY));
+  await retryAttachment(circleId, postId);
+  await drainPhotoQueue(); // joins retryAttachment's own nudge if it's still running
+
+  const attachment = await getAttachment(circleId, postId);
+  expect(attachment?.bytes).toEqual(photo);
+  expect(attachment?.status).toBe('fetched');
 });

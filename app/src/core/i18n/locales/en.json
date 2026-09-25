@@ -481,7 +481,8 @@
   "ui": {
     "close": "Close",
     "photoArriving": "Photo on its way",
-    "photoUnavailable": "Photo unavailable"
+    "photoUnavailable": "Photo unavailable",
+    "photoUnavailableRetry": "Photo unavailable. Tap to retry."
   },
   "time": {
     "now": "now",

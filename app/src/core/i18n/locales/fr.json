@@ -481,7 +481,8 @@
   "ui": {
     "close": "Fermer",
     "photoArriving": "Photo en route",
-    "photoUnavailable": "Photo indisponible"
+    "photoUnavailable": "Photo indisponible",
+    "photoUnavailableRetry": "Photo indisponible. Touche pour réessayer."
   },
   "time": {
     "now": "maintenant",

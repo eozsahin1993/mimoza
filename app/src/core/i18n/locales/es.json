@@ -481,7 +481,8 @@
   "ui": {
     "close": "Cerrar",
     "photoArriving": "Foto en camino",
-    "photoUnavailable": "Foto no disponible"
+    "photoUnavailable": "Foto no disponible",
+    "photoUnavailableRetry": "Foto no disponible. Toca para reintentar."
   },
   "time": {
     "now": "ahora",

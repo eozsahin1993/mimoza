@@ -126,6 +126,18 @@ export async function markAttachmentFetched(circleId: string, entryId: string, b
     .where(and(eq(attachments.circleId, circleId), eq(attachments.entryId, entryId)));
 }
 
+/**
+ * Clears a failed attachment's scheduled backoff, so the queue's next
+ * drain treats it as due right away instead of waiting out the delay —
+ * the post screen's manual retry.
+ */
+export async function clearAttachmentBackoff(circleId: string, entryId: string): Promise<void> {
+  await db
+    .update(attachments)
+    .set({ nextAttemptAt: null })
+    .where(and(eq(attachments.circleId, circleId), eq(attachments.entryId, entryId)));
+}
+
 /** Records a failed download attempt and when it may next be retried. */
 export async function markAttachmentFailed(
   circleId: string,

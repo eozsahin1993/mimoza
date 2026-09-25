@@ -481,7 +481,8 @@
   "ui": {
     "close": "Schließen",
     "photoArriving": "Foto ist unterwegs",
-    "photoUnavailable": "Foto nicht verfügbar"
+    "photoUnavailable": "Foto nicht verfügbar",
+    "photoUnavailableRetry": "Foto nicht verfügbar. Zum Wiederholen tippen."
   },
   "time": {
     "now": "jetzt",

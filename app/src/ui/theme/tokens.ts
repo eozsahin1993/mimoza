@@ -263,6 +263,8 @@ export const Icons = {
   photoArriving: CloudDownload,
   /** A photo whose download has failed enough times to stop looking temporary. Also what a failed message is marked with — see `SnackbarHost`. */
   photoUnavailable: CircleAlert,
+  /** A failed photo's manual retry, in the post screen. */
+  retryPhoto: RefreshCw,
   /** A message about the app rather than about something that just happened. */
   notice: Info,
   /** Something asked for has happened — the message confirming a delete, a copy. */
