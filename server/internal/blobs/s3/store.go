@@ -48,7 +48,7 @@ type Downloads interface {
 
 // DefaultMaxBlobSize is the ceiling when an environment sets none. A
 // caller may ask for less, never more.
-const DefaultMaxBlobSize = 2 * 1024 * 1024
+const DefaultMaxBlobSize = 5 * 1024 * 1024
 
 func New(client *s3.Client, bucket string, maxBlobSize int64) *Store {
 	if maxBlobSize <= 0 {

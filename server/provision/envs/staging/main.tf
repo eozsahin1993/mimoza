@@ -29,7 +29,7 @@ module "lambda" {
   # Starting guesses, not measurements — see internal/config. Here rather
   # than in <env>.env so a change to them is a diff someone can review.
   settings = {
-    MAX_BLOB_SIZE_BYTES           = "2097152"
+    MAX_BLOB_SIZE_BYTES           = "5242880"
     INVITE_RETENTION_DAYS         = "7"
     RATE_LIMIT_WRITE_MAX_REQUESTS = "500"
     RATE_LIMIT_READ_MAX_REQUESTS  = "2000"

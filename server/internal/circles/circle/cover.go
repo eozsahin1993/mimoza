@@ -14,7 +14,7 @@ import (
 func coverKey(circleID, coverID string) string { return circleID + "/cover/" + coverID }
 
 // maxCoverSize matches a post's photo: a cover is one.
-const maxCoverSize = 2 * 1024 * 1024
+const maxCoverSize = 5 * 1024 * 1024
 
 type uploadResponse struct {
 	URL    string            `json:"url"`

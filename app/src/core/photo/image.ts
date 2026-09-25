@@ -15,7 +15,7 @@ import { generateUUID } from '@/core/crypto/primitives';
  * views a photo at full camera resolution on a phone screen anyway.
  */
 const MAX_DIMENSION = 1080;
-const JPEG_QUALITY = 0.65;
+const JPEG_QUALITY = 0.85;
 
 /**
  * A small avatar-sized thumbnail — for embedding directly inside an

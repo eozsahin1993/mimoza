@@ -14,7 +14,7 @@ import (
 func photoKey(circleID, postID string) string { return circleID + "/" + postID }
 
 // maxPhotoSize bounds what a client that skips compression can store.
-const maxPhotoSize = 2 * 1024 * 1024
+const maxPhotoSize = 5 * 1024 * 1024
 
 type uploadResponse struct {
 	URL    string            `json:"url"`
