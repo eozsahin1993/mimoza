@@ -40,11 +40,8 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
   const tints = useTints();
   return (
     <Pressable style={[styles.card, { borderColor: tints.cardEdge }]} onPress={onPress}>
-      {photoUri ? (
-        <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      ) : (
-        <PhotoPlaceholder style={StyleSheet.absoluteFill} />
-      )}
+      <PhotoPlaceholder style={StyleSheet.absoluteFill} />
+      {photoUri ? <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
       <LinearGradient colors={SCRIM} locations={[0.4, 1]} style={StyleSheet.absoluteFill} />
 
       {newCount ? (
