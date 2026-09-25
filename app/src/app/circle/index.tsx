@@ -41,6 +41,9 @@ import { showError } from '@/core/services/messages';
 import { syncCircles } from '@/core/sync/sync-circles';
 import { useLanguage } from '@/core/i18n/use-language';
 
+/** Scroll clearance above the FAB — see the same constant on circle/feed.tsx. */
+const LIST_BOTTOM_PADDING = 100;
+
 /**
  * Everything the list shows, headers included, so it is one FlatList that
  * windows every row rather than sections glued around it in header and
@@ -370,7 +373,10 @@ const styles = StyleSheet.create({
     // as tall as its content, leaving the message pinned under the header.
     flexGrow: 1,
     gap: Spacing.cardListGap,
-    paddingBottom: Spacing.cardListGap,
+    // Reserved unconditionally — a full screen of circles must clear the
+    // FAB at the bottom exactly as a short one does, not just enough to
+    // avoid the last row's own padding but the FAB's full footprint.
+    paddingBottom: LIST_BOTTOM_PADDING,
   },
   privacyNotice: {
     paddingHorizontal: Space.s0,
