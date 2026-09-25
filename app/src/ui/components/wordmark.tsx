@@ -1,10 +1,10 @@
 import { type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
+import { Petal } from '@/ui/theme/tokens';
 
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 /** Colours of the app icon's bloom, flattened: a gradient is invisible at this size. */
-const PETAL = '#F0BE3A';
 const HEART = '#FFF3D1';
 const PETAL_ANGLES = [0, 60, 120, 180, 240, 300];
 const DEFAULT_SIZE = 28;
@@ -72,7 +72,7 @@ export function Wordmark({
       <Path d={glyphs.d} fill={color ?? theme.text} />
       {withBloom ? (
         <G transform={`translate(${WITH_BLOOM.bloomX} ${WITH_BLOOM.bloomY}) scale(${WITH_BLOOM.bloomSize / 680})`}>
-          <G fill={PETAL}>
+          <G fill={Petal}>
             {PETAL_ANGLES.map((angle) => (
               <Ellipse key={angle} cy={-178} rx={125} ry={160} transform={`rotate(${angle})`} />
             ))}

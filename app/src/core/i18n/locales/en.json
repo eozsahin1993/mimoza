@@ -200,7 +200,6 @@
     }
   },
   "circle": {
-    "lastAdded": "Last added {{ago}}",
     "peopleCount_one": "{{count}} person",
     "peopleCount_other": "{{count}} people",
     "newCount_one": "{{count}} new",
@@ -208,8 +207,8 @@
     "profileUpdateFailedIn": "Could not update your profile in {{name}}",
     "profileUpdateFailed": "Could not update your profile everywhere",
     "list": {
-      "yourCircles": "Your circles",
-      "waitingToJoin": "Waiting to join · {{count}}",
+      "yourCircles": "Circles",
+      "waitingToJoin": "Waiting to join",
       "cancelPendingTitle": "Stop waiting to join {{name}}?",
       "cancelPendingMessage": "You can ask again with a new key.",
       "keepWaiting": "Keep waiting",
@@ -217,7 +216,10 @@
       "refreshFailed": "Could not refresh your circles",
       "emptyTitle": "No circles yet",
       "emptyBody": "Create one to share memories with the people in it. Circles are invite-only, so open a link someone sent you to join one.",
-      "createCircle": "Create a circle"
+      "createCircle": "Create a circle",
+      "locked": "Locked",
+      "lockedStatus": "Opens when a member is online",
+      "pendingStatus": "Pending"
     },
     "feed": {
       "subtitle_one": "{{count}} person. Tap for details",
@@ -468,10 +470,6 @@
       "withdrawMessage": "You can ask again with a new key.",
       "keepWaiting": "Keep waiting",
       "withdrawConfirm": "Withdraw"
-    },
-    "card": {
-      "waitingOn": "Waiting on {{name}} to approve you · asked {{ago}}",
-      "waitingOnUnknown": "Waiting on whoever sent the key · asked {{ago}}"
     },
     "request": {
       "someone": "Someone",

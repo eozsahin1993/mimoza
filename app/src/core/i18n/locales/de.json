@@ -200,7 +200,6 @@
     }
   },
   "circle": {
-    "lastAdded": "Letztes Foto {{ago}}",
     "peopleCount_one": "{{count}} Person",
     "peopleCount_other": "{{count}} Personen",
     "newCount_one": "{{count}} neu",
@@ -208,8 +207,8 @@
     "profileUpdateFailedIn": "Dein Profil konnte in {{name}} nicht aktualisiert werden",
     "profileUpdateFailed": "Dein Profil konnte nicht überall aktualisiert werden",
     "list": {
-      "yourCircles": "Deine Kreise",
-      "waitingToJoin": "Beitritt ausstehend · {{count}}",
+      "yourCircles": "Kreise",
+      "waitingToJoin": "Beitritt ausstehend",
       "cancelPendingTitle": "Anfrage für {{name}} zurückziehen?",
       "cancelPendingMessage": "Du kannst mit einem neuen Schlüssel erneut anfragen.",
       "keepWaiting": "Weiter warten",
@@ -217,7 +216,10 @@
       "refreshFailed": "Deine Kreise konnten nicht aktualisiert werden",
       "emptyTitle": "Noch keine Kreise",
       "emptyBody": "Erstelle einen, um Erinnerungen mit den Menschen zu teilen, die dir wichtig sind. In einen Kreis kommt man nur auf Einladung: Öffne den Link, den dir jemand geschickt hat.",
-      "createCircle": "Kreis erstellen"
+      "createCircle": "Kreis erstellen",
+      "locked": "Gesperrt",
+      "lockedStatus": "Öffnet sich, sobald ein Mitglied online ist",
+      "pendingStatus": "Ausstehend"
     },
     "feed": {
       "subtitle_one": "{{count}} Person. Tippen für Details",
@@ -468,10 +470,6 @@
       "withdrawMessage": "Mit einem neuen Schlüssel kannst du erneut anfragen.",
       "keepWaiting": "Weiter warten",
       "withdrawConfirm": "Zurückziehen"
-    },
-    "card": {
-      "waitingOn": "Warte, bis {{name}} dich annimmt · angefragt {{ago}}",
-      "waitingOnUnknown": "Warte auf die Person, die den Schlüssel geschickt hat · angefragt {{ago}}"
     },
     "request": {
       "someone": "Jemand",

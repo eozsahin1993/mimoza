@@ -1,75 +1,81 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/ui/components/icon';
 import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, Radius, Space } from '@/ui/theme/tokens';
-import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
+import { Colors, Icons, Petal, Radius, Space } from '@/ui/theme/tokens';
+import { useTints } from '@/ui/theme/hooks/use-theme';
 
 export type CircleCardProps = {
   name: string;
   memberCount: number;
   /** Data URI of the actual cover photo, when it's known — otherwise the hatch placeholder shows. */
   photoUri?: string;
-  /** Unread count shown as a "3 new" pill next to the name — omitted entirely once there's nothing new. */
+  /** Unread count shown as a "3 new" pill in the corner — omitted entirely once there's nothing new. */
   newCount?: number;
-  /** Most recent activity line, e.g. "Last added 6 days ago" — its own row under the member count. */
+  /** Compact age of the newest photo, e.g. "2h" — sits beside the member count. */
   latestActivity?: string;
   onPress?: () => void;
 };
 
-/** Exported so the pending card can hold the same silhouette in the list. */
-export const CARD_HEIGHT = 92;
+export const CARD_HEIGHT = 100;
+
+// The photo is the card, so everything on it is fixed light regardless of
+// scheme, the same way the wordmark sits over the welcome photo. The scrim
+// is what keeps that legible on a bright cover: clear across the top,
+// dark by the bottom edge where the text is.
+const ON_PHOTO = Colors.dark.text;
+const SCRIM = ['rgba(20,16,12,0)', 'rgba(20,16,12,0.78)'] as const;
 
 /**
- * A real card, not a photo with text laid over it — the cover gets a
- * full-height square (bigger than the old 84px thumbnail) on its own,
- * and the name, member count and activity sit on the card's own surface
- * beside it, so the photo can be emphasized without having to also stay
- * legible as a backdrop for white text.
+ * The cover photo edge to edge, with the name and the two numbers that
+ * matter laid over its bottom edge. What's new sits in the opposite
+ * corner so it never crowds the name.
  */
 export function CircleCard({ name, memberCount, photoUri, newCount, latestActivity, onPress }: CircleCardProps) {
   const { t } = useTranslation();
-  const theme = useTheme();
   const tints = useTints();
   return (
-    <Pressable
-      style={[styles.card, { backgroundColor: theme.surface, borderColor: tints.raisedBorder }]}
-      onPress={onPress}>
+    <Pressable style={[styles.card, { borderColor: tints.cardEdge }]} onPress={onPress}>
       {photoUri ? (
-        <Image source={{ uri: photoUri }} style={styles.cover} contentFit="cover" />
+        <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
-        <PhotoPlaceholder style={styles.cover} />
+        <PhotoPlaceholder style={StyleSheet.absoluteFill} />
       )}
+      <LinearGradient colors={SCRIM} locations={[0.4, 1]} style={StyleSheet.absoluteFill} />
 
-      <View style={styles.content}>
-        <View style={styles.titleRow}>
-          <ThemedText type="titleMedium" numberOfLines={1} style={styles.title}>
-            {name}
+      {newCount ? (
+        <View style={styles.badge} accessibilityLabel={t('circle.newCount', { count: newCount })}>
+          <ThemedText type="labelSmall" style={{ color: Colors.light.text }}>
+            {newCount}
           </ThemedText>
-          {newCount ? (
-            <View style={[styles.badge, { backgroundColor: tints.chipReactedBg }]}>
-              <ThemedText type="labelSmall" themeColor="accentBright">
-                {t('circle.newCount', { count: newCount })}
+        </View>
+      ) : null}
+
+      <View style={styles.footer}>
+        <ThemedText type="titleLarge" numberOfLines={1} style={[styles.name, { color: ON_PHOTO }]}>
+          {name}
+        </ThemedText>
+
+        <View style={styles.stats}>
+          <View style={styles.stat} accessibilityLabel={t('circle.peopleCount', { count: memberCount })}>
+            <Icon icon={Icons.members} size={14} color={ON_PHOTO} />
+            <ThemedText type="labelMedium" style={{ color: ON_PHOTO }}>
+              {memberCount}
+            </ThemedText>
+          </View>
+          {latestActivity ? (
+            <View style={styles.stat}>
+              <Icon icon={Icons.waiting} size={14} color={ON_PHOTO} />
+              <ThemedText type="labelMedium" style={{ color: ON_PHOTO }}>
+                {latestActivity}
               </ThemedText>
             </View>
           ) : null}
         </View>
-
-        <View style={styles.metaRow}>
-          <Icon icon={Icons.members} size={14} color={theme.muted} />
-          <ThemedText type="labelSmall" themeColor="muted" numberOfLines={1}>
-            {t('circle.peopleCount', { count: memberCount })}
-          </ThemedText>
-        </View>
-
-        {latestActivity ? (
-          <ThemedText type="labelSmall" themeColor="faint" numberOfLines={1}>
-            {latestActivity}
-          </ThemedText>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -78,37 +84,45 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
 const styles = StyleSheet.create({
   card: {
     height: CARD_HEIGHT,
-    flexDirection: 'row',
     borderRadius: Radius.circleCard,
+    // A hairline so a dark cover, or the hatch in dark mode, still has an
+    // edge against the background. On a light photo it is invisible.
     borderWidth: 1,
     overflow: 'hidden',
+    justifyContent: 'flex-end',
   },
-  cover: {
-    width: CARD_HEIGHT,
-    height: CARD_HEIGHT,
-  },
-  content: {
-    flex: 1,
-    padding: Space.s300,
-    justifyContent: 'center',
-    gap: Space.s100,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.s200,
-  },
-  title: {
-    flex: 1,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.s200,
-  },
+  // A count badge, not a chip: 20dp tall, round for one digit and a pill
+  // from two, like every other unread count on the platform.
   badge: {
-    paddingHorizontal: Space.s300,
-    paddingVertical: Space.s100,
+    position: 'absolute',
+    top: Space.s300,
+    right: Space.s300,
+    height: Space.s500,
+    minWidth: Space.s500,
+    paddingHorizontal: Space.s100,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: Radius.pill,
+    backgroundColor: Petal,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.s300,
+    paddingHorizontal: Space.s400,
+    paddingBottom: Space.s200,
+  },
+  name: {
+    flex: 1,
+  },
+  stats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.s300,
+  },
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.s100,
   },
 });

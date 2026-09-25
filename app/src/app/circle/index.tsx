@@ -7,8 +7,8 @@ import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { Avatar } from '@/ui/components/avatar/avatar';
 import { Wordmark } from '@/ui/components/wordmark';
 import { CircleCard } from '@/features/circle/components/circle-card';
+import { CircleStatusRow } from '@/features/circle/components/circle-status-row';
 import { JoinSheet } from '@/features/invite/components/join-sheet';
-import { PendingCircleCard } from '@/features/invite/components/pending-circle-card';
 import { EmptyCirclesIcon } from '@/features/circle/components/empty-circles-icon';
 import { FabButton } from '@/ui/components/buttons/fab-button';
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
@@ -34,11 +34,24 @@ import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/in
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { takePendingInviteCode } from '@/features/invite/services/pending-invite';
 import { bytesToDataUri } from '@/core/photo/image';
-import { formatAgo } from '@/core/utils/time';
+import { formatRelative } from '@/core/utils/time';
+import { upperCase } from '@/core/i18n/text';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
 import { showError } from '@/core/services/messages';
 import { syncCircles } from '@/core/sync/sync-circles';
 import { useLanguage } from '@/core/i18n/use-language';
+
+/**
+ * Everything the list shows, headers included, so it is one FlatList that
+ * windows every row rather than sections glued around it in header and
+ * footer components. Built fresh each render from the three sources; an
+ * empty source contributes nothing, not even its header.
+ */
+type ListItem =
+  | { kind: 'header'; key: string; title: string }
+  | { kind: 'pending'; key: string; request: PendingRequest }
+  | { kind: 'circle'; key: string; circle: CircleListItem }
+  | { kind: 'locked'; key: string; circle: CircleListItem };
 
 type CircleListItem = Circle & {
   memberCount: number;
@@ -65,6 +78,12 @@ export default function CircleListScreen() {
   const [profileName, setProfileName] = useState<string | undefined>();
   const ownColorSeed = useOwnColorSeed();
   const [circles, setCircles] = useState<CircleListItem[]>([]);
+  // A locked circle is one this device has no keys for yet, waiting on a
+  // member to reseal them. It stays in the list, apart, because "where did
+  // that circle go" is the question the section exists to answer.
+  const open = circles.filter((circle) => !circle.needsRewrap);
+  const locked = circles.filter((circle) => circle.needsRewrap);
+
   // Avoids flashing the empty state before the first load resolves.
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,7 +147,7 @@ export default function CircleListScreen() {
       setPending(await listRequests());
     }
     return results.some((result) => result.state === 'approved');
-  }, []);
+  }, [setPending]);
 
   // On mount as well as on focus. A screen underneath a modal never gains
   // focus, so opening an invite link — which puts this screen up and a
@@ -186,7 +205,7 @@ export default function CircleListScreen() {
         },
       },
     ]);
-  }, [t]);
+  }, [t, setPending]);
 
   /** Syncs every circle, then re-reads. Photos are left to their own queue. */
   const handleRefresh = useCallback(async () => {
@@ -207,6 +226,20 @@ export default function CircleListScreen() {
     }
   }, [loadFromDatabase, completePendingJoins, t]);
 
+  const items: ListItem[] = [];
+  if (pending.length) {
+    items.push({ kind: 'header', key: 'header-pending', title: t('circle.list.waitingToJoin') });
+    for (const request of pending) items.push({ kind: 'pending', key: `pending-${request.circleId}`, request });
+  }
+  if (open.length) {
+    items.push({ kind: 'header', key: 'header-circles', title: t('circle.list.yourCircles') });
+    for (const circle of open) items.push({ kind: 'circle', key: `circle-${circle.id}`, circle });
+  }
+  if (locked.length) {
+    items.push({ kind: 'header', key: 'header-locked', title: t('circle.list.locked') });
+    for (const circle of locked) items.push({ kind: 'locked', key: `locked-${circle.id}`, circle });
+  }
+
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
@@ -219,57 +252,53 @@ export default function CircleListScreen() {
         </View>
 
         <FlatList
-          data={loaded ? circles : []}
+          data={loaded ? items : []}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          keyExtractor={(circle) => circle.id}
-          ListHeaderComponent={
-            <>
-              <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />
-              {pending.length ? (
-                <View style={styles.pending}>
-                  <ThemedText type="labelMedium">
-                    {t('circle.list.waitingToJoin', { count: pending.length })}
-                  </ThemedText>
-                  {pending.map((request) => (
-                    <PendingCircleCard
-                      key={request.circleId}
-                      circleName={request.circleName}
-                      createdByName={request.invitedByName}
-                      submittedAt={request.submittedAt}
-                      onPress={() => router.push({ pathname: '/join/pending', params: { circleId: request.circleId } })}
-                      onCancel={() => handleCancelPending(request)}
-                    />
-                  ))}
-                </View>
-              ) : null}
-              {loaded && circles.length ? (
-                <ThemedText type="labelMedium" style={styles.sectionTitle}>
-                  {t('circle.list.yourCircles')}
-                </ThemedText>
-              ) : null}
-            </>
-          }
+          keyExtractor={(item) => item.key}
+          ListHeaderComponent={<PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <CircleCard
-              name={item.name}
-              memberCount={item.memberCount}
-              photoUri={item.photoUri}
-              newCount={item.newCount}
-              latestActivity={
-                item.newestPostAt === null
-                  ? undefined
-                  : t('circle.lastAdded', { ago: formatAgo(item.newestPostAt, language) })
-              }
-              onPress={() => router.push({ pathname: '/circle/feed', params: { circleId: item.id } })}
-            />
-          )}
+          renderItem={({ item }) => {
+            switch (item.kind) {
+              case 'header':
+                return (
+                  <ThemedText type="code" themeColor="muted" style={styles.sectionTitle}>
+                    {upperCase(item.title, language)}
+                  </ThemedText>
+                );
+              case 'pending':
+                return (
+                  <CircleStatusRow
+                    icon={Icons.waiting}
+                    name={item.request.circleName}
+                    status={t('circle.list.pendingStatus')}
+                    actionLabel={t('common.cancel')}
+                    onAction={() => handleCancelPending(item.request)}
+                    onPress={() => router.push({ pathname: '/join/pending', params: { circleId: item.request.circleId } })}
+                  />
+                );
+              case 'circle':
+                return (
+                  <CircleCard
+                    name={item.circle.name}
+                    memberCount={item.circle.memberCount}
+                    photoUri={item.circle.photoUri}
+                    newCount={item.circle.newCount}
+                    latestActivity={
+                      item.circle.newestPostAt === null ? undefined : formatRelative(item.circle.newestPostAt, language)
+                    }
+                    onPress={() => router.push({ pathname: '/circle/feed', params: { circleId: item.circle.id } })}
+                  />
+                );
+              case 'locked':
+                return <CircleStatusRow icon={Icons.locked} name={item.circle.name} status={t('circle.list.lockedStatus')} />;
+            }
+          }}
           // Only once the first read has resolved — otherwise the empty
           // state flashes before the circles arrive.
           // Not while a request is pending: the header already says what
           // is happening, and "no circles yet" under it reads as a denial.
           ListEmptyComponent={
-            loaded && !pending.length ? (
+            loaded && !items.length ? (
               <View style={styles.empty}>
                 <EmptyCirclesIcon />
                 <ThemedText type="titleMedium" style={styles.emptyTitle}>
@@ -342,12 +371,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.s0,
     paddingBottom: Space.s200,
   },
+  // The `code` type is sized for an invite code standing on its own; as a
+  // section label it only wants the face and the tracking.
   sectionTitle: {
+    fontSize: 12,
+    lineHeight: 12 * 1.3,
+    letterSpacing: 12 * 0.13,
     marginTop: Space.s200,
-  },
-  pending: {
-    gap: Space.s300,
-    paddingBottom: Space.s200,
   },
   empty: {
     flex: 1,

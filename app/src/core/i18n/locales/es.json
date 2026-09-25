@@ -200,7 +200,6 @@
     }
   },
   "circle": {
-    "lastAdded": "Última foto {{ago}}",
     "peopleCount_one": "{{count}} persona",
     "peopleCount_other": "{{count}} personas",
     "newCount_one": "{{count}} nueva",
@@ -208,8 +207,8 @@
     "profileUpdateFailedIn": "No se ha podido actualizar tu perfil en {{name}}",
     "profileUpdateFailed": "Tu perfil no se ha actualizado en todos los círculos",
     "list": {
-      "yourCircles": "Tus círculos",
-      "waitingToJoin": "Solicitudes pendientes · {{count}}",
+      "yourCircles": "Círculos",
+      "waitingToJoin": "Solicitudes pendientes",
       "cancelPendingTitle": "¿Cancelar la solicitud para unirte a {{name}}?",
       "cancelPendingMessage": "Puedes volver a pedirlo con una clave nueva.",
       "keepWaiting": "Seguir esperando",
@@ -217,7 +216,10 @@
       "refreshFailed": "No se han podido actualizar tus círculos",
       "emptyTitle": "Aún no tienes círculos",
       "emptyBody": "Crea uno para compartir recuerdos con quien tú quieras. A un círculo solo se entra por invitación: abre el enlace que te hayan enviado para unirte.",
-      "createCircle": "Crear círculo"
+      "createCircle": "Crear círculo",
+      "locked": "Bloqueado",
+      "lockedStatus": "Se abre cuando un miembro se conecta",
+      "pendingStatus": "Pendiente"
     },
     "feed": {
       "subtitle_one": "{{count}} persona. Toca para ver los detalles",
@@ -468,10 +470,6 @@
       "withdrawMessage": "Puedes volver a pedirlo con una clave nueva.",
       "keepWaiting": "Seguir esperando",
       "withdrawConfirm": "Retirar"
-    },
-    "card": {
-      "waitingOn": "Esperando a que {{name}} te apruebe · lo pediste {{ago}}",
-      "waitingOnUnknown": "Esperando a quien envió la clave · lo pediste {{ago}}"
     },
     "request": {
       "someone": "Alguien",

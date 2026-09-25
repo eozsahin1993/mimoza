@@ -200,7 +200,6 @@
     }
   },
   "circle": {
-    "lastAdded": "Son ekleme: {{ago}}",
     "peopleCount_one": "{{count}} kişi",
     "peopleCount_other": "{{count}} kişi",
     "newCount_one": "{{count}} yeni",
@@ -208,8 +207,8 @@
     "profileUpdateFailedIn": "Profilin {{name}} çevresinde güncellenemedi",
     "profileUpdateFailed": "Profilin bazı çevrelerde güncellenemedi",
     "list": {
-      "yourCircles": "Çevrelerin",
-      "waitingToJoin": "Onay bekleyen istekler · {{count}}",
+      "yourCircles": "Çevreler",
+      "waitingToJoin": "Onay bekleyen istekler",
       "cancelPendingTitle": "{{name}} çevresine katılma isteğin iptal edilsin mi?",
       "cancelPendingMessage": "Yeni bir anahtarla tekrar katılma isteğinde bulunabilirsin.",
       "keepWaiting": "Beklemeye devam et",
@@ -217,7 +216,10 @@
       "refreshFailed": "Çevreler yenilenemedi",
       "emptyTitle": "Henüz bir çevren yok",
       "emptyBody": "Anılarını paylaşmak için yeni bir çevre oluştur. Çevrelere sadece davetle girilir; birine katılmak için sana gönderilen bağlantıyı açabilirsin.",
-      "createCircle": "Çevre oluştur"
+      "createCircle": "Çevre oluştur",
+      "locked": "Kilitli",
+      "lockedStatus": "Bir üye çevrimiçi olunca açılır",
+      "pendingStatus": "Beklemede"
     },
     "feed": {
       "subtitle_one": "{{count}} kişi. Detaylar için dokun",
@@ -468,10 +470,6 @@
       "withdrawMessage": "Yeni bir anahtar alarak tekrar katılma isteğinde bulunabilirsin.",
       "keepWaiting": "Beklemeye devam et",
       "withdrawConfirm": "Geri çek"
-    },
-    "card": {
-      "waitingOn": "{{name}} tarafından onay bekleniyor · İstek zamanı: {{ago}}",
-      "waitingOnUnknown": "Davet eden kişinin onayı bekleniyor · İstek zamanı: {{ago}}"
     },
     "request": {
       "someone": "Biri",

@@ -123,6 +123,13 @@ export const AvatarTints = [
 export const AvatarInk = '#F4EDE2';
 
 /**
+ * The mimoza flower's yellow: the wordmark's petals, and the one badge
+ * that counts what's new. Scheme-independent, so anything on it is fixed
+ * dark rather than the theme's text colour.
+ */
+export const Petal = '#F0BE3A';
+
+/**
  * Non-solid fills, one set per scheme via `useTints()` — never the bare
  * export, or a component stops reacting to a scheme switch. Each base rgb
  * is that scheme's own `text`/`accent`/`danger`, so a fill always matches
@@ -141,6 +148,8 @@ export const Tints = {
     secondaryButtonBorder: 'rgba(245,239,230,0.2)',
     /** The three edges a `raised` surface can carry — quiet by default, tinted when the message has an outcome. */
     raisedBorder: 'rgba(245,239,230,0.08)',
+    /** A card's outline. Stronger than `raisedBorder` in dark, where a dark cover or the hatch would otherwise merge into the background. */
+    cardEdge: 'rgba(245,239,230,0.14)',
     raisedAccentBorder: 'rgba(192,138,46,0.30)',
     raisedDangerBorder: 'rgba(217,122,110,0.30)',
   },
@@ -155,6 +164,7 @@ export const Tints = {
     dangerWashBg: 'rgba(184,80,63,0.12)',
     secondaryButtonBorder: 'rgba(35,26,17,0.2)',
     raisedBorder: 'rgba(35,26,17,0.08)',
+    cardEdge: 'rgba(35,26,17,0.08)',
     raisedAccentBorder: 'rgba(166,85,47,0.30)',
     raisedDangerBorder: 'rgba(184,80,63,0.30)',
   },
@@ -165,7 +175,9 @@ export const Fonts = {
   sans: 'Outfit_400Regular',
   sansMedium: 'Outfit_500Medium',
   sansSemiBold: 'Outfit_600SemiBold',
-  mono: Platform.select({ ios: 'Menlo', default: 'ui-monospace' }) ?? 'monospace',
+  // 'monospace' is the Android family name; 'ui-monospace' is a CSS generic
+  // that Android does not know, and an unknown family falls back to sans.
+  mono: Platform.select({ ios: 'Menlo', default: 'monospace' }) ?? 'monospace',
 } as const;
 
 /**

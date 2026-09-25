@@ -200,7 +200,6 @@
     }
   },
   "circle": {
-    "lastAdded": "Dernier ajout {{ago}}",
     "peopleCount_one": "{{count}} personne",
     "peopleCount_other": "{{count}} personnes",
     "newCount_one": "{{count}} nouvelle",
@@ -208,8 +207,8 @@
     "profileUpdateFailedIn": "Impossible de mettre à jour ton profil dans {{name}}",
     "profileUpdateFailed": "Ton profil n’a pas pu être mis à jour dans tous les cercles",
     "list": {
-      "yourCircles": "Tes cercles",
-      "waitingToJoin": "En attente d’acceptation · {{count}}",
+      "yourCircles": "Cercles",
+      "waitingToJoin": "En attente d’acceptation",
       "cancelPendingTitle": "Annuler la demande pour rejoindre {{name}} ?",
       "cancelPendingMessage": "Tu pourras redemander avec une nouvelle clé.",
       "keepWaiting": "Continuer d’attendre",
@@ -217,7 +216,10 @@
       "refreshFailed": "Impossible d’actualiser tes cercles",
       "emptyTitle": "Aucun cercle pour l’instant",
       "emptyBody": "Crée-en un pour partager des souvenirs avec qui tu veux. On ne rejoint un cercle que sur invitation : ouvre le lien qu’on t’a envoyé.",
-      "createCircle": "Créer un cercle"
+      "createCircle": "Créer un cercle",
+      "locked": "Verrouillé",
+      "lockedStatus": "S’ouvre quand un membre se connecte",
+      "pendingStatus": "En attente"
     },
     "feed": {
       "subtitle_one": "{{count}} personne. Touche pour les détails",
@@ -468,10 +470,6 @@
       "withdrawMessage": "Tu pourras redemander avec une nouvelle clé.",
       "keepWaiting": "Continuer d’attendre",
       "withdrawConfirm": "Retirer"
-    },
-    "card": {
-      "waitingOn": "En attente : {{name}} doit t’accepter · demandé {{ago}}",
-      "waitingOnUnknown": "En attente de la personne qui a envoyé la clé · demandé {{ago}}"
     },
     "request": {
       "someone": "Quelqu’un",
