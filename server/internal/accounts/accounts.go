@@ -50,3 +50,31 @@ type Provider struct {
 	RefreshToken string
 	LinkedAt     time.Time
 }
+
+// DeviceLink is one in-flight handoff of an account's keypair, from a
+// phone that has it to one that does not. Both ends are the same
+// account, and a session lives in that account's partition, so the key
+// shape is the access check.
+type DeviceLink struct {
+	SessionID string
+	// Throwaway, minted by the waiting phone for this handoff. It travels
+	// in the QR code rather than from here, so a relay that substituted
+	// its own key would not be the one sealed to.
+	PublicKey []byte
+	// Empty until the other phone answers.
+	SealedKeypair []byte
+	CreatedAt     time.Time
+	DeliveredAt   time.Time
+	ExpiresAt     time.Time
+}
+
+func (l DeviceLink) Delivered() bool { return len(l.SealedKeypair) > 0 }
+
+// DefaultDeviceLinkRetention is long enough to go and find the other
+// phone. An open session holds only a public key, and once answered, a
+// blob only the waiting phone can open.
+const DefaultDeviceLinkRetention = time.Hour
+
+// X25519KeyLength is what this relay will accept as a public key. It does
+// no curve arithmetic itself, but it does refuse a key that cannot be one.
+const X25519KeyLength = 32

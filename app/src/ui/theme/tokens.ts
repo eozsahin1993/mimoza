@@ -9,6 +9,8 @@ import Album from 'lucide-react-native/icons/album';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowUp from 'lucide-react-native/icons/arrow-up';
 import Bookmark from 'lucide-react-native/icons/bookmark';
+import Camera from 'lucide-react-native/icons/camera';
+import CameraOff from 'lucide-react-native/icons/camera-off';
 import Check from 'lucide-react-native/icons/check';
 import Clock from 'lucide-react-native/icons/clock';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
@@ -271,6 +273,10 @@ export const Icons = {
   addPhoto: ImagePlus,
   /** How many people are in a circle — next to the count on its card row. */
   members: Users,
+  /** Asks for camera access before a scanner can open. */
+  camera: Camera,
+  /** Camera access denied — points at Settings instead of a blank preview. */
+  cameraOff: CameraOff,
 } as const satisfies Record<string, IconGlyph>;
 
 export const Radius = {

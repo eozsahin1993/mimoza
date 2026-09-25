@@ -33,15 +33,20 @@ const (
 	AccountPKPrefix  = "account#"
 	ProviderPKPrefix = "provider#"
 
-	ProfileSK  = "profile"
-	DeviceSK   = "device#"
-	ProviderSK = "provider#"
-	LookupSK   = "lookup"
+	ProfileSK    = "profile"
+	DeviceSK     = "device#"
+	ProviderSK   = "provider#"
+	LookupSK     = "lookup"
+	DeviceLinkSK = "devicelink#"
 )
 
 func AccountPK(accountID string) string { return AccountPKPrefix + accountID }
 
 func DeviceKey(deviceID string) string { return DeviceSK + deviceID }
+
+// DeviceLinkKey puts a handoff inside the account's own partition, which
+// is the access check: only a device signed in as that account can name it.
+func DeviceLinkKey(sessionID string) string { return DeviceLinkSK + sessionID }
 
 // ProviderID is how a sign-in is named in both places it appears: the
 // provider and the subject it issued, which is stable where an email
@@ -75,4 +80,10 @@ const (
 	AttrUpdatedAt    = "updatedAt"
 	AttrRefreshToken = "refreshToken"
 	AttrLinkedAt     = "linkedAt"
+
+	AttrSealedKeypair = "sealedKeypair"
+	AttrDeliveredAt   = "deliveredAt"
+	// TTL attribute, epoch seconds. DynamoDB sweeps lazily, so reads check
+	// it rather than trusting a row's absence.
+	AttrExpiresAt = "expiresAt"
 )

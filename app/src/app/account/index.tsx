@@ -125,6 +125,12 @@ export default function AccountScreen() {
       title: t('settings.account'),
       rows: [
         {
+          label: t('account.scanDevice.header'),
+          description: t('account.scanDevice.confirmNote'),
+          control: { kind: 'navigate' },
+          onPress: () => router.push('/account/device-link-scan'),
+        },
+        {
           label: signingOut ? t('settings.signingOut') : t('settings.signOut'),
           disabled: signingOut,
           onPress: handleSignOut,

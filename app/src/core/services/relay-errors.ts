@@ -82,3 +82,28 @@ export class JoinRequestGoneError extends Error {
     this.name = 'JoinRequestGoneError';
   }
 }
+
+/**
+ * Raised when a device-link session is gone: it expired, or it never
+ * existed on this account. Permanent — the phones have to start a new
+ * handshake, since the throwaway key the old one was sealed to is the
+ * only thing that could have opened it.
+ */
+export class DeviceLinkGoneError extends Error {
+  constructor() {
+    super('That device link is no longer open.');
+    this.name = 'DeviceLinkGoneError';
+  }
+}
+
+/**
+ * Raised when a device-link session already holds a sealed keypair.
+ * First answer wins, so a second scan of the same code is refused rather
+ * than overwriting what the waiting phone is about to collect.
+ */
+export class DeviceLinkAnsweredError extends Error {
+  constructor() {
+    super('That code was already used by another device.');
+    this.name = 'DeviceLinkAnsweredError';
+  }
+}

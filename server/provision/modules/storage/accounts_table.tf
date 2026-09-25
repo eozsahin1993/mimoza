@@ -23,6 +23,14 @@ resource "aws_dynamodb_table" "accounts" {
     type = "S"
   }
 
+  # Device-link sessions are the only rows here that expire: a keypair
+  # handoff is open for minutes. Profiles, devices and sign-ins carry no
+  # expiresAt at all, so the sweeper never looks at them twice.
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
+  }
+
   point_in_time_recovery {
     enabled = var.point_in_time_recovery
   }

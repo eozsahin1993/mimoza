@@ -1,7 +1,7 @@
 import {
-  ensureAccountKeypair,
   forgetAccountKeypair,
   getAccountKeypair,
+  mintAndSaveAccountKeypair,
   saveAccountKeypair,
 } from '@/core/services/keystore/account-keypair';
 
@@ -20,30 +20,29 @@ describe('account keypair', () => {
     expect(await getAccountKeypair(ACCOUNT_A)).toBeNull();
   });
 
-  test('mints a keypair the first time and reports it as created', async () => {
-    const { keypair, created } = await ensureAccountKeypair(ACCOUNT_A);
+  test('mints a keypair with both halves present', async () => {
+    const keypair = await mintAndSaveAccountKeypair(ACCOUNT_A);
 
-    expect(created).toBe(true);
     expect(keypair.publicKey).toHaveLength(32);
     expect(keypair.secretKey).toHaveLength(32);
   });
 
-  test('returns the same keypair on a second call, not created', async () => {
-    const first = await ensureAccountKeypair(ACCOUNT_A);
-    const second = await ensureAccountKeypair(ACCOUNT_A);
+  test('minting again overwrites the previous keypair', async () => {
+    const first = await mintAndSaveAccountKeypair(ACCOUNT_A);
+    const second = await mintAndSaveAccountKeypair(ACCOUNT_A);
 
-    expect(second.created).toBe(false);
-    expect(second.keypair).toEqual(first.keypair);
+    expect(second).not.toEqual(first);
+    expect(await getAccountKeypair(ACCOUNT_A)).toEqual(second);
   });
 
   test('round-trips the minted keypair through storage', async () => {
-    const { keypair } = await ensureAccountKeypair(ACCOUNT_A);
+    const keypair = await mintAndSaveAccountKeypair(ACCOUNT_A);
 
     expect(await getAccountKeypair(ACCOUNT_A)).toEqual(keypair);
   });
 
   test('saveAccountKeypair overwrites the stored value', async () => {
-    const { keypair: original } = await ensureAccountKeypair(ACCOUNT_A);
+    const original = await mintAndSaveAccountKeypair(ACCOUNT_A);
     const replacement = { ...original, publicKey: new Uint8Array(32).fill(9) };
 
     await saveAccountKeypair(ACCOUNT_A, replacement);
@@ -52,28 +51,27 @@ describe('account keypair', () => {
   });
 
   test('forgetting clears the stored keypair', async () => {
-    await ensureAccountKeypair(ACCOUNT_A);
+    await mintAndSaveAccountKeypair(ACCOUNT_A);
     await forgetAccountKeypair(ACCOUNT_A);
 
     expect(await getAccountKeypair(ACCOUNT_A)).toBeNull();
   });
 
   test('two accounts on the same device do not share a keypair', async () => {
-    const a = await ensureAccountKeypair(ACCOUNT_A);
-    const b = await ensureAccountKeypair(ACCOUNT_B);
+    const a = await mintAndSaveAccountKeypair(ACCOUNT_A);
+    const b = await mintAndSaveAccountKeypair(ACCOUNT_B);
 
-    expect(b.created).toBe(true);
-    expect(b.keypair).not.toEqual(a.keypair);
-    expect(await getAccountKeypair(ACCOUNT_A)).toEqual(a.keypair);
+    expect(b).not.toEqual(a);
+    expect(await getAccountKeypair(ACCOUNT_A)).toEqual(a);
   });
 
   test('forgetting one account leaves the other untouched', async () => {
-    await ensureAccountKeypair(ACCOUNT_A);
-    const b = await ensureAccountKeypair(ACCOUNT_B);
+    await mintAndSaveAccountKeypair(ACCOUNT_A);
+    const b = await mintAndSaveAccountKeypair(ACCOUNT_B);
 
     await forgetAccountKeypair(ACCOUNT_A);
 
     expect(await getAccountKeypair(ACCOUNT_A)).toBeNull();
-    expect(await getAccountKeypair(ACCOUNT_B)).toEqual(b.keypair);
+    expect(await getAccountKeypair(ACCOUNT_B)).toEqual(b);
   });
 });

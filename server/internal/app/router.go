@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"mimoza-relay/internal/accounts/deletion"
+	"mimoza-relay/internal/accounts/devicelink"
 	"mimoza-relay/internal/accounts/devices"
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/accounts/profile"
@@ -140,6 +141,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		Notify:  notifier,
 	}, readLimit, writeLimit)
 	devices.Register(accountMux, &devices.Service{Store: devices.NewStore(deps.Accounts)}, writeLimit)
+	devicelink.Register(accountMux, &devicelink.Service{Store: devicelink.NewStore(deps.Accounts)}, readLimit, writeLimit)
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 

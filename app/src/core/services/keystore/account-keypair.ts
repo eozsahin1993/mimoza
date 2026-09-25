@@ -45,24 +45,13 @@ export async function getAccountKeypair(accountId: string): Promise<Keypair | nu
 }
 
 /**
- * Returns the stored keypair, minting one the first time. `created` is
- * what sign-in uses to decide whether to publish the public half as an
- * ordinary first key or as a reset, which is the difference between
- * "here is my key" and "every circle I am in is now unreadable".
- *
- * synced-store's retries shrink but do not close the window where a
- * fresh restore reads as `created: true` before iCloud has actually
- * delivered the real key — whatever calls this first (sign-in) should
- * treat a reset right after restore as a possibility to confirm, not
- * a certainty to act on silently.
+ * Always mints a fresh keypair and saves it, overwriting whatever was
+ * there.
  */
-export async function ensureAccountKeypair(accountId: string): Promise<{ keypair: Keypair; created: boolean }> {
-  const existing = await getAccountKeypair(accountId);
-  if (existing) return { keypair: existing, created: false };
-
+export async function mintAndSaveAccountKeypair(accountId: string): Promise<Keypair> {
   const keypair = generateEphemeralKeypair();
   await saveAccountKeypair(accountId, keypair);
-  return { keypair, created: true };
+  return keypair;
 }
 
 export async function saveAccountKeypair(accountId: string, keypair: Keypair): Promise<void> {

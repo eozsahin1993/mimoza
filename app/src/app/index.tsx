@@ -15,12 +15,16 @@ import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Colors, Space, Spacing } from '@/ui/theme/tokens';
-import { getProfile, saveProfile } from '@/data/db';
-import { generateUUID } from '@/core/crypto/primitives';
+import { getProfile } from '@/data/db';
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
+import {
+  KeypairStatuses,
+  checkAccountKeypairStatus,
+  mintAndSaveAccountKeypair,
+  publishAccountKeypairOrDegrade,
+} from '@/features/account/usecases/account-keypair-flow';
+import { finishSignIn } from '@/features/account/usecases/finish-sign-in';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
-import { goPostAuth } from '@/features/invite/services/pending-invite';
-import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
 
 type Provider = 'apple' | 'google';
 
@@ -59,53 +63,41 @@ export default function WelcomeScreen() {
   async function handleSignIn(provider: Provider) {
     setBusyProvider(provider);
     try {
-      const result =
-        provider === 'google'
-          ? await signInWithGoogle(() => setIsRecovering(true))
-          : await signInWithApple(() => setIsRecovering(true));
+      const result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
       if (result.outcome !== 'success') return;
 
-      // Launch skipped this while signed out, and signing out removed it.
-      enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
+      if (!result.relayProfile) return;
+      const { accountId, name } = result.relayProfile;
 
-      // A returning device (local profile already exists — e.g. this was
-      // just a re-auth after signing out) has nothing new to fill in.
-      if (hasProfile) {
-        await goPostAuth(router);
+      // The keypair is its own concern, run after sign-in rather than
+      // inside it. The spinner goes up before the check, not from inside
+      // it: the local/synced lookup is the slow part, so anything fired
+      // after it resolves would appear only once the wait was over.
+      if (name) setIsRecovering(true);
+      const status = await checkAccountKeypairStatus(accountId);
+
+      // Only worth asking when there's an account to bring over: a name on
+      // the relay.
+      const undecidable =
+        status.kind === KeypairStatuses.KEYPAIR_MISMATCH || status.kind === KeypairStatuses.NEEDS_RECOVERY;
+      if (undecidable && name) {
+        router.push({ pathname: '/account/device-link', params: { accountId, name } });
         return;
       }
 
-      // No local profile, but the relay may already have a name for this
-      // account — signing in on a new device for an account that has
-      // completed setup elsewhere. The relay is what decides that now,
-      // not a guess about whether this is "the same person": sign-in
-      // always resolves to the same account for the same provider
-      // identity, so there is nothing to ask.
-      if (result.relayProfile?.name) {
-        const now = Date.now();
-        await saveProfile({
-          accountId: result.relayProfile.accountId,
-          name: result.relayProfile.name,
-          picture: null,
-          deviceId: generateUUID(),
-          createdAt: now,
-          updatedAt: now,
-        });
-        await goPostAuth(router);
-        return;
+      if (status.kind === KeypairStatuses.FRESH_SIGNUP) {
+        await publishAccountKeypairOrDegrade(accountId, await mintAndSaveAccountKeypair(accountId), true);
+      } else if (status.kind === KeypairStatuses.KEYPAIR_MISMATCH) {
+        // Mismatched but nameless: a signup whose publish failed and got
+        // swallowed, not a returning account. Nothing to recover from.
+        await publishAccountKeypairOrDegrade(accountId, status.keypair, false);
       }
 
-      // Brand new account. Always through the form, pre-filled with
-      // whatever the provider gave us — profile-setup downloads the
-      // suggested picture itself. Nobody gets a name and avatar committed
-      // to their circles without having seen them first.
-      router.push({
-        pathname: '/profile-setup',
-        params: {
-          suggestedName: result.suggestedName ?? '',
-          suggestedPictureUrl: result.suggestedPictureUrl ?? '',
-          onboarding: '1',
-        },
+      await finishSignIn({
+        accountId,
+        name,
+        suggestedName: result.suggestedName,
+        suggestedPictureUrl: result.suggestedPictureUrl,
       });
     } catch (err) {
       console.error(`${provider} sign-in failed`, err);
