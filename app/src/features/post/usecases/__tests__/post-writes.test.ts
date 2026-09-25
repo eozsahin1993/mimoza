@@ -146,7 +146,10 @@ describe('reacting', () => {
     expect((await listReactors(postId)).map((reactor) => reactor.emoji).sort()).toEqual(['❤️', '🥂']);
   });
 
-  test('tapping the same emoji again takes it back', async () => {
+  // Cancels the queued add outright rather than sending it and an
+  // unreact back to back — the first tap never reached the relay, so
+  // there is nothing there yet to undo. See queue.ts's queueReactionChange.
+  test('tapping the same emoji again before the first tap sends cancels it, queuing nothing', async () => {
     const circleId = await makeCircle();
     const postId = await makePost(circleId);
     await toggleReaction(circleId, postId, '❤️');
@@ -154,7 +157,7 @@ describe('reacting', () => {
     await toggleReaction(circleId, postId, '❤️');
 
     expect(await listReactors(postId)).toEqual([]);
-    expect((await due(circleId, Date.now())).map((row) => row.op)).toEqual(['reaction', 'unreact']);
+    expect(await due(circleId, Date.now())).toEqual([]);
   });
 
   // The card sums the relay's counts plus what is queued, so a tap shows

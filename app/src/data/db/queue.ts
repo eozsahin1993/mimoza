@@ -34,9 +34,42 @@ export function queueComment(comment: NewComment, entry: NewOutboxEntry): void {
   });
 }
 
-/** A tap, either direction. The card sums the relay's counts plus adds minus removes. */
+/**
+ * A tap, either direction. Toggling again before the first tap has sent
+ * cancels it rather than queuing a second op to race it: settleReaction
+ * (reactions.ts) confirms whatever the row's pendingOp currently says,
+ * not the op its own entry actually carried, so two in flight at once
+ * lets the first one's confirmation delete or clear a row a second,
+ * unsent tap has since repurposed. Nothing has reached the relay while
+ * an entry is still queued, so cancelling it needs no write of its own —
+ * the row just reverts to what it was before that entry existed.
+ */
 export function queueReactionChange(reaction: NewReaction, op: 'add' | 'remove', entry: NewOutboxEntry): void {
   db.transaction((tx) => {
+    const queued = tx
+      .select({ seq: outbox.seq, op: outbox.op })
+      .from(outbox)
+      .where(and(eq(outbox.postId, reaction.postId), eq(outbox.entryId, reaction.tag), eq(outbox.status, 'queued')))
+      .all();
+
+    if (queued.length > 0) {
+      for (const row of queued) tx.delete(outbox).where(eq(outbox.seq, row.seq)).run();
+      const target = and(
+        eq(postReactions.postId, reaction.postId),
+        eq(postReactions.accountId, reaction.accountId),
+        eq(postReactions.tag, reaction.tag)
+      );
+      // Cancelling a queued add leaves never-reacted; cancelling a
+      // queued remove leaves the confirmed reaction it was queued
+      // against, so the row stays rather than being deleted.
+      if (queued.some((row) => row.op === 'reaction')) {
+        tx.delete(postReactions).where(target).run();
+      } else {
+        tx.update(postReactions).set({ pendingOp: null }).where(target).run();
+      }
+      return;
+    }
+
     tx.insert(postReactions)
       .values({ ...reaction, pendingOp: op })
       .onConflictDoUpdate({
