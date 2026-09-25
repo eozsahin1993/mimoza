@@ -51,7 +51,10 @@ export type PendingJoinCheck =
  */
 export async function checkPendingJoinRequest(circleId: string): Promise<PendingJoinCheck> {
   const circle = await getCircle(circleId);
-  if (circle && circle.leftAt === null) return { state: 'approved', circleId };
+  if (circle && circle.leftAt === null) {
+    await dropRequest(circleId);
+    return { state: 'approved', circleId };
+  }
 
   const request = await getRequest(circleId);
   if (!request) return { state: 'gone' };
