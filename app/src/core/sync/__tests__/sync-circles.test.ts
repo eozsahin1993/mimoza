@@ -209,6 +209,30 @@ describe('a sync pass', () => {
     expect(keys.resealFor).not.toHaveBeenCalled();
   });
 
+  // Only a reseal clears needsRewrap, so a failure swallowed here would
+  // leave this device holding the new rosterVersion with nothing left to
+  // trigger another attempt — and in a two-member circle there is nobody
+  // else whose device could make one.
+  test('a failed reseal does not stop the next pass from retrying', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
+    relay.getRoster.mockResolvedValue(
+      roster({
+        rosterVersion: 2,
+        members: [
+          { accountId: 'me', name: 'Me', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+          { accountId: 'ali', name: 'Ali', publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW, needsRewrap: true },
+        ],
+      })
+    );
+    keys.resealFor.mockRejectedValueOnce(new Error('offline'));
+
+    expect(await syncCircles()).toBe(1);
+
+    expect(await syncCircles()).toBe(0);
+    expect(keys.resealFor).toHaveBeenCalledTimes(2);
+  });
+
   test('one broken circle does not stop the rest', async () => {
     const good = circleId();
     const bad = circleId();

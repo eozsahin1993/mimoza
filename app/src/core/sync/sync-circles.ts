@@ -40,7 +40,7 @@ export async function syncCircles(): Promise<number> {
   const profile = await getProfile();
   if (!profile) return 0;
 
-  const { circles, requests } = await timed('sync.me', () => listCircles());
+  const { circles, requests } = await timed('sync.circles', () => listCircles());
   const now = Date.now();
 
   // The invite code is this device's own and is not echoed back, so
@@ -119,22 +119,20 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string): Pro
       );
 
       // Someone replaced their keypair and can read nothing until a member
-      // who holds the keys seals them again. Whoever syncs first does it,
-      // and a repeat is harmless. Never this account: its own flag is
-      // cleared by somebody else, and it has nothing to seal from.
+      // who holds the keys seals them again. It is idempotent in nature.
       if (!circle.needsRewrap) {
+        let resealFailed = false;
         for (const member of roster.members.filter((member) => member.needsRewrap)) {
-          await resealFor(circle.circleId, member).catch((err) =>
-            console.error(`Failed to reseal keys for ${member.accountId} in ${circle.circleId}`, err)
-          );
+          await resealFor(circle.circleId, member).catch((err) => {
+            resealFailed = true;
+            console.error(`Failed to reseal keys for ${member.accountId} in ${circle.circleId}`, err);
+          });
         }
+
+        if (resealFailed) throw new Error(`Could not reseal keys in circle ${circle.circleId}`);
       }
     } catch (err) {
-      // applyCircle above already committed the relay's new versions
-      // locally. Left in place, the next pass's rosterMoved check would
-      // compare the local row against itself and find nothing moved —
-      // permanently skipping a roster/key fetch that never actually
-      // succeeded. Roll the two version fields back to whatever was last
+      // Roll the two version fields back to whatever was last
       // confirmed (or 0, a circle this device has never synced) so the
       // next pass sees this as still-stale and tries again.
       await applyCircle({ ...circle, rosterVersion: before?.rosterVersion ?? 0, keyVersion: before?.keyVersion ?? 0 }, now);
