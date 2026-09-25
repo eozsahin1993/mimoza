@@ -97,7 +97,7 @@ export default function NewPostScreen() {
               <Switch
                 value={addToAlbum}
                 onValueChange={setAddToAlbum}
-                trackColor={{ false: tints.chipIdleBg, true: theme.accent }}
+                trackColor={{ false: tints.switchTrack, true: theme.accent }}
                 thumbColor={theme.text}
               />
             </View>

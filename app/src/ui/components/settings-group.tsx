@@ -49,7 +49,7 @@ function SettingsAccessory({ control, disabled }: { control: SettingsControl; di
           value={control.value}
           onValueChange={control.onValueChange}
           disabled={disabled}
-          trackColor={{ false: tints.chipIdleBg, true: theme.accent }}
+          trackColor={{ false: tints.switchTrack, true: theme.accent }}
           thumbColor={theme.text}
         />
       );

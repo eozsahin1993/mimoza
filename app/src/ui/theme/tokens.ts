@@ -39,18 +39,18 @@ import type { IconGlyph } from '@/ui/components/icon';
 
 export const Colors = {
   dark: {
-    background: '#14100C',
-    surface: '#1D1712',
-    raised: '#2A231B',
+    background: '#221B15',
+    surface: '#332A21',
+    raised: '#40352B',
     accent: '#C08A2E',
     accentBright: '#DCA645',
     accentLabel: '#17120C',
     danger: '#D97A6E',
     text: '#F4EDE2',
     body: '#D8CDBE',
-    secondary: '#BEB2A2',
-    muted: '#8C8071',
-    faint: '#7E7263',
+    secondary: '#C4B8A8',
+    muted: '#A09383',
+    faint: '#948777',
     faintest: '#6E6455',
   },
   light: {
@@ -85,8 +85,9 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
  * dark screen, and this system reserves that for photographs.
  */
 
-/** Photo placeholder slot background, light mode only — dark mode uses `surface`. */
+/** Photo placeholder slot background, per scheme — the fill under a cover while it loads. */
 export const PhotoSlotLight = '#DED4C4';
+export const PhotoSlotDark = '#5A4833';
 
 /** Swap this for terracotta / plum / moss — every other value in the system stays fixed. */
 export const AlternateAccents = {
@@ -138,11 +139,15 @@ export const Petal = '#F0BE3A';
 export const Tints = {
   dark: {
     chipIdleBg: 'rgba(245,239,230,0.06)',
-    chipIdleBorder: 'rgba(245,239,230,0.10)',
-    chipReactedBg: 'rgba(192,138,46,0.18)',
-    chipReactedBorder: 'rgba(192,138,46,0.45)',
-    privacyWashBg: 'rgba(192,138,46,0.09)',
+    chipIdleBorder: 'rgba(245,239,230,0.12)',
+    chipReactedBg: 'rgba(192,138,46,0.20)',
+    chipReactedBorder: 'rgba(192,138,46,0.55)',
+    privacyWashBg: 'rgba(192,138,46,0.10)',
     privacyWashBorder: 'rgba(192,138,46,0.22)',
+    /** The diagonal lines of a photo placeholder. */
+    hatch: 'rgba(245,239,230,0.09)',
+    /** A switch's track in the off state. */
+    switchTrack: 'rgba(245,239,230,0.14)',
     dangerWashBorder: 'rgba(217,122,110,0.35)',
     dangerWashBg: 'rgba(217,122,110,0.12)',
     secondaryButtonBorder: 'rgba(245,239,230,0.2)',
@@ -160,6 +165,9 @@ export const Tints = {
     chipReactedBorder: 'rgba(166,85,47,0.45)',
     privacyWashBg: 'rgba(166,85,47,0.09)',
     privacyWashBorder: 'rgba(166,85,47,0.22)',
+    // What these roles rendered with before they had a token of their own.
+    hatch: 'rgba(35,26,17,0.08)',
+    switchTrack: 'rgba(35,26,17,0.06)',
     dangerWashBorder: 'rgba(184,80,63,0.35)',
     dangerWashBg: 'rgba(184,80,63,0.12)',
     secondaryButtonBorder: 'rgba(35,26,17,0.2)',

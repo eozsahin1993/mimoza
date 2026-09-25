@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, PhotoSlotLight, Space } from '@/ui/theme/tokens';
+import { Icons, PhotoSlotDark, PhotoSlotLight, Space } from '@/ui/theme/tokens';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
@@ -50,9 +50,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, onRetry, .
   const { scheme } = useAppSettings();
   const theme = useTheme();
   const tints = useTints();
-  // Dark mode's hatch sits on `surface`; light mode has no surface dim
-  // enough to read as a slot, hence the dedicated PhotoSlotLight.
-  const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
+  const hatchFill = scheme === 'dark' ? PhotoSlotDark : PhotoSlotLight;
   const retryable = missing === 'unavailable' && !compact && !!onRetry;
 
   return (
@@ -76,7 +74,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, onRetry, .
               patternUnits="userSpaceOnUse"
               patternTransform="rotate(45)">
               <Rect width={22} height={22} fill={hatchFill} />
-              <Line x1={0} y1={0} x2={0} y2={22} stroke={tints.raisedBorder} strokeWidth={1} />
+              <Line x1={0} y1={0} x2={0} y2={22} stroke={tints.hatch} strokeWidth={1} />
             </Pattern>
           </Defs>
           <Rect width="100%" height="100%" fill="url(#hatch)" />
