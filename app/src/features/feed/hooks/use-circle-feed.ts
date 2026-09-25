@@ -117,6 +117,27 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
   }, [circleId]);
 
   /**
+   * Sync, then re-read — for the moment right after approving a join
+   * request. The roster only changed on the relay; nothing has pulled
+   * that down to this device yet, and neither `circle_members` nor
+   * `activity` supports an optimistic local write the way posts/reactions
+   * do (no pending column, no client-known id to reconcile against — see
+   * the outbox table's own doc comment). Unforced: something genuinely
+   * changed, so the relay's version hint is trusted to notice it, same as
+   * any other pass.
+   */
+  const syncAndReload = useCallback(async () => {
+    if (!circleId) return;
+    try {
+      await syncCircles();
+    } catch (err) {
+      console.error('Failed to sync after answering a join request', err);
+    } finally {
+      await reload().catch((err) => console.error('Failed to reload the feed', err));
+    }
+  }, [circleId, reload]);
+
+  /**
    * Appends the next page rather than replacing the feed — unlike
    * `reload`, which always starts back over at the first page. No-ops
    * quietly rather than throwing: `onEndReached` can fire more than once
@@ -151,7 +172,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     [circleId, patchPost],
   );
 
-  const requests = usePendingRequestRows({ circleId, ownIsAdmin: meta?.ownIsAdmin ?? false, onRosterChanged: reload });
+  const requests = usePendingRequestRows({ circleId, ownIsAdmin: meta?.ownIsAdmin ?? false, onRosterChanged: syncAndReload });
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
   const language = useLanguage();
   const posts = usePostRows({
