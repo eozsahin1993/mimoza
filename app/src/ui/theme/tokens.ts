@@ -51,7 +51,7 @@ export const Colors = {
     secondary: '#C4B8A8',
     muted: '#A09383',
     faint: '#948777',
-    faintest: '#6E6455',
+    faintest: '#847969',
   },
   light: {
     background: '#F3EDE2',
