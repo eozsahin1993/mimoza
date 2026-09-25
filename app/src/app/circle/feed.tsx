@@ -95,6 +95,7 @@ export default function FeedScreen() {
 
         <FlatList
           data={rows}
+          showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
           keyExtractor={(row) => row.key}
           renderItem={({ item }) => item.render()}
