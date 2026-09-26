@@ -7,6 +7,7 @@ import { AndroidNotificationPriority, setNotificationHandler } from 'expo-notifi
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { Dialog } from '@/ui/components/dialog';
 import { EnvBadge } from '@/ui/components/env-badge';
 import { Snackbar } from '@/ui/components/snackbar';
 import { Colors } from '@/ui/theme/tokens';
@@ -14,6 +15,7 @@ import { initDatabase } from '@/data/db';
 import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
 import { startPushTapRouting } from '@/features/push-notifications/services/tap';
 import { AppSettingsProvider, useAppSettings } from '@/ui/theme/hooks/use-app-settings';
+import { useAlerts } from '@/core/hooks/use-alerts';
 import { useMessages } from '@/core/hooks/use-messages';
 import { useSessionExpiry } from '@/core/hooks/use-session-expiry';
 import { getAppSettings, type AppSettings } from '@/core/services/settings';
@@ -90,6 +92,7 @@ const MimozaLightTheme = {
 function AppShell() {
   const { scheme } = useAppSettings();
   const { message, visible, dismiss, settle } = useMessages();
+  const alert = useAlerts();
   useSessionExpiry();
 
   return (
@@ -106,6 +109,25 @@ function AppShell() {
       {/* Outside the stack, so a message survives the screen that caused
           it — including one that navigates away as it reports. */}
       <Snackbar message={message} visible={visible} dismiss={dismiss} onHidden={settle} />
+      {/* Same reasoning: the app's own stand-in for `Alert.alert`, so it
+          has to outlive the screen that opened it too. Every button gets
+          `dismiss` folded into its own `onPress` here, rather than inside
+          `Dialog` itself — `NotificationPromptDialog` is the other caller,
+          and it already closes itself through its own state. */}
+      <Dialog
+        visible={alert.visible}
+        title={alert.request?.title ?? ''}
+        message={alert.request?.message}
+        buttons={(alert.request?.buttons ?? []).map((button) => ({
+          ...button,
+          onPress: () => {
+            alert.dismiss();
+            button.onPress?.();
+          },
+        }))}
+        onDismiss={alert.dismiss}
+        onHidden={alert.settle}
+      />
       {/* Last, so it sits over every screen and the snackbar alike. */}
       <EnvBadge />
     </ThemeProvider>

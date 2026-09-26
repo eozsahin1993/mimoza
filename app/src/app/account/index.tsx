@@ -4,10 +4,11 @@ import { useLocales } from 'expo-localization';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
+import { showAlert } from '@/core/services/alerts';
 import { LoadingModal } from '@/ui/components/loading-modal';
 import { OptionSheet } from '@/ui/components/option-sheet';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
@@ -164,7 +165,7 @@ export default function AccountScreen() {
   };
 
   function handleDevReset() {
-    Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, the account keypair, and the database itself. No undo.', [
+    showAlert('Reset all local data? (dev only)', 'Wipes every circle, key, the account keypair, and the database itself. No undo.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Reset',
@@ -183,7 +184,7 @@ export default function AccountScreen() {
   }
 
   function handleSignOut() {
-    Alert.alert(
+    showAlert(
       t('settings.signOutTitle'),
       t('settings.signOutMessage'),
       [
@@ -205,7 +206,7 @@ export default function AccountScreen() {
   }
 
   function handleDeleteAccount() {
-    Alert.alert(
+    showAlert(
       t('settings.deleteTitle'),
       t('settings.deleteMessage'),
       [

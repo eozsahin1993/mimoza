@@ -5,9 +5,9 @@ import {
   type NotificationResponse,
 } from 'expo-notifications';
 import { router } from 'expo-router';
-import { Alert } from 'react-native';
 
 import { initDatabase, getPost } from '@/data/db';
+import { showAlert } from '@/core/services/alerts';
 import { i18n } from '@/core/i18n/i18n';
 import { discoverPendingRequests } from '@/features/invite/usecases/invite-to-circle';
 
@@ -82,7 +82,7 @@ async function openDestination(response: NotificationResponse): Promise<void> {
     if (requestId) {
       const stillPending = (await discoverPendingRequests(circleId)).some((request) => request.requestId === requestId);
       if (!stillPending) {
-        Alert.alert(i18n.t('feed.requestGoneTitle'), i18n.t('feed.requestGoneMessage'));
+        showAlert(i18n.t('feed.requestGoneTitle'), i18n.t('feed.requestGoneMessage'), [{ text: i18n.t('common.ok') }]);
       }
     }
   } catch (err) {

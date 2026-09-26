@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { showAlert } from '@/core/services/alerts';
 import { DeviceLinkAnsweredError, DeviceLinkGoneError } from '@/core/services/relay-errors';
 import { completeDeviceLink, parseDeviceLinkPayload } from '@/features/account/usecases/device-link';
 import { getProfile, listCircles } from '@/data/db';
@@ -36,11 +37,11 @@ export default function DeviceLinkScanScreen() {
     setSending(true);
     try {
       await completeDeviceLink(profile.accountId, payload);
-      Alert.alert(t('account.scanDevice.sent'), undefined, [{ text: t('account.scanDevice.back'), onPress: router.back }]);
+      showAlert(t('account.scanDevice.sent'), undefined, [{ text: t('account.scanDevice.back'), onPress: router.back }]);
     } catch (err) {
       console.error('Failed to send the account keys to the scanned device', err);
       const gone = err instanceof DeviceLinkGoneError || err instanceof DeviceLinkAnsweredError;
-      Alert.alert(
+      showAlert(
         t('account.scanDevice.addFailed'),
         gone ? t('account.scanDevice.expiredCode') : t('account.transfer.somethingWrong'),
         [{ text: t('account.scanDevice.back'), onPress: router.back }]
@@ -55,14 +56,14 @@ export default function DeviceLinkScanScreen() {
     try {
       payload = parseDeviceLinkPayload(data);
     } catch {
-      Alert.alert(t('account.scanDevice.unreadableCode'), t('account.scanDevice.invalidCode'), [
+      showAlert(t('account.scanDevice.unreadableCode'), t('account.scanDevice.invalidCode'), [
         { text: t('account.scanDevice.back'), onPress: router.back },
       ]);
       return;
     }
 
     const count = (await listCircles()).length;
-    Alert.alert(t('account.scanDevice.confirmTitleUnnamed'), t('account.scanDevice.confirmMessage', { count }), [
+    showAlert(t('account.scanDevice.confirmTitleUnnamed'), t('account.scanDevice.confirmMessage', { count }), [
       { text: t('common.cancel'), style: 'cancel', onPress: () => setRearm((n) => n + 1) },
       { text: t('account.scanDevice.addDevice'), onPress: () => void send(payload) },
     ]);

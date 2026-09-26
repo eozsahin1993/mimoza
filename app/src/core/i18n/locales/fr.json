@@ -1,6 +1,7 @@
 {
   "common": {
     "cancel": "Annuler",
+    "ok": "OK",
     "settingNotSaved": "Impossible d’enregistrer ce réglage",
     "sessionExpired": "Ta session a expiré"
   },

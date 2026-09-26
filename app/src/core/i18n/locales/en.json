@@ -1,6 +1,7 @@
 {
   "common": {
     "cancel": "Cancel",
+    "ok": "OK",
     "settingNotSaved": "Could not save that setting",
     "sessionExpired": "Your session expired"
   },

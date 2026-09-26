@@ -1,6 +1,7 @@
 {
   "common": {
     "cancel": "İptal",
+    "ok": "Tamam",
     "settingNotSaved": "Ayar kaydedilemedi",
     "sessionExpired": "Oturumun sona erdi"
   },

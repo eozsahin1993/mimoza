@@ -1,6 +1,7 @@
 {
   "common": {
     "cancel": "Cancelar",
+    "ok": "Aceptar",
     "settingNotSaved": "No se ha podido guardar el ajuste",
     "sessionExpired": "Tu sesión ha caducado"
   },
