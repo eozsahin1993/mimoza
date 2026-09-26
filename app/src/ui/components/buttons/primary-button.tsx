@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, type PressableProps } from 'react-native';
+import { Pressable, StyleSheet, View, type PressableProps } from 'react-native';
 
 import { ButtonHeight, Radius, Space } from '@/ui/theme/tokens';
 import { ThemedText } from '@/ui/theme/themed-text';
@@ -8,9 +8,11 @@ import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type PrimaryButtonProps = PressableProps & {
   label: string;
+  /** 'destructive' fills the button in the danger color instead of the accent gradient — for a confirm that can't be undone. */
+  tone?: 'default' | 'destructive';
 };
 
-export function PrimaryButton({ label, style, disabled, ...rest }: PrimaryButtonProps) {
+export function PrimaryButton({ label, style, disabled, tone = 'default', ...rest }: PrimaryButtonProps) {
   const theme = useTheme();
 
   return (
@@ -22,6 +24,12 @@ export function PrimaryButton({ label, style, disabled, ...rest }: PrimaryButton
               {label}
             </ThemedText>
           </ThemedView>
+        ) : tone === 'destructive' ? (
+          <View style={[styles.button, { backgroundColor: theme.danger }, pressed && styles.pressed]}>
+            <ThemedText type="labelLarge" style={styles.destructiveLabel} numberOfLines={1}>
+              {label}
+            </ThemedText>
+          </View>
         ) : (
           <LinearGradient
             colors={[theme.accent, theme.accentBright]}
@@ -49,5 +57,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  destructiveLabel: {
+    color: '#FFFFFF',
   },
 });

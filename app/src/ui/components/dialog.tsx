@@ -8,26 +8,34 @@ import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 
+export type DialogButton = {
+  text: string;
+  /** 'destructive' fills the button in the danger color. 'cancel' is what tapping outside or the Android back button triggers, on top of closing. */
+  style?: 'default' | 'cancel' | 'destructive';
+  onPress?: () => void;
+};
+
 export type DialogProps = {
   visible: boolean;
   title: string;
-  message: string;
-  confirmLabel: string;
-  cancelLabel: string;
-  onConfirm: () => void;
-  /** Also what tapping outside or the Android back button does. */
-  onCancel: () => void;
+  message?: string;
+  /** One button renders full-width; two render side by side, the first as the secondary (left) action. */
+  buttons: DialogButton[];
+  /** Always fires on close — tapping outside, the Android back button, or either button. */
+  onDismiss: () => void;
+  /** Called once the closing fade has finished — see `useAlerts`, which waits for this before showing the next one queued. */
+  onHidden?: () => void;
 };
 
 /**
- * A centered two-button dialog in the app's own style — for a decision
- * that deserves the middle of the screen, where a sheet would read as a
- * side action. A styled stand-in for `Alert.alert`, which can't be themed.
+ * A centered dialog in the app's own style — for a decision that
+ * deserves the middle of the screen, where a sheet would read as a side
+ * action. A styled stand-in for `Alert.alert`, which can't be themed.
  *
  * Same fade mechanics as `LoadingModal`: mounted but not visible, so the
  * closing fade has something left to animate.
  */
-export function Dialog({ visible, title, message, confirmLabel, cancelLabel, onConfirm, onCancel }: DialogProps) {
+export function Dialog({ visible, title, message, buttons, onDismiss, onHidden }: DialogProps) {
   const tints = useTints();
   const [mounted, setMounted] = useState(visible);
   const [progress] = useState(() => new Animated.Value(visible ? 1 : 0));
@@ -41,26 +49,52 @@ export function Dialog({ visible, title, message, confirmLabel, cancelLabel, onC
       duration: visible ? 240 : 200,
       useNativeDriver: true,
     }).start(({ finished }) => {
-      if (finished && !visible) setMounted(false);
+      if (finished && !visible) {
+        setMounted(false);
+        onHidden?.();
+      }
     });
-  }, [visible, progress]);
+  }, [visible, progress, onHidden]);
 
   if (!mounted) return null;
 
+  const [first, second] = buttons;
+  const primary = second ?? first;
+
+  function handleBackdrop() {
+    // Matches what the platform's own alert does when there's a way to
+    // decline — a bare "OK" alert has no cancel button, so dismissing it
+    // this way answers nothing.
+    buttons.find((button) => button.style === 'cancel')?.onPress?.();
+    onDismiss();
+  }
+
+  function press(button: DialogButton) {
+    onDismiss();
+    button.onPress?.();
+  }
+
   return (
-    <Modal transparent visible animationType="none" onRequestClose={onCancel}>
+    <Modal transparent visible animationType="none" onRequestClose={handleBackdrop}>
       <Animated.View style={[styles.backdrop, { opacity: progress }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleBackdrop} />
         {/* `raised`, as for anything floating over the page (see the
             tokens' note): `surface` all but vanishes into a dark page. */}
         <ThemedView type="raised" style={[styles.card, { borderColor: tints.raisedBorder }]}>
           <ThemedText type="titleLarge">{title}</ThemedText>
-          <ThemedText type="bodyMedium" themeColor="muted">
-            {message}
-          </ThemedText>
+          {message ? (
+            <ThemedText type="bodyMedium" themeColor="muted">
+              {message}
+            </ThemedText>
+          ) : null}
           <View style={styles.actions}>
-            <SecondaryButton label={cancelLabel} style={styles.action} onPress={onCancel} />
-            <PrimaryButton label={confirmLabel} style={styles.action} onPress={onConfirm} />
+            {second ? <SecondaryButton label={first.text} style={styles.action} onPress={() => press(first)} /> : null}
+            <PrimaryButton
+              label={primary.text}
+              tone={primary.style === 'destructive' ? 'destructive' : 'default'}
+              style={styles.action}
+              onPress={() => press(primary)}
+            />
           </View>
         </ThemedView>
       </Animated.View>

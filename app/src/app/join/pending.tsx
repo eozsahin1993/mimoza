@@ -1,13 +1,14 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, AppState, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Space, Spacing } from '@/ui/theme/tokens';
+import { showAlert } from '@/core/services/alerts';
 import { getRequest } from '@/data/db';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 
@@ -88,7 +89,7 @@ export default function JoinPendingScreen() {
 
   function handleCancel() {
     if (!circleId) return;
-    Alert.alert(t('invite.pending.withdrawTitle'), t('invite.pending.withdrawMessage'), [
+    showAlert(t('invite.pending.withdrawTitle'), t('invite.pending.withdrawMessage'), [
       { text: t('invite.pending.keepWaiting'), style: 'cancel' },
       {
         text: t('invite.pending.withdrawConfirm'),

@@ -1,9 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
+import { showAlert } from '@/core/services/alerts';
 import { BottomSheet } from '@/ui/components/bottom-sheet';
 import { LoadingModal } from '@/ui/components/loading-modal';
 import { PrimaryButton } from '@/ui/components/buttons/primary-button';
@@ -105,7 +106,7 @@ export default function DeviceLinkScreen() {
       if (closedRef.current) return;
       console.error('Device link failed', err);
       setLink({ kind: 'idle' });
-      Alert.alert(t('account.keyRecovery.failed'), t('account.transfer.somethingWrong'));
+      showAlert(t('account.keyRecovery.failed'), t('account.transfer.somethingWrong'), [{ text: t('common.ok') }]);
     }
   }
 
@@ -127,7 +128,7 @@ export default function DeviceLinkScreen() {
       await finishSignIn({ accountId, name: name ?? '' });
     } catch (err) {
       console.error('Failed to create new keys for this device', err);
-      Alert.alert(t('account.keyRecovery.failed'), t('account.transfer.somethingWrong'));
+      showAlert(t('account.keyRecovery.failed'), t('account.transfer.somethingWrong'), [{ text: t('common.ok') }]);
     } finally {
       setCreatingKey(false);
     }

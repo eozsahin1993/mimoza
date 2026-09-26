@@ -1,6 +1,7 @@
 {
   "common": {
     "cancel": "Abbrechen",
+    "ok": "OK",
     "settingNotSaved": "Die Einstellung konnte nicht gespeichert werden",
     "sessionExpired": "Deine Sitzung ist abgelaufen"
   },

@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -38,6 +38,7 @@ import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative } from '@/core/utils/time';
 import { upperCase } from '@/core/i18n/text';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
+import { showAlert } from '@/core/services/alerts';
 import { showError } from '@/core/services/messages';
 import { syncCircles } from '@/core/sync/sync-circles';
 import { useLanguage } from '@/core/i18n/use-language';
@@ -199,7 +200,7 @@ export default function CircleListScreen() {
   );
 
   const handleCancelPending = useCallback((request: PendingRequest) => {
-    Alert.alert(t('circle.list.cancelPendingTitle', { name: request.circleName }), t('circle.list.cancelPendingMessage'), [
+    showAlert(t('circle.list.cancelPendingTitle', { name: request.circleName }), t('circle.list.cancelPendingMessage'), [
       { text: t('circle.list.keepWaiting'), style: 'cancel' },
       {
         text: t('circle.list.cancelRequest'),

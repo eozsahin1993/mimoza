@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
@@ -24,6 +24,7 @@ import {
   publishAccountKeypairOrDegrade,
 } from '@/features/account/usecases/account-keypair-flow';
 import { finishSignIn } from '@/features/account/usecases/finish-sign-in';
+import { showAlert } from '@/core/services/alerts';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 
 type Provider = 'apple' | 'google';
@@ -106,11 +107,12 @@ export default function WelcomeScreen() {
       // isn't available at all on this device (see appleAvailable above),
       // so telling an Android user to "try Apple instead" would be wrong.
       const otherLabel = provider === 'apple' ? 'Google' : appleAvailable ? 'Apple' : null;
-      Alert.alert(
+      showAlert(
         t('onboarding.signInFailedTitle'),
         otherLabel
           ? t('onboarding.signInFailedTryOther', { provider: providerLabel, other: otherLabel })
           : t('onboarding.signInFailed', { provider: providerLabel }),
+        [{ text: t('common.ok') }],
       );
     } finally {
       setBusyProvider(null);

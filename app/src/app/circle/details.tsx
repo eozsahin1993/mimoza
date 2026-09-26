@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ActionSheet, type ActionSheetOption } from '@/ui/components/action-sheet';
@@ -31,6 +31,7 @@ import {
   type NotifyLevel,
 } from '@/features/push-notifications/usecases/push-preferences';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
+import { showAlert } from '@/core/services/alerts';
 import { showDone, showError } from '@/core/services/messages';
 import { pickAndCompressImage } from '@/core/photo/image';
 import { formatMonth } from '@/core/utils/time';
@@ -106,7 +107,7 @@ export default function CircleDetailsScreen() {
 
   function handleRemoveMember(member: Member) {
     if (!circleId) return;
-    Alert.alert(
+    showAlert(
       member.name ? t('circle.details.removeTitle', { name: member.name }) : t('circle.details.removeTitleUnnamed'),
       t('circle.details.removeMessage'),
       [
@@ -225,7 +226,7 @@ export default function CircleDetailsScreen() {
   /** Asks first: this retires every invite already handed out. */
   function handleReplaceKey() {
     if (!circleId) return;
-    Alert.alert(
+    showAlert(
       t('circle.details.replaceKeyTitle'),
       t('circle.details.replaceKeyMessage'),
       [
@@ -256,7 +257,7 @@ export default function CircleDetailsScreen() {
     // hands the circle to someone, and this is where that can be
     // cancelled and overridden with "Make admin" on someone else.
     const name = circle?.name;
-    Alert.alert(
+    showAlert(
       lastMember
         ? name
           ? t('circle.details.deleteTitle', { name })

@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ActionSheet } from '@/ui/components/action-sheet';
@@ -36,6 +36,7 @@ import { openPost } from '@/features/post/usecases/open-post';
 import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
+import { showAlert } from '@/core/services/alerts';
 import { showError, showMessage } from '@/core/services/messages';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { onPhotoFetched } from '@/core/photo/photo-events';
@@ -191,7 +192,7 @@ export default function PostDetailsScreen() {
   function handleDelete() {
     if (!circleId || !postId) return;
 
-    Alert.alert(t('post.details.deleteConfirmTitle'), t('post.details.deleteConfirmMessage'), [
+    showAlert(t('post.details.deleteConfirmTitle'), t('post.details.deleteConfirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('post.details.delete'), style: 'destructive', onPress: runDelete },
     ]);

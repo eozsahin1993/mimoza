@@ -28,10 +28,11 @@ export function NotificationPromptDialog({ visible, waitingOn, onTurnOn, onNotNo
           ? t('notifications.prompt.bodyWaiting', { name: waitingOn.invitedByName, circle: waitingOn.circleName })
           : t('notifications.prompt.body')
       }
-      confirmLabel={t('notifications.prompt.turnOn')}
-      cancelLabel={t('notifications.prompt.notNow')}
-      onConfirm={onTurnOn}
-      onCancel={onNotNow}
+      buttons={[
+        { text: t('notifications.prompt.notNow'), style: 'cancel', onPress: onNotNow },
+        { text: t('notifications.prompt.turnOn'), onPress: onTurnOn },
+      ]}
+      onDismiss={onNotNow}
     />
   );
 }
