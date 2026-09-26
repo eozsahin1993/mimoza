@@ -24,6 +24,17 @@ const configs: Record<string, LocaleConfig> = Object.fromEntries(
 /** Channel names, read by i18next at JS runtime (services/channels.ts) — never through a native loc-key lookup. Mirrors the script. */
 const NOT_NATIVE = new Set(['channelGroup', 'invitesChannel']);
 
+/**
+ * The reverse case: native-only, with no loc-key entry to generate from at
+ * all. push_group_summary is GroupingNotificationsService.kt's own local
+ * "N new notifications" count string — formatted with a count, never sent
+ * by the relay (compose.go's Args are always actor/circle) — so it's
+ * authored directly in locales/*.json's android block, exactly like the
+ * generator script already expects for that file's other hand-maintained
+ * entries (see its own "merge rather than overwrite" comment).
+ */
+const ANDROID_ONLY = new Set(['push_group_summary']);
+
 const translations = { en, tr, es, fr, de };
 
 /** i18next's named placeholders, as each platform's own positional format specifier. Mirrors the script. */
@@ -44,7 +55,7 @@ test.each(Languages.map((language) => [language.code]))('%s: ios and android car
   const keys = Object.keys(push).filter((key) => !NOT_NATIVE.has(key));
 
   const ios = configs[code].ios?.['Localizable.strings'] ?? {};
-  const android = configs[code].android ?? {};
+  const android = Object.fromEntries(Object.entries(configs[code].android ?? {}).filter(([key]) => !ANDROID_ONLY.has(key)));
 
   expect(Object.keys(ios).sort()).toEqual(keys.map((key) => `push.${key}`).sort());
   expect(Object.keys(android).sort()).toEqual(keys.map((key) => androidKey(`push.${key}`)).sort());
