@@ -101,33 +101,6 @@ export function cachedCoverUri(circleId: string, hash: string): string | null {
 }
 
 /**
- * Suffixed with the avatar's own id, same reasoning as `coverFile`: a
- * member's picture is content-addressed (a changed picture is a new
- * avatarId, never an overwrite), so the old file simply stops being
- * referenced rather than needing to be invalidated.
- */
-function avatarFile(circleId: string, accountId: string, avatarId: string): File {
-  return new File(new Directory(Paths.cache, PHOTO_DIRECTORY), `${circleId}-avatar-${accountId}-${avatarId}.jpg`);
-}
-
-/** The avatar's cached path for this exact id, or null if it isn't cached yet. */
-export function cachedAvatarUri(circleId: string, accountId: string, avatarId: string): string | null {
-  const file = avatarFile(circleId, accountId, avatarId);
-  return file.exists ? file.uri : null;
-}
-
-/** Writes an avatar's bytes to the cache. Returns the `file://` URI. */
-export function writeAvatarFile(circleId: string, accountId: string, avatarId: string, bytes: Uint8Array): string {
-  const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
-  directory.create({ intermediates: true, idempotent: true });
-
-  const file = avatarFile(circleId, accountId, avatarId);
-  file.create({ overwrite: true });
-  file.write(bytes);
-  return file.uri;
-}
-
-/**
  * The cached file's URI, writing it from `readBytes()` only if it isn't
  * already there. `readBytes` is a callback rather than a value so a hit —
  * the overwhelmingly common case — never pulls the bytes out of SQLite

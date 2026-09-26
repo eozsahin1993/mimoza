@@ -147,24 +147,9 @@ function postRow(
   };
 }
 
-/**
- * Base64 is the one expensive thing in this file, and a row rebuild is
- * cheap otherwise — so cache by the bytes' own identity. Rebuilds happen
- * on every `patchPost` (a reaction, a comment) and those leave every
- * untouched post's picture the same array, so this hits on all but the
- * first pass after a reload.
- */
-const dataUris = new WeakMap<Uint8Array, string>();
-
+/** `bytesToDataUri` is memoized by the bytes' own identity, and a rebuild leaves every untouched post's picture the same array — so this hits on all but the first pass after a reload. */
 function pictureUri(picture: Uint8Array | null | undefined): string | undefined {
-  if (!picture) return undefined;
-
-  const cached = dataUris.get(picture);
-  if (cached) return cached;
-
-  const uri = bytesToDataUri(picture);
-  dataUris.set(picture, uri);
-  return uri;
+  return picture ? bytesToDataUri(picture) : undefined;
 }
 
 /** The relay's counts, adjusted by what's queued, into the shape PostCard already renders. */

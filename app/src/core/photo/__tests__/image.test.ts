@@ -1,4 +1,4 @@
-import { parsePictureThumbnail } from '@/core/photo/image';
+import { bytesToDataUri, parsePictureThumbnail } from '@/core/photo/image';
 
 const JPEG_HEADER = [0xff, 0xd8, 0xff];
 
@@ -21,6 +21,15 @@ test('rejects a non-string value outright', () => {
   expect(parsePictureThumbnail(undefined)).toBeNull();
   expect(parsePictureThumbnail(null)).toBeNull();
   expect(parsePictureThumbnail({})).toBeNull();
+});
+
+test('encodes bytes as a data URI', () => {
+  expect(bytesToDataUri(new Uint8Array([1, 2, 3]))).toBe('data:image/jpeg;base64,AQID');
+});
+
+test('a repeat call with the very same array stays correct once memoized', () => {
+  const bytes = new Uint8Array([1, 2, 3]);
+  expect(bytesToDataUri(bytes)).toBe(bytesToDataUri(bytes));
 });
 
 test('rejects an empty string', () => {

@@ -33,7 +33,8 @@ test("resolves an account's picture once its bytes have arrived", async () => {
 
   const resolved = await resolveMemberAvatars(circleId, [{ accountId: 'ali', avatarId: 'avatar-1' }]);
 
-  expect(resolved.get('ali')).toMatch(/^file:\/\/.*avatar-1\.jpg$/);
+  // AQID is [1, 2, 3] base64-encoded — bytes straight to a data URI, no file cache involved.
+  expect(resolved.get('ali')).toBe('data:image/jpeg;base64,AQID');
 });
 
 // No avatarId at all — never set one — is the common case, and must not

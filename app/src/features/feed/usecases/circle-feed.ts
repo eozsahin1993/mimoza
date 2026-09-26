@@ -9,6 +9,7 @@ import {
   listEveryMemberSeen,
   getProfile,
   summarise,
+  type CommentWithAuthor,
   type Post,
   type Profile,
   type ReactionSummary,
@@ -18,7 +19,7 @@ import { resolveMemberAvatars } from '@/features/circle/usecases/member-avatars'
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 
 /** One comment, with its author's current picture resolved alongside their name. */
-type CommentPreview = Awaited<ReturnType<typeof getComments>>[number] & { authorPhotoUri?: string };
+type CommentPreview = CommentWithAuthor & { authorPhotoUri?: string };
 
 /** The one comment a card shows, and the count behind its "Show all" link. */
 export type CommentSummary = { latest: CommentPreview | null; total: number };
@@ -127,16 +128,21 @@ export async function loadCircleFeedPage(
   const rawActivity = await listActivitySince(circleId, floor);
   const everyMember = await listEveryMemberSeen(circleId);
   const memberNames = new Map(everyMember.map((member) => [member.accountId, member.name]));
-  // A left member's picture is worth keeping too, same as their name —
-  // an old post or comment of theirs should still show who it was.
-  const avatarByAccount = await resolveMemberAvatars(
-    circleId,
-    everyMember.map((member) => ({ accountId: member.accountId, avatarId: member.avatarId })),
-  );
   const events = toMemberEvents(rawActivity.filter(isMembershipEvent), (accountId) => memberNames.get(accountId) ?? null);
 
   const photos = await resolvePhotos(circleId, page);
-  const commentsByPost = await commentSummaries(page, avatarByAccount);
+  const previewComments = await getComments(page.flatMap((post) => JSON.parse(post.recentCommentIds) as string[]));
+
+  // Only who this page actually needs a picture for — a post's author or
+  // a previewed comment's — not every member the circle has ever had.
+  const avatarsNeeded = new Set([...page.map((post) => post.authorId), ...previewComments.map((comment) => comment.authorId)]);
+  const membersByAccount = new Map(everyMember.map((member) => [member.accountId, member]));
+  const avatarByAccount = await resolveMemberAvatars(
+    circleId,
+    [...avatarsNeeded].map((accountId) => ({ accountId, avatarId: membersByAccount.get(accountId)?.avatarId ?? null })),
+  );
+
+  const commentsByPost = commentSummaries(page, previewComments, avatarByAccount);
   // No batched read for reactions yet (summarise is per post, unlike
   // comments/photos above) — FEED_PAGE_SIZE queries per page until one
   // exists.
@@ -160,13 +166,15 @@ export async function loadCircleFeedPage(
 }
 
 /**
- * The preview on every post in the page, in one getComments call across
- * all of their recentCommentIds instead of one call per post.
+ * The preview on every post in the page, from the one getComments call
+ * the caller already made across all of their recentCommentIds instead
+ * of one call per post.
  */
-async function commentSummaries(posts: Post[], avatarByAccount: Map<string, string>): Promise<Map<string, CommentSummary>> {
-  const allIds = posts.flatMap((post) => JSON.parse(post.recentCommentIds) as string[]);
-  const comments = await getComments(allIds);
-
+function commentSummaries(
+  posts: Post[],
+  comments: CommentWithAuthor[],
+  avatarByAccount: Map<string, string>,
+): Map<string, CommentSummary> {
   const byPost = new Map<string, typeof comments>();
   for (const comment of comments) {
     const list = byPost.get(comment.postId);
