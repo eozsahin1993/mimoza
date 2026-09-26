@@ -20,6 +20,7 @@
     "push_approved": "%1$s isteğini kabul etti",
     "push_commented_other": "%1$s yorum yaptı",
     "push_commented_yours": "%1$s fotoğrafına yorum yaptı",
+    "push_group_summary": "%1$d yeni bildirim",
     "push_join_request": "%1$s katılmak istiyor",
     "push_posted": "%1$s bir fotoğraf ekledi",
     "push_reacted_other": "%1$s bir fotoğrafa tepki verdi",

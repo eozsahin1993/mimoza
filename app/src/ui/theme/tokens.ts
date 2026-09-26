@@ -39,7 +39,7 @@ import type { IconGlyph } from '@/ui/components/icon';
 
 export const Colors = {
   dark: {
-    background: '#221B15',
+    background: '#18130F',
     surface: '#332A21',
     raised: '#40352B',
     accent: '#C08A2E',

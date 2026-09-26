@@ -11,9 +11,14 @@ package push
 
 import (
 	"context"
+	"errors"
 
 	"mimoza-relay/internal/circles"
 )
+
+// ErrUnregistered is what a Sender wraps its error in when the platform
+// itself says a token is dead (FCM/APNs both use 404 for this).
+var ErrUnregistered = errors.New("push: device unregistered")
 
 // Message is one notification. Silent carries no card at all — it is how
 // a roster change wakes a phone to sync.

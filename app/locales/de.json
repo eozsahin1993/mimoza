@@ -20,6 +20,7 @@
     "push_approved": "%1$s hat deine Anfrage angenommen",
     "push_commented_other": "%1$s hat kommentiert",
     "push_commented_yours": "%1$s hat dein Foto kommentiert",
+    "push_group_summary": "%1$d neue Benachrichtigungen",
     "push_join_request": "%1$s möchte beitreten",
     "push_posted": "%1$s hat ein Foto hinzugefügt",
     "push_reacted_other": "%1$s hat auf ein Foto reagiert",

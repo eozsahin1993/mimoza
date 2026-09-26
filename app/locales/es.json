@@ -20,6 +20,7 @@
     "push_approved": "%1$s aceptó tu solicitud",
     "push_commented_other": "%1$s comentó",
     "push_commented_yours": "%1$s comentó en tu foto",
+    "push_group_summary": "%1$d notificaciones nuevas",
     "push_join_request": "%1$s quiere unirse",
     "push_posted": "%1$s añadió una foto",
     "push_reacted_other": "%1$s reaccionó a una foto",

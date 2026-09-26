@@ -31,31 +31,31 @@ func New(account *ServiceAccount) *Sender {
 	}
 }
 
-// Send delivers one message to one device token. The text is
-// localization keys, which Android resolves against the app's own
-// strings.xml.
+// Send delivers one message to one device token, entirely as data: FCM's
+// own notification block bypasses the app whenever it isn't in the
+// foreground (https://firebase.google.com/docs/cloud-messaging/android/receive),
+// and has no field for grouping by circle either, so push-localization/android
+// does all of it — resolving the loc keys against the app's own
+// strings.xml and grouping — for every app state, not just foreground.
 func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Message) error {
 	accessToken, err := s.tokens.accessToken(ctx)
 	if err != nil {
 		return err
 	}
 
+	data := message.Data
+	if !message.Silent {
+		data = androidNotificationData(message)
+	}
+
 	payload := map[string]any{
 		"token": deviceToken,
-		"data":  message.Data,
+		"data":  data,
 		"android": map[string]any{
 			// High priority, or Doze defers a data-only message
 			// indefinitely and a notification arrives hours late.
 			"priority": "high",
 		},
-	}
-	if !message.Silent {
-		payload["android"].(map[string]any)["notification"] = map[string]any{
-			"title_loc_key":  androidResourceName(message.TitleKey),
-			"title_loc_args": message.Args,
-			"body_loc_key":   androidResourceName(message.BodyKey),
-			"body_loc_args":  message.Args,
-		}
 	}
 
 	body, err := json.Marshal(map[string]any{"message": payload})
@@ -77,13 +77,31 @@ func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Mess
 	}
 	defer resp.Body.Close()
 
-	// The body can name the device token, so only the status is
-	// reported. A 404 or 400 usually means a stale token; nothing prunes
-	// them yet, and a dead token costs one failed send per notification.
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("send push: %s: %w", resp.Status, push.ErrUnregistered)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("send push: %s", resp.Status)
 	}
 	return nil
+}
+
+// androidNotificationData copies message's data, never mutating it —
+// fanout.go shares one Data map across every device, iOS included — and
+// adds "body" as JSON, the only path back to content.body on Android.
+func androidNotificationData(message push.Message) map[string]string {
+	locArgs, _ := json.Marshal(message.Args)
+	body, _ := json.Marshal(message.Data)
+
+	data := make(map[string]string, len(message.Data)+4)
+	for k, v := range message.Data {
+		data[k] = v
+	}
+	data["titleLocKey"] = androidResourceName(message.TitleKey)
+	data["bodyLocKey"] = androidResourceName(message.BodyKey)
+	data["locArgs"] = string(locArgs)
+	data["body"] = string(body)
+	return data
 }
 
 // androidResourceName is a loc key as Android's own resource compiler

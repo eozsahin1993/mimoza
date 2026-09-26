@@ -14,6 +14,7 @@ import { Colors } from '@/ui/theme/tokens';
 import { initDatabase } from '@/data/db';
 import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
 import { startPushTapRouting } from '@/features/push-notifications/services/tap';
+import { ensureLocalizedChannels, followLanguageInChannelNames } from '@/features/push-notifications/services/channels';
 import { AppSettingsProvider, useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useAlerts } from '@/core/hooks/use-alerts';
 import { useMessages } from '@/core/hooks/use-messages';
@@ -151,6 +152,8 @@ export default function RootLayout() {
       })
       .catch((error) => console.error('Failed to initialize database', error));
     startPushTapRouting();
+    followLanguageInChannelNames();
+    ensureLocalizedChannels().catch((error) => console.error('Failed to set up notification channels', error));
     getAppSettings()
       .then((loaded) => {
         applyLanguage(loaded.language);

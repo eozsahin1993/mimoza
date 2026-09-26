@@ -1,5 +1,6 @@
 import { renameCircle as renameLocally } from '@/data/db';
 import { renameCircle as renameOnRelay } from '@/features/circle/services/circle-relay';
+import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 /**
  * Admin-only, enforced by the relay; the wall gets a `renamed` entry.
@@ -14,4 +15,7 @@ export async function renameCircle(circleId: string, name: string): Promise<void
 
   await renameOnRelay(circleId, trimmed);
   await renameLocally(circleId, trimmed);
+  await ensureCircleNotificationChannel(circleId, trimmed).catch((err) =>
+    console.error(`Failed to rename notification channel for ${circleId}`, err)
+  );
 }

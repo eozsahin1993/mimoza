@@ -48,6 +48,13 @@
           "imageWidth": 200
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/splash-icon.png",
+          "color": "#F0BE3A"
+        }
+      ],
       "expo-font",
       "expo-secure-store",
       "expo-sqlite",

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -56,6 +57,15 @@ func member(id, level string) circles.Member {
 
 func phone(id string) map[string][]accounts.Device {
 	return map[string][]accounts.Device{id: {{DeviceID: "phone-1", PushToken: "token-" + id, Platform: accounts.PlatformIOS}}}
+}
+
+type deleted struct{ accountID, deviceID string }
+
+type fakeDevices struct{ deletions []deleted }
+
+func (f *fakeDevices) Delete(_ context.Context, accountID, deviceID string) error {
+	f.deletions = append(f.deletions, deleted{accountID, deviceID})
+	return nil
 }
 
 // A level says what reaches you. Nobody hears about their own doing.
@@ -232,6 +242,59 @@ func TestNotify_ReportsWhatItDelivered(t *testing.T) {
 			t.Errorf("log is missing %s: %s", want, line)
 		}
 	}
+}
+
+// A platform saying a token is dead is the one failure that should
+// outlive the send that discovered it: fanout prunes it there and then,
+// not on some later sweep.
+func TestNotify_PrunesADeviceThePlatformDeclaresDead(t *testing.T) {
+	fake := &fakeDevices{}
+	notifier := &Notifier{
+		Circles:  &fakeCircles{roster: []circles.Member{member("all", circles.NotifyAll)}},
+		Accounts: &fakeAccounts{devices: phone("all")},
+		Devices:  fake,
+		Send: func(context.Context, string, string, Message) error {
+			return fmt.Errorf("send push: 404 Not Found: %w", ErrUnregistered)
+		},
+	}
+	notifier.Notify(context.Background(), Event{Kind: KindPost, CircleID: "circle-1", ActorID: "actor"})
+
+	if len(fake.deletions) != 1 || fake.deletions[0] != (deleted{"all", "phone-1"}) {
+		t.Fatalf("expected the dead device pruned, got %+v", fake.deletions)
+	}
+}
+
+// An ordinary failure (the network, a rate limit, a malformed payload)
+// says nothing about whether the token itself is still good, so it must
+// not prune anything — see the fcm/apns senders' own 400-vs-404 split.
+func TestNotify_AnOrdinaryFailureDoesNotPruneTheDevice(t *testing.T) {
+	fake := &fakeDevices{}
+	notifier := &Notifier{
+		Circles:  &fakeCircles{roster: []circles.Member{member("all", circles.NotifyAll)}},
+		Accounts: &fakeAccounts{devices: phone("all")},
+		Devices:  fake,
+		Send: func(context.Context, string, string, Message) error {
+			return errors.New("send push: 500 Internal Server Error")
+		},
+	}
+	notifier.Notify(context.Background(), Event{Kind: KindPost, CircleID: "circle-1", ActorID: "actor"})
+
+	if len(fake.deletions) != 0 {
+		t.Fatalf("expected nothing pruned, got %+v", fake.deletions)
+	}
+}
+
+// A nil Devices is every environment before this was wired in, plus any
+// test that doesn't care — an unregistered token must not panic there.
+func TestNotify_ErrUnregisteredWithNoDevicesDoesNotPanic(t *testing.T) {
+	notifier := &Notifier{
+		Circles:  &fakeCircles{roster: []circles.Member{member("all", circles.NotifyAll)}},
+		Accounts: &fakeAccounts{devices: phone("all")},
+		Send: func(context.Context, string, string, Message) error {
+			return ErrUnregistered
+		},
+	}
+	notifier.Notify(context.Background(), Event{Kind: KindPost, CircleID: "circle-1", ActorID: "actor"})
 }
 
 // Letting someone back in is an admin's job. A silent nudge goes to

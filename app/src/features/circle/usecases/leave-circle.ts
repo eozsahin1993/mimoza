@@ -2,6 +2,7 @@ import { getProfile, markCircleLeft } from '@/data/db';
 import { generateContentKey } from '@/features/circle/crypto';
 import { getRoster, leaveCircle as leaveOnRelay } from '@/features/circle/services/circle-relay';
 import { sealForEach } from '@/features/circle/usecases/key-exchange';
+import { removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 /**
  * Rotates on the way out, so nothing written afterwards is readable with
@@ -24,4 +25,7 @@ export async function leaveCircle(circleId: string): Promise<void> {
   await leaveOnRelay(circleId, roster.keyVersion, sealForEach(staying, generateContentKey()));
 
   await markCircleLeft(circleId, Date.now());
+  await removeCircleNotificationChannel(circleId).catch((err) =>
+    console.error(`Failed to remove notification channel for ${circleId}`, err)
+  );
 }

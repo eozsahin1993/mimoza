@@ -2,6 +2,7 @@ package push
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"mimoza-relay/internal/accounts"
@@ -18,6 +19,12 @@ type accountReader interface {
 	ListDevices(ctx context.Context, accountID string) ([]accounts.Device, error)
 }
 
+// deviceDeleter is devices.Service's own Delete, kept as its own
+// interface rather than folded into accountReader
+type deviceDeleter interface {
+	Delete(ctx context.Context, accountID, deviceID string) error
+}
+
 // Notifier fans one event out to the phones it should reach. It runs
 // inside the handler that wrote the thing, so a failure here is logged
 // rather than returned: the write already happened, and telling the
@@ -25,6 +32,9 @@ type accountReader interface {
 type Notifier struct {
 	Circles  circleReader
 	Accounts accountReader
+	// Devices prunes a registration the platform itself has declared
+	// dead (see ErrUnregistered)
+	Devices deviceDeleter
 	// Send is nil until an environment has push credentials. Fanout
 	// still resolves and reports; it just delivers nothing.
 	Send Sender
@@ -68,6 +78,15 @@ func (n *Notifier) Notify(ctx context.Context, event Event) {
 				skipped++
 				slog.WarnContext(ctx, "a push did not land",
 					"reason", "push_failed", "error", err, "platform", device.Platform)
+				if errors.Is(err, ErrUnregistered) && n.Devices != nil {
+					if delErr := n.Devices.Delete(ctx, recipient, device.DeviceID); delErr != nil {
+						slog.WarnContext(ctx, "could not prune a dead device",
+							"reason", "device_prune_failed", "error", delErr, "accountId", recipient)
+					} else {
+						slog.InfoContext(ctx, "pruned a dead device",
+							"reason", "device_unregistered", "accountId", recipient, "platform", device.Platform)
+					}
+				}
 				continue
 			}
 			delivered++

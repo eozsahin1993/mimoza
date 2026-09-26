@@ -5,20 +5,18 @@ import com.google.firebase.messaging.RemoteMessage
 import expo.modules.notifications.service.ExpoFirebaseMessagingService
 import expo.modules.notifications.service.interfaces.FirebaseMessagingDelegate
 import expo.modules.notifications.service.delegates.FirebaseMessagingDelegate as StockDelegate
+import org.json.JSONArray
 
 /**
  * Registered by this module's own AndroidManifest.xml at normal priority,
- * ahead of expo-notifications' own declaration (priority="-1" there, on
- * purpose) for the same MESSAGING_EVENT intent, so this is the one FCM
- * actually delivers to.
+ * ahead of expo-notifications' own declaration (priority="-1" there), so
+ * this is the one FCM actually delivers to.
  *
- * expo-notifications only ever reads a message's literal `notification.title`
- * / `.body`, or a plain `data.title` / `data.message` — never FCM's own
- * title_loc_key/body_loc_key mechanism the relay actually sends (see the
- * relay's push/compose.go and push/fcm/sender.go); see
- * https://github.com/expo/expo/issues/7961, open since 2020, for the
- * library's own stance on this — safe to remove this module (and drop the
- * relay back to sending literal text there) if that ever changes.
+ * Every card ships data-only (see fcm/sender.go): FCM's notification
+ * block bypasses the app whenever it isn't foregrounded, which breaks
+ * both loc-key resolution and grouping by circle (see
+ * GroupingNotificationsService) — so titleLocKey/bodyLocKey/locArgs ride
+ * as plain data fields instead, resolved here.
  */
 class LocalizingFirebaseMessagingService : ExpoFirebaseMessagingService() {
   override val firebaseMessagingDelegate: FirebaseMessagingDelegate by lazy {
@@ -27,15 +25,16 @@ class LocalizingFirebaseMessagingService : ExpoFirebaseMessagingService() {
 }
 
 /**
- * Resolves a message's title_loc_key/body_loc_key against this app's own
- * strings.xml, the same way Play Services would for a killed app, then
- * hands a message carrying literal data.title/data.message to the stock
- * delegate, unchanged otherwise. Tap-routing and background tasks read
- * the same `data` map either way (see RemoteMessageSerializer), so
- * nothing about them needs to know this happened.
+ * Resolves titleLocKey/bodyLocKey (see fcm/sender.go's
+ * androidNotificationData) against this app's own strings.xml, then
+ * hands the stock delegate a message carrying literal data.title/
+ * data.message — unchanged otherwise, so tap-routing and background
+ * tasks (which read the same `data` map) don't need to know this
+ * happened.
  *
- * A message with no loc-key at all — a silent roster nudge, which never
- * carries a `notification` block — passes through completely untouched.
+ * A silent roster nudge has no loc key at all, so it passes through
+ * untouched and is never presented — title-and-body-less is "nothing to
+ * show" both here and to setNotificationHandler.
  */
 private class LocalizingDelegate(
   private val context: Context,
@@ -46,9 +45,10 @@ private class LocalizingDelegate(
   }
 
   private fun resolved(remoteMessage: RemoteMessage): RemoteMessage {
-    val notification = remoteMessage.notification ?: return remoteMessage
-    val title = resolve(notification.titleLocalizationKey, notification.titleLocalizationArgs)
-    val body = resolve(notification.bodyLocalizationKey, notification.bodyLocalizationArgs)
+    val data = remoteMessage.data
+    val args = data["locArgs"]?.let(::parseArgs)
+    val title = resolve(data["titleLocKey"], args)
+    val body = resolve(data["bodyLocKey"], args)
     if (title == null && body == null) return remoteMessage
 
     val builder = RemoteMessage.Builder(remoteMessage.to ?: context.packageName)
@@ -61,11 +61,17 @@ private class LocalizingDelegate(
     return builder.build()
   }
 
-  /** Android's own resource compiler rejects a "." in a string resource's name — the relay already names these without one (see androidResourceName in fcm/sender.go), so no translation is needed here. */
+  // Already underscored by the relay (androidResourceName in
+  // fcm/sender.go), since aapt2 rejects a "." in a resource name.
   private fun resolve(key: String?, args: Array<String>?): String? {
-    key ?: return null
+    if (key.isNullOrEmpty()) return null
     val resId = context.resources.getIdentifier(key, "string", context.packageName)
     if (resId == 0) return null
     return context.getString(resId, *(args ?: emptyArray()))
+  }
+
+  private fun parseArgs(json: String): Array<String> {
+    val array = JSONArray(json)
+    return Array(array.length()) { array.getString(it) }
   }
 }

@@ -171,8 +171,9 @@ func testMessage() push.Message {
 	}
 }
 
-// The card is localization keys, which Android renders against the app's
-// own strings.xml, and the data rides alongside for the tap.
+// Every card ships data-only (see Send's doc comment for why): the loc
+// keys and args ride in data for push-localization/android to resolve
+// against the app's own strings.xml, same as the rest of the data.
 func TestSendPostsLocalizationKeys(t *testing.T) {
 	tokens := tokenServer(t, 3600, new(int))
 	defer tokens.Close()
@@ -192,17 +193,26 @@ func TestSendPostsLocalizationKeys(t *testing.T) {
 
 	message, _ := got["message"].(map[string]any)
 	android, _ := message["android"].(map[string]any)
-	notification, _ := android["notification"].(map[string]any)
-	// Dotted as compose.go names them, matching iOS's own Localizable.strings
-	// convention — but aapt2 rejects a "." in a resource name, so Android's
-	// own copy has to lose it. See TestSendUnderscoresLocKeysForAndroid.
-	if notification["body_loc_key"] != "push_posted" || notification["title_loc_key"] != "push_title_circle" {
-		t.Fatalf("notification = %v", notification)
+	if _, carries := android["notification"]; carries {
+		t.Error("a card must still ship data-only, not FCM's own notification block")
 	}
 	if android["priority"] != "high" {
 		t.Errorf("a data message at normal priority is deferred by Doze: %v", android)
 	}
 	data, _ := message["data"].(map[string]any)
+	// Dotted as compose.go names them, matching iOS's own Localizable.strings
+	// convention — but aapt2 rejects a "." in a resource name, so Android's
+	// own copy has to lose it. See TestSendUnderscoresLocKeysForAndroid.
+	if data["bodyLocKey"] != "push_posted" || data["titleLocKey"] != "push_title_circle" {
+		t.Fatalf("data = %v", data)
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(data["locArgs"].(string)), &args); err != nil {
+		t.Fatalf("locArgs wasn't a JSON array: %v (%v)", data["locArgs"], err)
+	}
+	if len(args) != 2 || args[0] != "Sarah" || args[1] != "Family" {
+		t.Errorf("locArgs = %v", args)
+	}
 	if data["circleId"] != "circle-1" || data["entryId"] != "post-1" {
 		t.Errorf("data = %v", data)
 	}
@@ -210,7 +220,7 @@ func TestSendPostsLocalizationKeys(t *testing.T) {
 
 // Android's resource compiler refuses a "." in a string resource's name.
 // compose.go's keys are dotted to match iOS's Localizable.strings
-// convention, so the copy Android looks title_loc_key/body_loc_key up
+// convention, so the copy Android looks titleLocKey/bodyLocKey up
 // against has to be the underscored one, not what iOS gets sent.
 func TestSendUnderscoresLocKeysForAndroid(t *testing.T) {
 	tokens := tokenServer(t, 3600, new(int))
@@ -233,16 +243,17 @@ func TestSendUnderscoresLocKeysForAndroid(t *testing.T) {
 	}
 
 	envelope, _ := got["message"].(map[string]any)
-	android, _ := envelope["android"].(map[string]any)
-	notification, _ := android["notification"].(map[string]any)
-	if notification["title_loc_key"] != "push_title_account" || notification["body_loc_key"] != "push_rewrap_needed" {
-		t.Fatalf("notification = %v", notification)
+	data, _ := envelope["data"].(map[string]any)
+	if data["titleLocKey"] != "push_title_account" || data["bodyLocKey"] != "push_rewrap_needed" {
+		t.Fatalf("data = %v", data)
 	}
 }
 
-// A silent push is data only: no notification block, so the platform
-// renders nothing and the app wakes to sync.
-func TestSendPostsASilentMessageWithNoNotification(t *testing.T) {
+// A silent push carries none of the loc-key/args/body scaffolding a card
+// needs: push-localization/android (and, in the foreground, the app's
+// own setNotificationHandler) both treat a title-and-body-less message
+// as nothing to show, and the app just wakes to sync.
+func TestSendPostsASilentMessageWithNoCardFields(t *testing.T) {
 	tokens := tokenServer(t, 3600, new(int))
 	defer tokens.Close()
 
@@ -262,8 +273,99 @@ func TestSendPostsASilentMessageWithNoNotification(t *testing.T) {
 	}
 
 	envelope, _ := got["message"].(map[string]any)
-	android, _ := envelope["android"].(map[string]any)
-	if _, carries := android["notification"]; carries {
-		t.Error("a silent push must carry no notification block")
+	data, _ := envelope["data"].(map[string]any)
+	if _, has := data["titleLocKey"]; has {
+		t.Errorf("a silent push must carry no loc keys: %v", data)
+	}
+}
+
+// The app's own PresentationDelegate override groups notifications by
+// circle, but expo-notifications only resolves arbitrary data back out
+// through a data.body field holding its own JSON object — the relay has
+// to speak that convention for the grouping to see the circle id at all.
+func TestSendCarriesCircleIdForAndroidGrouping(t *testing.T) {
+	tokens := tokenServer(t, 3600, new(int))
+	defer tokens.Close()
+
+	var got map[string]any
+	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+	}))
+	defer fcmAPI.Close()
+
+	sender := New(testAccount(t, tokens.URL))
+	sender.Client.Transport = redirectTo(fcmAPI.URL)
+
+	if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
+		t.Fatal(err)
+	}
+
+	message, _ := got["message"].(map[string]any)
+	data, _ := message["data"].(map[string]any)
+	var body map[string]string
+	if err := json.Unmarshal([]byte(data["body"].(string)), &body); err != nil {
+		t.Fatalf("data.body wasn't a JSON object: %v (%v)", data["body"], err)
+	}
+	if body["circleId"] != "circle-1" {
+		t.Errorf("body = %v", body)
+	}
+}
+
+// A valid-JSON data.body makes Android's own NotificationSerializer
+// treat the message as Expo-service-formatted and expose *only* body's
+// contents as a tapped notification's data — so body has to carry every
+// field a tap needs to route to the right screen (entryId included),
+// not just circleId, or a tap silently loses everywhere but the circle.
+func TestSendsBodyCarriesEveryFieldATapNeeds(t *testing.T) {
+	tokens := tokenServer(t, 3600, new(int))
+	defer tokens.Close()
+
+	var got map[string]any
+	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+	}))
+	defer fcmAPI.Close()
+
+	sender := New(testAccount(t, tokens.URL))
+	sender.Client.Transport = redirectTo(fcmAPI.URL)
+
+	if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
+		t.Fatal(err)
+	}
+
+	message, _ := got["message"].(map[string]any)
+	data, _ := message["data"].(map[string]any)
+	var body map[string]string
+	if err := json.Unmarshal([]byte(data["body"].(string)), &body); err != nil {
+		t.Fatalf("data.body wasn't a JSON object: %v (%v)", data["body"], err)
+	}
+	if body["entryId"] != "post-1" {
+		t.Errorf("a tap needs the post it is on, and body is the only place Android's tap handler looks once it's valid JSON: %v", body)
+	}
+}
+
+// A silent push has no notification to group, and fanout.go reuses one
+// Message, Data map included, across every device of a recipient — so
+// adding "body" here must never mutate the caller's map, or a later
+// send (to this same device, or an iOS one) would see it unexpectedly.
+func TestSendDoesNotMutateTheSharedDataMap(t *testing.T) {
+	tokens := tokenServer(t, 3600, new(int))
+	defer tokens.Close()
+
+	fcmAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer fcmAPI.Close()
+
+	sender := New(testAccount(t, tokens.URL))
+	sender.Client.Transport = redirectTo(fcmAPI.URL)
+
+	message := testMessage()
+	if err := sender.Send(context.Background(), "device-token", message); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, mutated := message.Data["body"]; mutated {
+		t.Error("Send must not add to the caller's Data map")
 	}
 }

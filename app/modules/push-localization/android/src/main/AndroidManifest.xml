@@ -8,5 +8,14 @@
         <action android:name="com.google.firebase.MESSAGING_EVENT"/>
       </intent-filter>
     </service>
+
+    <!-- No priority set (defaults to 0), ahead of expo-notifications' own
+         declaration of the same NOTIFICATION_EVENT intent at priority="-1" —
+         see GroupingNotificationsService's own doc comment for why. -->
+    <receiver android:name="expo.modules.pushlocalization.GroupingNotificationsService" android:exported="false">
+      <intent-filter>
+        <action android:name="expo.modules.notifications.NOTIFICATION_EVENT"/>
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

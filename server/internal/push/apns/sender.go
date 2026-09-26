@@ -38,6 +38,8 @@ type aps struct {
 	Alert *alert `json:"alert,omitempty"`
 	// A silent push carries no card: it wakes the app to sync.
 	ContentAvailable int `json:"content-available,omitempty"`
+	// iOS itself groups a device's notifications by this value
+	ThreadID string `json:"thread-id,omitempty"`
 }
 
 // alert is localization keys, not text. iOS resolves them against the
@@ -87,6 +89,7 @@ func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Mess
 			LocKey:       message.BodyKey,
 			LocArgs:      message.Args,
 		}
+		request.APS.ThreadID = message.Data["circleId"]
 	}
 
 	body, err := json.Marshal(request)
@@ -110,9 +113,9 @@ func (s *Sender) Send(ctx context.Context, deviceToken string, message push.Mess
 	}
 	defer resp.Body.Close()
 
-	// The body can name the device token, so only the status is
-	// reported. A 400 or 410 usually means a stale token; nothing prunes
-	// them yet, same as fcm.
+	if resp.StatusCode == http.StatusGone {
+		return fmt.Errorf("send push: %s: %w", resp.Status, push.ErrUnregistered)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("send push: %s", resp.Status)
 	}

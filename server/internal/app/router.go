@@ -78,15 +78,14 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
 	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
 
-	// One sub-mux so RequireSession wraps every circles slice at once,
-	// while the budget wraps each handler individually — reads and writes
-	// don't share one. Each endpoint still checks its own write token or
-	// authority signature beyond the session.
+	devicesService := &devices.Service{Store: devices.NewStore(deps.Accounts)}
+
 	// One notifier for every slice that writes: it resolves who should
 	// hear about a change and tells their phones.
 	notifier := &push.Notifier{
 		Circles:  members.NewStore(deps.Circles),
 		Accounts: deps.Accounts,
+		Devices:  devicesService,
 		Send:     deps.Send,
 	}
 
@@ -140,7 +139,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		Circles: members.NewStore(deps.Circles),
 		Notify:  notifier,
 	}, readLimit, writeLimit)
-	devices.Register(accountMux, &devices.Service{Store: devices.NewStore(deps.Accounts)}, writeLimit)
+	devices.Register(accountMux, devicesService, writeLimit)
 	devicelink.Register(accountMux, &devicelink.Service{Store: devicelink.NewStore(deps.Accounts)}, readLimit, writeLimit)
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))

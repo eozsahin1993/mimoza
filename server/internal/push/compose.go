@@ -18,6 +18,30 @@ const (
 	keyAccountTitleKey = "push.title_account"
 )
 
+// Android notification channel ids, matching channels.ts on the client
+// (circleNotificationChannelId/INVITES_CHANNEL_ID) exactly — a mismatch
+// here silently falls back to expo-notifications' own high-importance
+// channel, since the client only ever posts to a channel it finds already
+// created.
+const (
+	channelInvites      = "invites"
+	channelCirclePrefix = "circle-"
+)
+
+// channelID names the channel a card lands on. A join request or its
+// approval goes to the shared invites channel rather than the circle's
+// own: a requester has no circle channel yet, and an admin muting their
+// own circle shouldn't silence requests to join it. Everything else is
+// scoped to the circle it happened in.
+func channelID(kind, circleID string) string {
+	switch kind {
+	case KindJoinRequest, KindApproved:
+		return channelInvites
+	default:
+		return channelCirclePrefix + circleID
+	}
+}
+
 // compose builds the card one recipient sees. actor and circle are the
 // names it is rendered with; recipient decides whose photo it was.
 func compose(event Event, actor, circle, recipient string) Message {
@@ -25,8 +49,9 @@ func compose(event Event, actor, circle, recipient string) Message {
 		TitleKey: keyCircleTitle,
 		Args:     []string{actor, circle},
 		Data: map[string]string{
-			"circleId": event.CircleID,
-			"type":     event.Kind,
+			"circleId":  event.CircleID,
+			"type":      event.Kind,
+			"channelId": channelID(event.Kind, event.CircleID),
 		},
 	}
 	if event.EntryID != "" {

@@ -22,6 +22,7 @@ import { entryContext } from '@/core/sync/entry-handlers';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getRoster, listCircles, type Circle } from '@/features/circle/services/circle-relay';
 import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-exchange';
+import { ensureCircleNotificationChannel, removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 export type SyncOptions = {
   /**
@@ -73,7 +74,12 @@ export async function syncCircles(options: SyncOptions = {}): Promise<number> {
   // deleted, so what was already synced is still readable.
   const present = new Set(circles.map((circle) => circle.circleId));
   for (const local of await listLocalCircles()) {
-    if (!present.has(local.id)) await markCircleLeft(local.id, now);
+    if (!present.has(local.id)) {
+      await markCircleLeft(local.id, now);
+      await removeCircleNotificationChannel(local.id).catch((err) =>
+        console.error(`Failed to remove notification channel for ${local.id}`, err)
+      );
+    }
   }
 
   let failed = 0;
@@ -101,6 +107,13 @@ export async function syncCircles(options: SyncOptions = {}): Promise<number> {
 async function syncCircle(circle: Circle, now: number, myAccountId: string, force: boolean): Promise<void> {
   const before = await getCircle(circle.circleId);
   await applyCircle(circle, now);
+  // Every circle this account is in — created, freshly joined, or just
+  // renamed by someone else — passes through here, so this is the one
+  // place that keeps the Android channel a push actually lands on
+  // (see fcm/sender.go's channelID) in step with what's stored locally.
+  await ensureCircleNotificationChannel(circle.circleId, circle.name).catch((err) =>
+    console.error(`Failed to ensure notification channel for ${circle.circleId}`, err)
+  );
 
   const rosterMoved =
     force ||

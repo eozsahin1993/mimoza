@@ -6,6 +6,7 @@ import { getAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { createCircle as createOnRelay } from '@/features/circle/services/circle-relay';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
+import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 export type CreateCircleInput = {
   name: string;
@@ -35,6 +36,11 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   // to decide.
   const now = Date.now();
   await applyCircle(membership, now);
+  // Not left to the next sync pass: a push about this circle (even one
+  // this device sends itself, via another member) can arrive before then.
+  await ensureCircleNotificationChannel(membership.circleId, membership.name).catch((err) =>
+    console.error(`Failed to create notification channel for ${membership.circleId}`, err)
+  );
 
   // Not left to the next sync: it only refetches the roster when
   // rosterVersion moves, and the line above just recorded the current

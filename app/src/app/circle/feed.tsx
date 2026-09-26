@@ -78,7 +78,7 @@ export default function FeedScreen() {
         <View style={styles.headerInset}>
           <ScreenHeader
             title={circleName}
-            subtitle={t('circle.feed.subtitle', { count: memberCount })}
+            subtitle={loaded ? t('circle.feed.subtitle', { count: memberCount }) : undefined}
             onPressTitle={openDetails}
             actions={
               <>
