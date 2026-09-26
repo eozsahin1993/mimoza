@@ -110,12 +110,21 @@ function AppShell() {
           it — including one that navigates away as it reports. */}
       <Snackbar message={message} visible={visible} dismiss={dismiss} onHidden={settle} />
       {/* Same reasoning: the app's own stand-in for `Alert.alert`, so it
-          has to outlive the screen that opened it too. */}
+          has to outlive the screen that opened it too. Every button gets
+          `dismiss` folded into its own `onPress` here, rather than inside
+          `Dialog` itself — `NotificationPromptDialog` is the other caller,
+          and it already closes itself through its own state. */}
       <Dialog
         visible={alert.visible}
         title={alert.request?.title ?? ''}
         message={alert.request?.message}
-        buttons={alert.request?.buttons ?? []}
+        buttons={(alert.request?.buttons ?? []).map((button) => ({
+          ...button,
+          onPress: () => {
+            alert.dismiss();
+            button.onPress?.();
+          },
+        }))}
         onDismiss={alert.dismiss}
         onHidden={alert.settle}
       />

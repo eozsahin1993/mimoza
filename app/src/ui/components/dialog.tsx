@@ -10,7 +10,7 @@ import { useTints } from '@/ui/theme/hooks/use-theme';
 
 export type DialogButton = {
   text: string;
-  /** 'destructive' fills the button in the danger color. 'cancel' is what tapping outside or the Android back button triggers, on top of closing. */
+  /** 'destructive' fills the button in the danger color. 'cancel' is also what tapping outside or the Android back button triggers. */
   style?: 'default' | 'cancel' | 'destructive';
   onPress?: () => void;
 };
@@ -21,7 +21,13 @@ export type DialogProps = {
   message?: string;
   /** One button renders full-width; two render side by side, the first as the secondary (left) action. */
   buttons: DialogButton[];
-  /** Always fires on close — tapping outside, the Android back button, or either button. */
+  /**
+   * Tapping outside or the Android back button, when there's no
+   * 'cancel'-style button to defer to instead. Never fires from pressing a
+   * button — a caller wanting any button press to also close wraps that
+   * into the button's own `onPress` (see the global alert host in
+   * `_layout.tsx`).
+   */
   onDismiss: () => void;
   /** Called once the closing fade has finished — see `useAlerts`, which waits for this before showing the next one queued. */
   onHidden?: () => void;
@@ -56,22 +62,24 @@ export function Dialog({ visible, title, message, buttons, onDismiss, onHidden }
     });
   }, [visible, progress, onHidden]);
 
-  if (!mounted) return null;
+  // Nothing to draw a real dialog with — and buttons[1] would make
+  // `primary` (below) undefined, not just quietly wrong.
+  if (!mounted || buttons.length === 0) return null;
 
   const [first, second] = buttons;
   const primary = second ?? first;
 
   function handleBackdrop() {
-    // Matches what the platform's own alert does when there's a way to
-    // decline — a bare "OK" alert has no cancel button, so dismissing it
-    // this way answers nothing.
-    buttons.find((button) => button.style === 'cancel')?.onPress?.();
-    onDismiss();
-  }
-
-  function press(button: DialogButton) {
-    onDismiss();
-    button.onPress?.();
+    // Matches what the platform's own alert does: a way to decline
+    // answers it, same as tapping Cancel would. A bare "OK" alert has no
+    // cancel button, so it just closes — answering nothing, the same as
+    // pressing OK would not do either.
+    const cancelButton = buttons.find((button) => button.style === 'cancel');
+    if (cancelButton) {
+      cancelButton.onPress?.();
+    } else {
+      onDismiss();
+    }
   }
 
   return (
@@ -88,12 +96,12 @@ export function Dialog({ visible, title, message, buttons, onDismiss, onHidden }
             </ThemedText>
           ) : null}
           <View style={styles.actions}>
-            {second ? <SecondaryButton label={first.text} style={styles.action} onPress={() => press(first)} /> : null}
+            {second ? <SecondaryButton label={first.text} style={styles.action} onPress={first.onPress} /> : null}
             <PrimaryButton
               label={primary.text}
               tone={primary.style === 'destructive' ? 'destructive' : 'default'}
               style={styles.action}
-              onPress={() => press(primary)}
+              onPress={primary.onPress}
             />
           </View>
         </ThemedView>
