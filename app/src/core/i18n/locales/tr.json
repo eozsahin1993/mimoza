@@ -160,15 +160,22 @@
       "back": "Geri"
     },
     "privacy": {
-      "title": "İçeriğin nerede depolanır?",
-      "contentLabel": "İçeriğin",
-      "contentBody": "Eklediğin her şey, bize değil çevreye ait bir anahtarla cihazında şifrelenecek şekilde tasarlandı. Kopyaları her üyenin cihazında kalır; ayrıca çevrimdışı bir yedek tutmana da yardımcı oluruz.",
-      "accountLabel": "Hesabın",
-      "accountBody": "Giriş yapman, sadece kötüye kullanımı önlemek için gerçek bir kişi olduğunu doğrular. Bu bilgi çevrelerinden tamamen ayrı tutulur; ne paylaştığınla ya da kimlerle olduğunla asla ilişkilendirilmez.",
-      "visibilityLabel": "Neleri görebiliyoruz?",
-      "visibilityBody": "Depolanan verilerde, aynı çevredeki iki kaydın aynı kişiden geldiğini anlayabiliriz ama o kişinin kim olduğunu asla göremeyiz. Sadece bir çevrenin var olduğunu, ne kadar aktif olduğunu ve istek yapıldığını görürüz; kimin yaptığını ya da içeriğini asla göremeyiz.",
-      "leavingLabel": "Biri ayrıldığında ne olur?",
-      "leavingBody": "Biri ayrıldığında çevre anahtarı otomatik olarak değiştirilir. Ayrılan kişi önceden indirdiği içeriklere erişebilir ancak yeni paylaşımları alamaz.",
+      "title": "Gizlilik taahhütlerimiz",
+      "points": {
+        "content": {
+          "label": "İçerik",
+          "body": "Fotoğraflar, açıklamalar, yorumlar ve tepkiler, yalnızca her çevrenin üyelerinde bulunan ve Mimoza'da asla tutulmayan anahtarlarla uçtan uca şifrelenir; bu içeriği saklarız ama okuyamayız."
+        },
+        "account": {
+          "label": "Hesap",
+          "body": "Mimoza'nın sakladığı tek profil bilgisi adın ve eklediysen fotoğrafındır; e-posta adresin asla saklanmaz ve fotoğrafın da tıpkı içeriğin gibi her çevre için ayrıca şifrelenir."
+        },
+        "sharing": {
+          "label": "Bilgilerin",
+          "body": "Bilgilerini asla satmayız ve asla reklam için kullanmayız."
+        }
+      },
+      "readPolicy": "Gizlilik politikasının tamamını oku",
       "close": "Kapat"
     },
     "privacyNotice": {

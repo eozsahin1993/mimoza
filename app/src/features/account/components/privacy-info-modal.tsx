@@ -1,37 +1,46 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Dimensions, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
+import { Icon } from '@/ui/components/icon';
+import { Bloom } from '@/ui/components/wordmark';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Space, Spacing } from '@/ui/theme/tokens';
+import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
+import { upperCase } from '@/core/i18n/text';
+import { useLanguage } from '@/core/i18n/use-language';
 
 export type PrivacyInfoModalProps = {
   visible: boolean;
   onClose: () => void;
 };
 
-// This describes the intended end-to-end design, not everything that's
-// actually running today — see the conversation this was added in.
-// Notably: leaving a circle doesn't currently rotate the shared secret
-// (only an admin removing someone does). Revisit this copy once that
-// lands for real. "What we can see" is the exception — worded to match
-// what the relay actually does today (verified against server/
-// directly), not the intended design. That includes authorIdentityPublicKey,
-// stored plaintext on every entry since account deletion needs it to find
-// everything one identity posted — the relay can tell two entries in the
-// same circle share an author, though never who that author is or
-// whether they're active in any other circle.
-const SECTIONS = ['content', 'account', 'visibility', 'leaving'] as const;
+// The copy states the claim `docs/DESIGN.md` makes and no more: content
+// is end-to-end encrypted, membership is not. Keep it in step with that
+// file and `RELAY_DESIGN.md` ("What is encrypted"), not with what the
+// design hopes to do next.
+const POINTS = ['content', 'account', 'sharing'] as const;
+
+const BLOOM_SIZE = 14;
+/**
+ * The domain the launch checklist reserves for the policy. Nothing is
+ * deployed there yet, so this leads nowhere until the site is — see
+ * `docs/LAUNCH_CHECKLIST.md`, "Store listings".
+ */
+const PRIVACY_POLICY_URL = 'https://joinmimoza.com/privacy';
+/** The circle list's section titles, at the same size: `code` is sized for an invite code standing on its own. */
+const LABEL_SIZE = 12;
+const LABEL_LINE_HEIGHT = LABEL_SIZE * 1.3;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SLIDE_DISTANCE = Dimensions.get('window').height;
 
 export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
   const { t } = useTranslation();
+  const language = useLanguage();
   const theme = useTheme();
   // Modal unmounts the instant `visible` goes false, which would cut off
   // any exit animation — so mounting is tracked separately, and only
@@ -73,24 +82,40 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
           },
         ]}>
         <ThemedView type="surface" style={styles.sheetInner}>
-          <ThemedSafeAreaView edges={['bottom']}>
+          <ThemedSafeAreaView edges={['bottom']} style={styles.column}>
             <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
               <ThemedText type="titleLarge" style={styles.title}>
                 {t('account.privacy.title')}
               </ThemedText>
 
-              {SECTIONS.map((section) => (
-                <View key={section} style={styles.section}>
-                  <ThemedText type="labelMedium">
-                    {t(`account.privacy.${section}Label`)}
-                  </ThemedText>
-                  <ThemedText type="bodyMedium" themeColor="secondary">
-                    {t(`account.privacy.${section}Body`)}
-                  </ThemedText>
+              {POINTS.map((point) => (
+                <View key={point} style={styles.point}>
+                  <Bloom size={BLOOM_SIZE} style={styles.pointBloom} />
+                  <View style={styles.pointText}>
+                    <ThemedText type="code" themeColor="muted" style={styles.pointLabel}>
+                      {upperCase(t(`account.privacy.points.${point}.label`), language)}
+                    </ThemedText>
+                    <ThemedText type="bodyMedium" themeColor="secondary">
+                      {t(`account.privacy.points.${point}.body`)}
+                    </ThemedText>
+                  </View>
                 </View>
               ))}
+
+              <Pressable
+                style={styles.policyLink}
+                hitSlop={8}
+                accessibilityRole="link"
+                onPress={() => {
+                  Linking.openURL(PRIVACY_POLICY_URL).catch((err) => console.error('Failed to open the privacy policy', err));
+                }}>
+                <ThemedText type="labelLarge" themeColor="accentBright">
+                  {t('account.privacy.readPolicy')}
+                </ThemedText>
+                <Icon icon={Icons.external} size={16} color={theme.accentBright} />
+              </Pressable>
             </ScrollView>
 
             <View style={styles.footer}>
@@ -119,10 +144,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     maxHeight: '85%',
   },
+  // `flexShrink: 1` from here down to the scroll view. Yoga's default is
+  // 0, so without it a body taller than `maxHeight` doesn't shrink and
+  // scroll, it overflows, and `overflow: 'hidden'` clips the Close button
+  // off the bottom.
   sheetInner: {
+    flexShrink: 1,
     borderTopLeftRadius: Radius.bottomSheet,
     borderTopRightRadius: Radius.bottomSheet,
     overflow: 'hidden',
+  },
+  column: {
+    flexShrink: 1,
+  },
+  scroll: {
+    flexShrink: 1,
   },
   grabber: {
     alignSelf: 'center',
@@ -136,15 +172,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
     gap: Spacing.cardListGap,
   },
+  // Wider than the gap between sections, so the title reads as the
+  // sheet's heading rather than as one more label in the list.
   title: {
-    marginBottom: Space.s100,
+    marginTop: Space.s200,
+    marginBottom: Space.s300,
   },
-  section: {
-    gap: Space.s200,
+  point: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Space.s300,
+  },
+  // Against the first line, so a bullet that wraps keeps its marker at
+  // the top rather than drifting to the middle. Nudged below the line
+  // box's centre: the small mono glyphs sit low in it, and a bloom
+  // centred on the box reads as floating above the label.
+  pointBloom: {
+    marginTop: (LABEL_LINE_HEIGHT - BLOOM_SIZE) / 2 + Space.s100,
+  },
+  pointText: {
+    flex: 1,
+    gap: Space.s100,
+  },
+  pointLabel: {
+    fontSize: LABEL_SIZE,
+    lineHeight: LABEL_LINE_HEIGHT,
+    letterSpacing: LABEL_SIZE * 0.13,
+  },
+  // Indented to the text column, so it reads as the points' footnote
+  // rather than a fourth bullet.
+  policyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.s100,
+    marginLeft: BLOOM_SIZE + Space.s300,
   },
   footer: {
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.cardListGap,
+    paddingTop: Space.s900,
     paddingBottom: Spacing.cardListGap,
   },
 });

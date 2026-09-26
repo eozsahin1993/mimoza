@@ -160,15 +160,22 @@
       "back": "Atrás"
     },
     "privacy": {
-      "title": "Dónde está tu contenido",
-      "contentLabel": "Tu contenido",
-      "contentBody": "Todo lo que añades está pensado para cifrarse en tu dispositivo con una clave que pertenece al círculo, no a nosotros. Quedan copias en el dispositivo de cada miembro, y también te ayudamos a guardar una copia de seguridad sin conexión.",
-      "accountLabel": "Tu cuenta",
-      "accountBody": "Iniciar sesión solo confirma que eres una persona real, para evitar abusos. Se guarda por separado de tus círculos y nunca se vincula con lo que publicas ni con quién estás.",
-      "visibilityLabel": "Qué podemos ver",
-      "visibilityBody": "En los datos almacenados, podemos saber que dos entradas del mismo círculo tienen el mismo autor, pero nunca quién es esa persona. Solo vemos que un círculo existe, cuánta actividad tiene y que se hacen solicitudes, nunca quién las hace ni qué contienen.",
-      "leavingLabel": "Si alguien se va",
-      "leavingBody": "Cuando alguien se va, la clave del círculo cambia. Esa persona conserva lo que ya había descargado y no recibe nada más.",
+      "title": "Nuestros compromisos de privacidad",
+      "points": {
+        "content": {
+          "label": "Contenido",
+          "body": "Las fotos, los pies de foto, los comentarios y las reacciones están cifrados de extremo a extremo con claves que solo tienen los miembros de cada círculo, nunca Mimoza; guardamos ese contenido, pero no podemos leerlo."
+        },
+        "account": {
+          "label": "Cuenta",
+          "body": "Los únicos datos de perfil que Mimoza guarda son tu nombre y, si la añades, una foto; nunca se guarda ninguna dirección de correo, y la foto se cifra para cada círculo igual que tu contenido."
+        },
+        "sharing": {
+          "label": "Tus datos",
+          "body": "Nunca vendemos tus datos ni los usamos para publicidad."
+        }
+      },
+      "readPolicy": "Leer la política de privacidad completa",
       "close": "Cerrar"
     },
     "privacyNotice": {

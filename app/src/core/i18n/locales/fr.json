@@ -160,15 +160,22 @@
       "back": "Retour"
     },
     "privacy": {
-      "title": "Où se trouve ton contenu",
-      "contentLabel": "Ton contenu",
-      "contentBody": "Tout ce que tu ajoutes est censé être chiffré sur ton appareil avec une clé qui appartient au cercle, pas à nous. Des copies restent sur l’appareil de chaque membre, et on t’aide aussi à garder une sauvegarde hors ligne.",
-      "accountLabel": "Ton compte",
-      "accountBody": "La connexion sert uniquement à confirmer que tu es une vraie personne, pour éviter les abus. Elle est stockée séparément de tes cercles et n’est jamais liée à ce que tu publies ni aux personnes avec qui tu es.",
-      "visibilityLabel": "Ce qu’on peut voir",
-      "visibilityBody": "Dans les données stockées, on peut savoir que deux entrées d’un même cercle ont le même auteur, mais jamais qui est cette personne. On voit seulement qu’un cercle existe, son niveau d’activité et que des requêtes ont lieu, jamais qui les fait ni ce qu’elles contiennent.",
-      "leavingLabel": "Si quelqu’un part",
-      "leavingBody": "Quand quelqu’un part, la clé du cercle change. Cette personne garde ce qu’elle a déjà téléchargé et ne reçoit plus rien.",
+      "title": "Nos engagements de confidentialité",
+      "points": {
+        "content": {
+          "label": "Contenu",
+          "body": "Les photos, les légendes, les commentaires et les réactions sont chiffrés de bout en bout avec des clés que seuls les membres de chaque cercle détiennent, jamais Mimoza. On stocke ce contenu, mais on ne peut pas le lire."
+        },
+        "account": {
+          "label": "Compte",
+          "body": "Les seules informations de profil que Mimoza conserve sont ton nom et, si tu en ajoutes une, une photo. Aucune adresse e-mail n’est jamais stockée, et la photo est chiffrée pour chaque cercle, comme ton contenu."
+        },
+        "sharing": {
+          "label": "Tes données",
+          "body": "On ne vend jamais tes données et on ne les utilise jamais pour de la publicité."
+        }
+      },
+      "readPolicy": "Lire la politique de confidentialité complète",
       "close": "Fermer"
     },
     "privacyNotice": {

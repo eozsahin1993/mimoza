@@ -160,15 +160,22 @@
       "back": "Back"
     },
     "privacy": {
-      "title": "Where your content lives",
-      "contentLabel": "Your content",
-      "contentBody": "Everything you add is meant to be encrypted on your device with a key that belongs to the circle, not us. Copies remain on every member's device, and we help you keep an offline backup as well.",
-      "accountLabel": "Your account",
-      "accountBody": "Signing in only confirms you're a real person, to prevent abuse. It's stored separately from your circles and is never linked to what you post or who you're with.",
-      "visibilityLabel": "What we can see",
-      "visibilityBody": "At rest, we can determine that two entries in the same circle share an author, but never who that person is. We see only that a circle exists, how active it is, and that requests occur, never who made them or what they contain.",
-      "leavingLabel": "If someone leaves",
-      "leavingBody": "The circle key rotates when someone leaves. They keep what they already downloaded, and receive nothing further.",
+      "title": "Our privacy commitments",
+      "points": {
+        "content": {
+          "label": "Content",
+          "body": "Photos, captions, comments and reactions are end-to-end encrypted with keys held only by the members of each circle, never by Mimoza; we store that content but cannot read it."
+        },
+        "account": {
+          "label": "Account",
+          "body": "The only profile details Mimoza keeps are your name and, if you add one, a picture; no email address is ever stored, and the picture is encrypted for each circle just like your content."
+        },
+        "sharing": {
+          "label": "Your information",
+          "body": "We never sell your information, and we never use it for advertising."
+        }
+      },
+      "readPolicy": "Read the full privacy policy",
       "close": "Close"
     },
     "privacyNotice": {

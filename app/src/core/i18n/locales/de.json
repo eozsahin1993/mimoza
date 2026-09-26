@@ -160,15 +160,22 @@
       "back": "Zurück"
     },
     "privacy": {
-      "title": "Wo deine Inhalte liegen",
-      "contentLabel": "Deine Inhalte",
-      "contentBody": "Alles, was du hinzufügst, soll auf deinem Gerät mit einem Schlüssel verschlüsselt werden, der dem Kreis gehört, nicht uns. Kopien bleiben auf dem Gerät jedes Mitglieds, und wir helfen dir außerdem, ein Offline-Backup aufzubewahren.",
-      "accountLabel": "Dein Konto",
-      "accountBody": "Die Anmeldung bestätigt nur, dass du ein echter Mensch bist, um Missbrauch zu verhindern. Sie wird getrennt von deinen Kreisen gespeichert und nie damit verknüpft, was du postest oder mit wem du verbunden bist.",
-      "visibilityLabel": "Was wir sehen können",
-      "visibilityBody": "In den gespeicherten Daten können wir erkennen, dass zwei Einträge im selben Kreis vom selben Autor stammen, aber nie, wer diese Person ist. Wir sehen nur, dass ein Kreis existiert, wie aktiv er ist und dass Anfragen eingehen – nie, wer sie stellt oder was sie enthalten.",
-      "leavingLabel": "Wenn jemand geht",
-      "leavingBody": "Wenn jemand geht, wird der Schlüssel des Kreises gewechselt. Die Person behält, was sie schon heruntergeladen hat, und bekommt danach nichts mehr.",
+      "title": "Unser Datenschutzversprechen",
+      "points": {
+        "content": {
+          "label": "Inhalte",
+          "body": "Fotos, Bildunterschriften, Kommentare und Reaktionen sind Ende-zu-Ende-verschlüsselt, mit Schlüsseln, die nur die Mitglieder des jeweiligen Kreises besitzen, nie Mimoza; wir speichern diese Inhalte, können sie aber nicht lesen."
+        },
+        "account": {
+          "label": "Konto",
+          "body": "Die einzigen Profildaten, die Mimoza speichert, sind dein Name und, falls du eines hinzufügst, ein Bild; eine E-Mail-Adresse wird nie gespeichert, und das Bild wird für jeden Kreis genauso verschlüsselt wie deine Inhalte."
+        },
+        "sharing": {
+          "label": "Deine Daten",
+          "body": "Wir verkaufen deine Daten nie und nutzen sie nie für Werbung."
+        }
+      },
+      "readPolicy": "Vollständige Datenschutzerklärung lesen",
       "close": "Schließen"
     },
     "privacyNotice": {

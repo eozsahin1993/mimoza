@@ -33,6 +33,33 @@ const WITH_BLOOM = {
   bloomSize: 580,
 };
 
+/** The bloom itself, 680 units across and centred on the origin, so the wordmark and `Bloom` place it with one transform each. */
+function BloomGlyph() {
+  return (
+    <>
+      <G fill={Petal}>
+        {PETAL_ANGLES.map((angle) => (
+          <Ellipse key={angle} cy={-178} rx={125} ry={160} transform={`rotate(${angle})`} />
+        ))}
+      </G>
+      <Circle r={98} fill={HEART} />
+    </>
+  );
+}
+
+/**
+ * The bloom on its own, as a marker beside text. In place of the "o" it
+ * belongs to the home screen only (see `withBloom`); standing alone it
+ * can go where a bullet would.
+ */
+export function Bloom({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
+  return (
+    <Svg width={size} height={size} viewBox="-340 -340 680 680" style={style} aria-hidden>
+      <BloomGlyph />
+    </Svg>
+  );
+}
+
 type WordmarkProps = Pick<ViewProps, 'accessibilityRole' | 'accessibilityLabel'> & {
   /** The em size, as a font size would be. */
   size?: number;
@@ -72,12 +99,7 @@ export function Wordmark({
       <Path d={glyphs.d} fill={color ?? theme.text} />
       {withBloom ? (
         <G transform={`translate(${WITH_BLOOM.bloomX} ${WITH_BLOOM.bloomY}) scale(${WITH_BLOOM.bloomSize / 680})`}>
-          <G fill={Petal}>
-            {PETAL_ANGLES.map((angle) => (
-              <Ellipse key={angle} cy={-178} rx={125} ry={160} transform={`rotate(${angle})`} />
-            ))}
-          </G>
-          <Circle r={98} fill={HEART} />
+          <BloomGlyph />
         </G>
       ) : null}
     </Svg>

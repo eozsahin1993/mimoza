@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import Album from 'lucide-react-native/icons/album';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowUp from 'lucide-react-native/icons/arrow-up';
+import ArrowUpRight from 'lucide-react-native/icons/arrow-up-right';
 import Bookmark from 'lucide-react-native/icons/bookmark';
 import Camera from 'lucide-react-native/icons/camera';
 import CameraOff from 'lucide-react-native/icons/camera-off';
@@ -254,6 +255,8 @@ export const Icons = {
   more: Ellipsis,
   /** Trailing affordance on a row that navigates somewhere. */
   disclosure: ChevronRight,
+  /** Leaves the app for a web page. */
+  external: ArrowUpRight,
   add: Plus,
   /** Starts a new post — writing something into the circle, not adding a row to a list. */
   composePost: SquarePen,
