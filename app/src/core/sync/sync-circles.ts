@@ -22,6 +22,7 @@ import { entryContext } from '@/core/sync/entry-handlers';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getRoster, listCircles, type Circle } from '@/features/circle/services/circle-relay';
 import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-exchange';
+import { setMemberAvatar } from '@/features/circle/usecases/set-member-avatar';
 import { ensureCircleNotificationChannel, removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 export type SyncOptions = {
@@ -85,7 +86,7 @@ export async function syncCircles(options: SyncOptions = {}): Promise<number> {
   let failed = 0;
   for (const circle of circles) {
     try {
-      await syncCircle(circle, now, profile.accountId, options.force ?? false);
+      await syncCircle(circle, now, profile.accountId, profile.picture, options.force ?? false);
     } catch (err) {
       console.error(`Failed to sync circle ${circle.circleId}`, err);
       failed += 1;
@@ -104,7 +105,13 @@ export async function syncCircles(options: SyncOptions = {}): Promise<number> {
  * a page encrypted under a version this device has not been given yet
  * would be skipped and never revisited — cursors do not rewind.
  */
-async function syncCircle(circle: Circle, now: number, myAccountId: string, force: boolean): Promise<void> {
+async function syncCircle(
+  circle: Circle,
+  now: number,
+  myAccountId: string,
+  myPicture: Uint8Array | null,
+  force: boolean
+): Promise<void> {
   const before = await getCircle(circle.circleId);
   await applyCircle(circle, now);
   // Every circle this account is in — created, freshly joined, or just
@@ -139,6 +146,20 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string, forc
         })),
         now
       );
+
+      // A circle this device has never seen before — a fresh join, or its
+      // first pull of one created elsewhere — starts with no avatarId for
+      // this account unless another of this account's devices already set
+      // one first. Seed it the same way an edit does, rather than leaving
+      // it on initials until the next profile edit happens to touch it.
+      if (!before && myPicture) {
+        const own = roster.members.find((member) => member.accountId === myAccountId);
+        if (!own?.avatarId) {
+          await setMemberAvatar(circle.circleId, myAccountId, myPicture).catch((err) =>
+            console.error(`Failed to seed the avatar in circle ${circle.circleId}`, err)
+          );
+        }
+      }
 
       // Someone replaced their keypair and can read nothing until a member
       // who holds the keys seals them again. It is idempotent in nature.

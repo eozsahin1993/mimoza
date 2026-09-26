@@ -36,6 +36,7 @@ jest.mock('@/core/services/keystore/circle-keys', () => ({
   getCurrentContentKey: jest.fn(async () => ({ version: 1, key: new Uint8Array(32).fill(1) })),
 }));
 jest.mock('@/core/photo/photo-queue', () => ({ nudgePhotoQueue: jest.fn() }));
+jest.mock('@/features/circle/usecases/set-member-avatar', () => ({ setMemberAvatar: jest.fn(async () => undefined) }));
 
 const relay = jest.requireMock('@/features/circle/services/circle-relay') as {
   listCircles: jest.Mock;
@@ -50,6 +51,9 @@ const circleKeys = jest.requireMock('@/core/services/keystore/circle-keys') as {
 };
 const posts = jest.requireMock('@/features/post/services/post-relay') as {
   walkEntries: jest.Mock;
+};
+const avatar = jest.requireMock('@/features/circle/usecases/set-member-avatar') as {
+  setMemberAvatar: jest.Mock;
 };
 
 const NOW = 1_700_000_000_000;
@@ -443,5 +447,62 @@ describe('a sync pass', () => {
     const [request] = await listRequests();
     expect(request.inviteCode).toBe('CODE');
     expect(request.circleName).toBe('Family');
+  });
+
+  // A circle's roster is shared across every device this account has, so
+  // avatarId can already be set here without this device having done it —
+  // seeding again would just churn a new id over one another device chose.
+  describe('avatar seeding on a circle this device has not seen before', () => {
+    afterEach(async () => {
+      // saveProfile's onConflictDoUpdate only overwrites a field it was
+      // actually given — omitting picture here would leave the previous
+      // test's behind, not clear it.
+      await saveProfile({ accountId: 'me', name: 'Me', picture: null, deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+    });
+
+    test('seeds this account\'s picture when it has one and the roster has none yet', async () => {
+      await saveProfile({ accountId: 'me', name: 'Me', picture: new Uint8Array([9]), deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+
+      await syncCircles();
+
+      expect(avatar.setMemberAvatar).toHaveBeenCalledWith(id, 'me', new Uint8Array([9]));
+    });
+
+    test('does not seed when this device has no picture', async () => {
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+
+      await syncCircles();
+
+      expect(avatar.setMemberAvatar).not.toHaveBeenCalled();
+    });
+
+    test('does not overwrite an avatarId another of this account\'s devices already set', async () => {
+      await saveProfile({ accountId: 'me', name: 'Me', picture: new Uint8Array([9]), deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({ members: [{ accountId: 'me', name: 'Me', avatarId: 'existing', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW }] })
+      );
+
+      await syncCircles();
+
+      expect(avatar.setMemberAvatar).not.toHaveBeenCalled();
+    });
+
+    test('does not reseed on a later sync of the same circle', async () => {
+      await saveProfile({ accountId: 'me', name: 'Me', picture: new Uint8Array([9]), deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      await syncCircles();
+      avatar.setMemberAvatar.mockClear();
+
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
+      await syncCircles();
+
+      expect(avatar.setMemberAvatar).not.toHaveBeenCalled();
+    });
   });
 });

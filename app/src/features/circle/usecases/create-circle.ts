@@ -6,6 +6,7 @@ import { getAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { createCircle as createOnRelay } from '@/features/circle/services/circle-relay';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
+import { setMemberAvatar } from '@/features/circle/usecases/set-member-avatar';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 export type CreateCircleInput = {
@@ -60,6 +61,16 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     ],
     now
   );
+
+  // This account's first (and only) membership row here starts with no
+  // avatarId, same as the cover below — seed it from whatever's already
+  // on this device's own profile rather than leaving it on initials until
+  // a later edit happens to touch it.
+  if (profile.picture) {
+    await setMemberAvatar(membership.circleId, profile.accountId, profile.picture).catch((err) =>
+      console.error(`Failed to set the avatar in circle ${membership.circleId}`, err)
+    );
+  }
 
   // Needs the circle to exist to upload against, and a circle with no
   // cover is still a circle.
