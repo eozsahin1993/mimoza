@@ -1,9 +1,12 @@
 import { getCircle, getMember, getProfile, listMembers, type Circle, type Member } from '@/data/db';
 import { listInvites, type Invite } from '@/features/invite/services/invite-relay';
+import { resolveMemberAvatars } from '@/features/circle/usecases/member-avatars';
 
 export type CircleDetails = {
   circle: Circle | null;
   members: Member[];
+  /** Each current member's picture, by account id — absent members fall back to initials. */
+  avatarByAccount: Map<string, string>;
   ownIsAdmin: boolean;
   /** Null in the gap between joining and that join completing. */
   ownPublicKey: string | null;
@@ -22,6 +25,10 @@ export async function loadCircleDetails(circleId: string): Promise<CircleDetails
   const [circle, members, profile] = await Promise.all([getCircle(circleId), listMembers(circleId), getProfile()]);
   const ownMember = profile ? await getMember(circleId, profile.accountId) : null;
   const admin = ownMember?.role === 'admin';
+  const avatarByAccount = await resolveMemberAvatars(
+    circleId,
+    members.map((member) => ({ accountId: member.accountId, avatarId: member.avatarId })),
+  );
 
   // Admins only, and never fatal: the screen is worth showing without a
   // code, and the relay refuses the read to anyone else anyway.
@@ -34,6 +41,7 @@ export async function loadCircleDetails(circleId: string): Promise<CircleDetails
   return {
     circle,
     members,
+    avatarByAccount,
     ownIsAdmin: admin,
     ownPublicKey: profile?.accountId ?? null,
     invite,

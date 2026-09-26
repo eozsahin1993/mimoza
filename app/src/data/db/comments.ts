@@ -5,7 +5,11 @@ import { circleMembers, postComments } from '@/data/db/schema';
 
 export type Comment = typeof postComments.$inferSelect;
 export type NewComment = typeof postComments.$inferInsert;
-export type CommentWithAuthor = Comment & { authorName: string };
+export type CommentWithAuthor = Comment & {
+  authorName: string;
+  authorAvatarId: string | null;
+  authorAvatarKeyVersion: number | null;
+};
 
 /**
  * Comments arrive three ways: the preview the relay carries on every
@@ -37,9 +41,23 @@ export async function applyChildren(postId: string, comments: NewComment[]): Pro
   for (const comment of comments) await applyComment(comment);
 }
 
+function withAuthor(row: { comment: Comment; name: string | null; avatarId: string | null; avatarKeyVersion: number | null }): CommentWithAuthor {
+  return {
+    ...row.comment,
+    authorName: row.name ?? '',
+    authorAvatarId: row.avatarId ?? null,
+    authorAvatarKeyVersion: row.avatarKeyVersion ?? null,
+  };
+}
+
 export async function listComments(postId: string): Promise<CommentWithAuthor[]> {
   const rows = await db
-    .select({ comment: postComments, name: circleMembers.name })
+    .select({
+      comment: postComments,
+      name: circleMembers.name,
+      avatarId: circleMembers.avatarId,
+      avatarKeyVersion: circleMembers.avatarKeyVersion,
+    })
     .from(postComments)
     .leftJoin(
       circleMembers,
@@ -51,14 +69,19 @@ export async function listComments(postId: string): Promise<CommentWithAuthor[]>
     .where(and(eq(postComments.postId, postId), isNull(postComments.deletedAt)))
     .orderBy(asc(postComments.createdAt));
 
-  return rows.map((row) => ({ ...row.comment, authorName: row.name ?? '' }));
+  return rows.map(withAuthor);
 }
 
 /** The preview on a card: the comments the relay named on the post row, minus any since deleted. */
 export async function getComments(commentIds: string[]): Promise<CommentWithAuthor[]> {
   if (commentIds.length === 0) return [];
   const rows = await db
-    .select({ comment: postComments, name: circleMembers.name })
+    .select({
+      comment: postComments,
+      name: circleMembers.name,
+      avatarId: circleMembers.avatarId,
+      avatarKeyVersion: circleMembers.avatarKeyVersion,
+    })
     .from(postComments)
     .leftJoin(
       circleMembers,
@@ -70,7 +93,7 @@ export async function getComments(commentIds: string[]): Promise<CommentWithAuth
     .where(and(inArray(postComments.id, commentIds), isNull(postComments.deletedAt)))
     .orderBy(asc(postComments.createdAt));
 
-  return rows.map((row) => ({ ...row.comment, authorName: row.name ?? '' }));
+  return rows.map(withAuthor);
 }
 
 export async function markCommentDeleted(commentId: string, at: number): Promise<void> {

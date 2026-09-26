@@ -181,14 +181,14 @@ function toPostCard(view: FeedPostView, profile: Profile | null, language: Langu
   const { post } = view;
 
   // The reader's own post shows their own live picture rather than
-  // waiting on a roster row for themselves; anyone else's picture isn't
-  // resolved yet (see FeedPostView) and falls back to initials.
+  // waiting on a roster row for themselves — the account's own device
+  // always has it, where the roster copy needs a sync round trip first.
   const isOwn = profile?.accountId === post.authorId;
 
   return {
     id: post.id,
     authorName: view.authorName || (isOwn ? profile.name : '') || i18n.getFixedT(language)('post.unknownMember'),
-    authorPhotoUri: isOwn ? pictureUri(profile?.picture) : undefined,
+    authorPhotoUri: isOwn ? pictureUri(profile?.picture) : view.authorPhotoUri,
     authorPublicKey: post.authorId,
     timestamp: formatTimestamp(post.createdAt, language),
     photoUri: view.photoUri,
@@ -202,10 +202,12 @@ function toPostCard(view: FeedPostView, profile: Profile | null, language: Langu
   };
 }
 
-function toCommentItem(comment: CommentWithAuthor, language: LanguageCode): CommentItem {
+function toCommentItem(comment: CommentWithAuthor & { authorPhotoUri?: string }, language: LanguageCode): CommentItem {
   return {
     id: comment.id,
     authorName: comment.authorName || i18n.getFixedT(language)('post.unknownMember'),
+    authorPhotoUri: comment.authorPhotoUri,
+    authorPublicKey: comment.authorId,
     body: comment.body,
     timestamp: formatRelative(comment.createdAt, language),
   };
