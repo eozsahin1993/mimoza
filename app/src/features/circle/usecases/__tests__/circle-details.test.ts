@@ -85,6 +85,7 @@ test('returns an empty shape for a circle this device does not have', async () =
   expect(details).toEqual({
     circle: null,
     members: [],
+    avatarByAccount: new Map(),
     ownIsAdmin: false,
     // Not null: the profile is a single account-wide row, unlike the old
     // per-circle identity — it resolves whether or not this circle does.

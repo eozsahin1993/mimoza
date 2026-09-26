@@ -9,15 +9,20 @@ import {
   listEveryMemberSeen,
   getProfile,
   summarise,
+  type CommentWithAuthor,
   type Post,
   type Profile,
   type ReactionSummary,
 } from '@/data/db';
 import { toMemberEvents, isMembershipEvent, type MemberEvent } from '@/features/feed/usecases/group-member-events';
+import { resolveMemberAvatars } from '@/features/circle/usecases/member-avatars';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 
+/** One comment, with its author's current picture resolved alongside their name. */
+type CommentPreview = CommentWithAuthor & { authorPhotoUri?: string };
+
 /** The one comment a card shows, and the count behind its "Show all" link. */
-export type CommentSummary = { latest: Awaited<ReturnType<typeof getComments>>[number] | null; total: number };
+export type CommentSummary = { latest: CommentPreview | null; total: number };
 
 /**
  * One page's own position: the oldest post it carried, or null at the
@@ -31,6 +36,8 @@ export type FeedPostView = {
   post: Post;
   /** Resolved live from the roster, same as an activity row's actor — posts carry only authorId. */
   authorName: string;
+  /** Resolved live from the roster too — posts carry only authorId, never a picture of their own. */
+  authorPhotoUri?: string;
   photoUri?: string;
   /** Undefined only once the photo has actually arrived — see missingPhotoFor. Absent post-and-all when there never was one. */
   photoStatus?: string;
@@ -119,18 +126,31 @@ export async function loadCircleFeedPage(
   // use-circle-feed.ts).
   const floor = hasMore && oldestPost ? oldestPost.createdAt : 0;
   const rawActivity = await listActivitySince(circleId, floor);
-  const members = await membersByAccount(circleId);
-  const events = toMemberEvents(rawActivity.filter(isMembershipEvent), (accountId) => members.get(accountId) ?? null);
+  const everyMember = await listEveryMemberSeen(circleId);
+  const memberNames = new Map(everyMember.map((member) => [member.accountId, member.name]));
+  const events = toMemberEvents(rawActivity.filter(isMembershipEvent), (accountId) => memberNames.get(accountId) ?? null);
 
   const photos = await resolvePhotos(circleId, page);
-  const commentsByPost = await commentSummaries(page);
+  const previewComments = await getComments(page.flatMap((post) => JSON.parse(post.recentCommentIds) as string[]));
+
+  // Only who this page actually needs a picture for — a post's author or
+  // a previewed comment's — not every member the circle has ever had.
+  const avatarsNeeded = new Set([...page.map((post) => post.authorId), ...previewComments.map((comment) => comment.authorId)]);
+  const membersByAccount = new Map(everyMember.map((member) => [member.accountId, member]));
+  const avatarByAccount = await resolveMemberAvatars(
+    circleId,
+    [...avatarsNeeded].map((accountId) => ({ accountId, avatarId: membersByAccount.get(accountId)?.avatarId ?? null })),
+  );
+
+  const commentsByPost = commentSummaries(page, previewComments, avatarByAccount);
   // No batched read for reactions yet (summarise is per post, unlike
   // comments/photos above) — FEED_PAGE_SIZE queries per page until one
   // exists.
   const posts_ = await Promise.all(
     page.map(async (post) => ({
       post,
-      authorName: members.get(post.authorId) ?? '',
+      authorName: memberNames.get(post.authorId) ?? '',
+      authorPhotoUri: avatarByAccount.get(post.authorId),
       ...photos.get(post.id),
       reactions: meta.ownPublicKey ? await summarise(post.id, meta.ownPublicKey) : { counts: {}, total: 0, iReacted: false },
       comments: commentsByPost.get(post.id) ?? { latest: null, total: post.commentCount },
@@ -145,20 +165,16 @@ export async function loadCircleFeedPage(
   };
 }
 
-/** The account-id -> name map both actor and subject resolution draw from — includes members who have since left. */
-async function membersByAccount(circleId: string): Promise<Map<string, string>> {
-  const members = await listEveryMemberSeen(circleId);
-  return new Map(members.map((member) => [member.accountId, member.name]));
-}
-
 /**
- * The preview on every post in the page, in one getComments call across
- * all of their recentCommentIds instead of one call per post.
+ * The preview on every post in the page, from the one getComments call
+ * the caller already made across all of their recentCommentIds instead
+ * of one call per post.
  */
-async function commentSummaries(posts: Post[]): Promise<Map<string, CommentSummary>> {
-  const allIds = posts.flatMap((post) => JSON.parse(post.recentCommentIds) as string[]);
-  const comments = await getComments(allIds);
-
+function commentSummaries(
+  posts: Post[],
+  comments: CommentWithAuthor[],
+  avatarByAccount: Map<string, string>,
+): Map<string, CommentSummary> {
   const byPost = new Map<string, typeof comments>();
   for (const comment of comments) {
     const list = byPost.get(comment.postId);
@@ -172,7 +188,10 @@ async function commentSummaries(posts: Post[]): Promise<Map<string, CommentSumma
         (newest, comment) => (!newest || comment.createdAt > newest.createdAt ? comment : newest),
         null,
       );
-      return [post.id, { latest, total: post.commentCount }];
+      const preview: CommentPreview | null = latest
+        ? { ...latest, authorPhotoUri: avatarByAccount.get(latest.authorId) }
+        : null;
+      return [post.id, { latest: preview, total: post.commentCount }];
     }),
   );
 }

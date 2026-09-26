@@ -32,6 +32,7 @@ import {
 } from '@/data/db';
 import { commentOnPost } from '@/features/post/usecases/comment-on-post';
 import { deletePost } from '@/features/post/usecases/delete-post';
+import { resolveMemberAvatars } from '@/features/circle/usecases/member-avatars';
 import { openPost } from '@/features/post/usecases/open-post';
 import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
@@ -60,6 +61,19 @@ function describeReactors(names: string[], expanded: boolean, t: TFunction): str
 /** One emoji's chip: the relay's count, and whether one of them is yours. */
 type ReactionChipView = { emoji: string; count: number; reactedByMe: boolean };
 
+/** A comment, with its author's current picture resolved alongside their name. */
+type CommentView = CommentWithAuthor & { authorPhotoUri?: string };
+
+/** listComments plus resolving every author's current picture in one pass. */
+async function loadComments(circleId: string, postId: string): Promise<CommentView[]> {
+  const rows = await listComments(postId);
+  const avatarByAccount = await resolveMemberAvatars(
+    circleId,
+    rows.map((comment) => ({ accountId: comment.authorId, avatarId: comment.authorAvatarId })),
+  );
+  return rows.map((comment) => ({ ...comment, authorPhotoUri: avatarByAccount.get(comment.authorId) }));
+}
+
 export default function PostDetailsScreen() {
   const { t } = useTranslation();
   const language = useLanguage();
@@ -74,7 +88,7 @@ export default function PostDetailsScreen() {
   const [profileName, setProfileName] = useState<string | undefined>();
   const [reactions, setReactions] = useState<ReactionChipView[]>([]);
   const [reactors, setReactors] = useState<string[]>([]);
-  const [comments, setComments] = useState<CommentWithAuthor[]>([]);
+  const [comments, setComments] = useState<CommentView[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [showAllReactors, setShowAllReactors] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -93,7 +107,7 @@ export default function PostDetailsScreen() {
       getProfile(),
       getReactions(postId),
       listReactors(postId),
-      listComments(postId),
+      loadComments(circleId, postId),
     ]);
 
     setCircleName(circle?.name ?? '');
@@ -218,7 +232,7 @@ export default function PostDetailsScreen() {
     const body = commentText;
     setCommentText('');
     await commentOnPost(circleId, postId, body);
-    setComments(await listComments(postId));
+    setComments(await loadComments(circleId, postId));
   }
 
   return (
@@ -345,6 +359,7 @@ export default function PostDetailsScreen() {
                 <View key={comment.id} style={styles.commentRow}>
                   <Avatar
                     size={36}
+                    uri={comment.authorPhotoUri}
                     name={comment.authorName || profileName}
                     colorSeed={comment.authorId}
                   />

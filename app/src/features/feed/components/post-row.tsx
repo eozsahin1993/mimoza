@@ -147,24 +147,9 @@ function postRow(
   };
 }
 
-/**
- * Base64 is the one expensive thing in this file, and a row rebuild is
- * cheap otherwise — so cache by the bytes' own identity. Rebuilds happen
- * on every `patchPost` (a reaction, a comment) and those leave every
- * untouched post's picture the same array, so this hits on all but the
- * first pass after a reload.
- */
-const dataUris = new WeakMap<Uint8Array, string>();
-
+/** `bytesToDataUri` is memoized by the bytes' own identity, and a rebuild leaves every untouched post's picture the same array — so this hits on all but the first pass after a reload. */
 function pictureUri(picture: Uint8Array | null | undefined): string | undefined {
-  if (!picture) return undefined;
-
-  const cached = dataUris.get(picture);
-  if (cached) return cached;
-
-  const uri = bytesToDataUri(picture);
-  dataUris.set(picture, uri);
-  return uri;
+  return picture ? bytesToDataUri(picture) : undefined;
 }
 
 /** The relay's counts, adjusted by what's queued, into the shape PostCard already renders. */
@@ -181,14 +166,14 @@ function toPostCard(view: FeedPostView, profile: Profile | null, language: Langu
   const { post } = view;
 
   // The reader's own post shows their own live picture rather than
-  // waiting on a roster row for themselves; anyone else's picture isn't
-  // resolved yet (see FeedPostView) and falls back to initials.
+  // waiting on a roster row for themselves — the account's own device
+  // always has it, where the roster copy needs a sync round trip first.
   const isOwn = profile?.accountId === post.authorId;
 
   return {
     id: post.id,
     authorName: view.authorName || (isOwn ? profile.name : '') || i18n.getFixedT(language)('post.unknownMember'),
-    authorPhotoUri: isOwn ? pictureUri(profile?.picture) : undefined,
+    authorPhotoUri: isOwn ? pictureUri(profile?.picture) : view.authorPhotoUri,
     authorPublicKey: post.authorId,
     timestamp: formatTimestamp(post.createdAt, language),
     photoUri: view.photoUri,
@@ -202,10 +187,12 @@ function toPostCard(view: FeedPostView, profile: Profile | null, language: Langu
   };
 }
 
-function toCommentItem(comment: CommentWithAuthor, language: LanguageCode): CommentItem {
+function toCommentItem(comment: CommentWithAuthor & { authorPhotoUri?: string }, language: LanguageCode): CommentItem {
   return {
     id: comment.id,
     authorName: comment.authorName || i18n.getFixedT(language)('post.unknownMember'),
+    authorPhotoUri: comment.authorPhotoUri,
+    authorPublicKey: comment.authorId,
     body: comment.body,
     timestamp: formatRelative(comment.createdAt, language),
   };

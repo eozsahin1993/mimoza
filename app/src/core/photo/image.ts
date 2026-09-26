@@ -188,11 +188,21 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Turns stored picture bytes (e.g. `device_profile.picture`) into a URI
- * `<Image>` can render directly. Only worth it for one-off renders like a
- * single avatar — for a scrolling list of many photos, decode-per-render
- * is real overhead a stored file URI avoids (see `CompressedImage.uri`).
+ * Base64 is the only expensive part, and callers routinely hand back the
+ * exact same array across renders (a profile's `picture` column, an
+ * attachment's `bytes`) — so this is cached by the array's own identity.
+ * Encoding still happens once per genuinely new picture, which is the
+ * "single avatar" case the function is for; a scrolling list of many
+ * photos still wants a stored file URI instead (see `CompressedImage.uri`).
  */
+const dataUriCache = new WeakMap<Uint8Array, string>();
+
+/** Turns stored picture bytes (e.g. `device_profile.picture`, an avatar attachment's `bytes`) into a URI `<Image>` can render directly. */
 export function bytesToDataUri(bytes: Uint8Array, mimeType = 'image/jpeg'): string {
-  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+  const cached = dataUriCache.get(bytes);
+  if (cached) return cached;
+
+  const uri = `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+  dataUriCache.set(bytes, uri);
+  return uri;
 }

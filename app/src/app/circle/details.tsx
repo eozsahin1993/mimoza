@@ -462,7 +462,8 @@ export default function CircleDetailsScreen() {
       <View key={member.accountId} style={[styles.memberRow, { borderBottomColor: tints.chipIdleBorder }]}>
         <Avatar
           size={44}
-                    name={member.name}
+          uri={details?.avatarByAccount.get(member.accountId)}
+          name={member.name}
           colorSeed={member.accountId}
         />
 

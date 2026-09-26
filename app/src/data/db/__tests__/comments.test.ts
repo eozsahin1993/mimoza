@@ -63,6 +63,52 @@ test('a comment resolves its author from the roster', async () => {
   expect(row.body).toBe('nice');
 });
 
+// The author's current picture comes from the same roster row as their
+// name, so a comment shows whoever they are now, not who they were when
+// they wrote it.
+test("a comment resolves its author's current avatar from the roster", async () => {
+  const { circle, post, n } = ids();
+  await applyCircle(
+    { circleId: circle, name: 'Family', role: 'admin', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
+    NOW
+  );
+  await applyRoster(
+    circle,
+    [
+      {
+        circleId: circle,
+        accountId: 'acc-ali',
+        name: 'Ali',
+        publicKey: 'pk',
+        role: 'member',
+        joinedAt: NOW,
+        avatarId: 'avatar-1',
+        avatarKeyVersion: 2,
+      },
+    ],
+    NOW
+  );
+  await applyPost({ id: post, circleId: circle, authorId: 'acc-ali', caption: 'x', createdAt: NOW, receivedAt: NOW, updatedAt: NOW });
+  await applyComment(comment(circle, post, `comment-1-${n}`));
+
+  const [row] = await listComments(post);
+  expect(row.authorAvatarId).toBe('avatar-1');
+  expect(row.authorAvatarKeyVersion).toBe(2);
+});
+
+// No avatar on the roster row (never set one, or one predating this
+// column) reads back as null, not undefined or a missing key — callers
+// branch on `!avatarId` to skip resolving a picture at all.
+test('a comment with no avatar on the roster reads back null, not undefined', async () => {
+  const { circle, post, n } = ids();
+  await seed(circle, post);
+  await applyComment(comment(circle, post, `comment-1-${n}`));
+
+  const [row] = await listComments(post);
+  expect(row.authorAvatarId).toBeNull();
+  expect(row.authorAvatarKeyVersion).toBeNull();
+});
+
 // The preview the relay carries on a post row is made of real comments.
 test('the preview reads back by id', async () => {
   const { circle, post, n } = ids();
