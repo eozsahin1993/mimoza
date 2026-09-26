@@ -173,7 +173,8 @@
     },
     "privacyNotice": {
       "encrypted": "Uçtan uca şifreli.",
-      "details": "Gizlilik detayları için dokun"
+      "details": "Gizlilik detayları için dokun",
+      "badge": "E2EE"
     }
   },
   "onboarding": {

@@ -13,12 +13,12 @@ import { EmptyCirclesIcon } from '@/features/circle/components/empty-circles-ico
 import { FabButton } from '@/ui/components/buttons/fab-button';
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
-import { PrivacyNotice } from '@/features/account/components/privacy-notice';
 import { NotificationPromptDialog } from '@/features/push-notifications/components/notification-prompt-dialog';
+import { Icon } from '@/ui/components/icon';
 import { answerNotificationPrompt, shouldOfferNotifications } from '@/features/push-notifications/usecases/enable-push';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Space, Spacing } from '@/ui/theme/tokens';
+import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import {
   countMembers,
   getFeed,
@@ -32,7 +32,7 @@ import {
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
-import { useTheme } from '@/ui/theme/hooks/use-theme';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { takePendingInviteCode } from '@/features/invite/services/pending-invite';
 import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative } from '@/core/utils/time';
@@ -78,6 +78,7 @@ export default function CircleListScreen() {
   const { t } = useTranslation();
   const language = useLanguage();
   const theme = useTheme();
+  const tints = useTints();
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   // Only for the header avatar's initials — the name isn't shown here.
   const [profileName, setProfileName] = useState<string | undefined>();
@@ -256,9 +257,21 @@ export default function CircleListScreen() {
         <View style={styles.header}>
           <Wordmark withBloom accessibilityRole="header" accessibilityLabel="mimoza" />
 
-          <Pressable onPress={() => router.push('/account')}>
-            <Avatar size={44} uri={avatarUri} name={profileName} colorSeed={ownColorSeed} />
-          </Pressable>
+          <View style={styles.headerRight}>
+            <Pressable
+              style={[styles.privacyPill, { borderColor: tints.chipReactedBorder }]}
+              onPress={() => setShowPrivacyInfo(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('account.privacyNotice.encrypted')} ${t('account.privacyNotice.details')}`}>
+              <Icon icon={Icons.locked} size={12} color={theme.accentBright} />
+              <ThemedText type="labelSmall" themeColor="accentBright">
+                {t('account.privacyNotice.badge')}
+              </ThemedText>
+            </Pressable>
+            <Pressable onPress={() => router.push('/account')}>
+              <Avatar size={44} uri={avatarUri} name={profileName} colorSeed={ownColorSeed} />
+            </Pressable>
+          </View>
         </View>
 
         <FlatList
@@ -273,7 +286,6 @@ export default function CircleListScreen() {
             />
           }
           keyExtractor={(item) => item.key}
-          ListHeaderComponent={<PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
             switch (item.kind) {
@@ -370,12 +382,26 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.topPadUnderSafeArea,
-    gap: Spacing.cardListGap,
+    gap: Space.s200,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.s400,
+  },
+  privacyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.s200,
+    height: 28,
+    paddingHorizontal: Space.s300,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
   },
   list: {
     // Grows to fill the screen so the empty state's `flex: 1` still has
@@ -387,10 +413,6 @@ const styles = StyleSheet.create({
     // FAB at the bottom exactly as a short one does, not just enough to
     // avoid the last row's own padding but the FAB's full footprint.
     paddingBottom: LIST_BOTTOM_PADDING,
-  },
-  privacyNotice: {
-    paddingHorizontal: Space.s0,
-    paddingBottom: Space.s200,
   },
   // The `code` type is sized for an invite code standing on its own; as a
   // section label it only wants the face and the tracking.

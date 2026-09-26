@@ -173,7 +173,8 @@
     },
     "privacyNotice": {
       "encrypted": "End-to-end encrypted.",
-      "details": "Tap for privacy details"
+      "details": "Tap for privacy details",
+      "badge": "E2EE"
     }
   },
   "onboarding": {

@@ -173,7 +173,8 @@
     },
     "privacyNotice": {
       "encrypted": "Ende-zu-Ende-verschlüsselt.",
-      "details": "Tippe für Details zum Datenschutz"
+      "details": "Tippe für Details zum Datenschutz",
+      "badge": "E2EE"
     }
   },
   "onboarding": {
