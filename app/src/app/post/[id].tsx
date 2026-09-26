@@ -7,7 +7,7 @@ import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ActionSheet } from '@/ui/components/action-sheet';
-import { Avatar } from '@/ui/components/avatar/avatar';
+import { CommentRow } from '@/features/post/components/comment-row';
 import { Icon } from '@/ui/components/icon';
 import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
 import { FabButton } from '@/ui/components/buttons/fab-button';
@@ -356,25 +356,15 @@ export default function PostDetailsScreen() {
 
             <View style={styles.comments}>
               {comments.map((comment) => (
-                <View key={comment.id} style={styles.commentRow}>
-                  <Avatar
-                    size={36}
-                    uri={comment.authorPhotoUri}
-                    name={comment.authorName || profileName}
-                    colorSeed={comment.authorId}
-                  />
-                  <View style={styles.commentBody}>
-                    <View style={styles.commentByline}>
-                      <ThemedText type="titleSmall">{comment.authorName || profileName || t('post.unknownMember')}</ThemedText>
-                      <ThemedText type="labelSmall" themeColor="faint">
-                        {formatRelative(comment.createdAt, language)}
-                      </ThemedText>
-                    </View>
-                    <ThemedText type="bodySmall" themeColor="secondary">
-                      {comment.body}
-                    </ThemedText>
-                  </View>
-                </View>
+                <CommentRow
+                  key={comment.id}
+                  size={36}
+                  authorName={comment.authorName || profileName || t('post.unknownMember')}
+                  authorPhotoUri={comment.authorPhotoUri}
+                  authorPublicKey={comment.authorId}
+                  body={comment.body}
+                  timestamp={formatRelative(comment.createdAt, language)}
+                />
               ))}
             </View>
           </ScrollView>
@@ -484,20 +474,6 @@ const styles = StyleSheet.create({
     gap: Space.s400,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.cardListGap,
-  },
-  commentRow: {
-    flexDirection: 'row',
-    gap: Space.s300,
-  },
-  commentByline: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: Space.s200,
-  },
-  commentBody: {
-    flex: 1,
-    gap: Space.s100,
-    paddingTop: Space.s100,
   },
   composer: {
     flexDirection: 'row',

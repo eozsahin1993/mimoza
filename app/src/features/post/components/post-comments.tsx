@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
+import { CommentRow } from '@/features/post/components/comment-row';
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { Icons, Radius, Space, Type } from '@/ui/theme/tokens';
@@ -80,26 +81,7 @@ export function PostComments({
 
   return (
     <View style={styles.container}>
-      {latest ? (
-        <View style={styles.commentRow}>
-          <Avatar
-            size={AVATAR_SIZE}
-            uri={latest.authorPhotoUri}
-            name={latest.authorName}
-            colorSeed={latest.authorPublicKey}
-          />
-          <View style={styles.commentBody}>
-            <ThemedText type="bodySmall" themeColor="secondary">
-              <ThemedText type="titleSmall">{latest.authorName}</ThemedText>
-              {'  '}
-              {latest.body}
-            </ThemedText>
-            <ThemedText type="labelSmall" themeColor="faint">
-              {latest.timestamp}
-            </ThemedText>
-          </View>
-        </View>
-      ) : null}
+      {latest ? <CommentRow {...latest} size={AVATAR_SIZE} /> : null}
 
       {total > 1 ? (
         <Pressable style={styles.showAll} onPress={onPressShowAll} disabled={!onPressShowAll} hitSlop={6}>
@@ -148,15 +130,6 @@ const styles = StyleSheet.create({
     // Its own rhythm, tighter than the card's bands: comment, link and
     // composer are one group, not three.
     gap: Space.s300,
-  },
-  commentRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.s300,
-  },
-  commentBody: {
-    flex: 1,
-    gap: Space.s100,
   },
   showAll: {
     flexDirection: 'row',
