@@ -2,6 +2,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
+import { notifySyncCompleted } from '@/core/sync/sync-events';
 import { syncCircles } from '@/core/sync/sync-circles';
 
 /** How often to check in while the app is open. Timers don't fire in the background, so this is a foreground cadence. */
@@ -29,8 +30,15 @@ export function runSync(): Promise<void> {
   }
 
   const pass = inFlight;
-  // Fire-and-forget: photos must never hold up whatever is awaiting the pass.
-  pass.then(() => nudgePhotoQueue());
+  // Fire-and-forget: neither the photo queue nor this notice may hold up
+  // whatever is awaiting the pass itself. `syncIfSignedIn`'s own catch
+  // means this always resolves — a pass that failed partway through
+  // still applied whatever circles it reached before that (see
+  // sync-circles.ts), so it's still worth telling a listener about.
+  pass.then(() => {
+    nudgePhotoQueue();
+    notifySyncCompleted();
+  });
   return pass;
 }
 

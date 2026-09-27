@@ -38,6 +38,7 @@ import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative } from '@/core/utils/time';
 import { upperCase } from '@/core/i18n/text';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
+import { onSyncCompleted } from '@/core/sync/sync-events';
 import { showAlert } from '@/core/services/alerts';
 import { showError } from '@/core/services/messages';
 import { syncCircles } from '@/core/sync/sync-circles';
@@ -176,6 +177,12 @@ export default function CircleListScreen() {
       .then(setOfferNotifications)
       .catch((err) => console.error('Failed to check notification permission', err));
   }, [loadFromDatabase]);
+
+  // A background pass writes straight to SQLite while this screen may
+  // already be the focused one, so focus alone won't catch it.
+  useEffect(() => onSyncCompleted(() => loadFromDatabase().catch((err) => console.error('Failed to load circles', err))), [
+    loadFromDatabase,
+  ]);
 
   const handleNotificationAnswer = useCallback((turnOn: boolean) => {
     setOfferNotifications(false);
