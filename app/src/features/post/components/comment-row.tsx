@@ -13,23 +13,25 @@ export type CommentRowProps = Omit<CommentItem, 'id'> & {
 const DEFAULT_AVATAR_SIZE = 30;
 
 /**
- * One comment, however many places show one: author and body inline on
- * one line — a comment is a reply, not a byline-and-caption pair — with
- * a relative timestamp of its own underneath, since the post it's on
- * already gives the absolute anchor.
+ * One comment, however many places show one: author and time on a
+ * byline, the comment itself on its own line below — a reply reads as a
+ * small message, not a caption with a name run into it.
  */
 export function CommentRow({ authorName, authorPhotoUri, authorPublicKey, body, timestamp, size = DEFAULT_AVATAR_SIZE }: CommentRowProps) {
   return (
     <View style={styles.row}>
       <Avatar size={size} uri={authorPhotoUri} name={authorName} colorSeed={authorPublicKey} />
       <View style={styles.body}>
+        <View style={styles.byline}>
+          <ThemedText type="titleSmall" numberOfLines={1} style={[styles.authorName, styles.bylineText]}>
+            {authorName}
+          </ThemedText>
+          <ThemedText type="labelSmall" themeColor="faint" style={styles.bylineText}>
+            {timestamp}
+          </ThemedText>
+        </View>
         <ThemedText type="bodySmall" themeColor="secondary">
-          <ThemedText type="titleSmall">{authorName}</ThemedText>
-          {'  '}
           {body}
-        </ThemedText>
-        <ThemedText type="labelSmall" themeColor="faint">
-          {timestamp}
         </ThemedText>
       </View>
     </View>
@@ -39,11 +41,22 @@ export function CommentRow({ authorName, authorPhotoUri, authorPublicKey, body, 
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: Space.s300,
   },
   body: {
     flex: 1,
-    gap: Space.s100,
+    gap: Space.s0,
+    marginTop: 0,
+  },
+  byline: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Space.s200,
+  },
+  authorName: {
+    flexShrink: 1,
+  },
+  bylineText: {
+    includeFontPadding: false,
   },
 });
