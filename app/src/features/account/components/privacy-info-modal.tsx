@@ -30,7 +30,7 @@ const BLOOM_SIZE = 14;
  * deployed there yet, so this leads nowhere until the site is — see
  * `docs/LAUNCH_CHECKLIST.md`, "Store listings".
  */
-const PRIVACY_POLICY_URL = 'https://joinmimoza.com/privacy';
+const PRIVACY_POLICY_URL = 'https://joinmimoza.com/privacy/';
 /** The circle list's section titles, at the same size: `code` is sized for an invite code standing on its own. */
 const LABEL_SIZE = 12;
 const LABEL_LINE_HEIGHT = LABEL_SIZE * 1.3;
