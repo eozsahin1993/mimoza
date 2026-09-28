@@ -1,6 +1,7 @@
 import {
   AttachmentKinds,
   AttachmentStatuses,
+  avatarEntryId,
   coverEntryId,
   forgetProfile,
   getAttachment,
@@ -37,6 +38,10 @@ jest.mock('@/core/services/keystore/circle-keys', () => ({
 }));
 jest.mock('@/core/photo/photo-queue', () => ({ nudgePhotoQueue: jest.fn() }));
 jest.mock('@/features/circle/usecases/set-member-avatar', () => ({ setMemberAvatar: jest.fn(async () => undefined) }));
+jest.mock('@/features/push-notifications/services/channels', () => ({
+  ensureCircleNotificationChannel: jest.fn(async () => undefined),
+  removeCircleNotificationChannel: jest.fn(async () => undefined),
+}));
 
 const relay = jest.requireMock('@/features/circle/services/circle-relay') as {
   listCircles: jest.Mock;
@@ -54,6 +59,10 @@ const posts = jest.requireMock('@/features/post/services/post-relay') as {
 };
 const avatar = jest.requireMock('@/features/circle/usecases/set-member-avatar') as {
   setMemberAvatar: jest.Mock;
+};
+const channels = jest.requireMock('@/features/push-notifications/services/channels') as {
+  ensureCircleNotificationChannel: jest.Mock;
+  removeCircleNotificationChannel: jest.Mock;
 };
 
 const NOW = 1_700_000_000_000;
@@ -199,6 +208,28 @@ describe('a sync pass', () => {
     await syncCircles({ force: true });
 
     expect(relay.getRoster).toHaveBeenCalledWith(id);
+  });
+
+  // A feed screen's pull-to-refresh only wants its own circle touched at
+  // all — not just left unforced, skipped entirely, so a stray version
+  // bump on some other circle can't turn "refresh this feed" into a
+  // surprise sync of a circle the user isn't even looking at.
+  test('a circleId restricts the pass to just that circle, even one whose own version moved', async () => {
+    const target = circleId();
+    const other = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(target), circleOf(other)], requests: [] });
+    await syncCircles();
+    relay.getRoster.mockClear();
+
+    // other's version moved on its own — it would ordinarily be refetched.
+    relay.listCircles.mockResolvedValue({
+      circles: [circleOf(target), circleOf(other, { rosterVersion: 2 })],
+      requests: [],
+    });
+    await syncCircles({ force: true, circleId: target });
+
+    expect(relay.getRoster).toHaveBeenCalledWith(target);
+    expect(relay.getRoster).not.toHaveBeenCalledWith(other);
   });
 
   // Departures set leftAt rather than deleting, so a post by someone who
@@ -380,6 +411,37 @@ describe('a sync pass', () => {
     expect(await getAttachment(id, coverEntryId('cover-1'))).not.toBeNull();
   });
 
+  // The channel-ensure call has to survive a roster fetch that throws
+  // right after it, or the next pass's before.name === circle.name check
+  // (applyCircle already committed the name) would skip it forever.
+  test('a failed roster fetch on a brand-new circle still creates the notification channel', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { name: 'Family' })], requests: [] });
+    relay.getRoster.mockRejectedValueOnce(new Error('offline'));
+
+    expect(await syncCircles()).toBe(1);
+    expect(channels.ensureCircleNotificationChannel).toHaveBeenCalledWith(id, 'Family');
+  });
+
+  // Leaving a circle deletes its Android channel (removeCircleNotificationChannel,
+  // above). A rejoin has to recreate it — the archived local row's name
+  // still matches, so that alone cannot be the signal to skip.
+  test('rejoining a circle after leaving it recreates the notification channel', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { name: 'Family' })], requests: [] });
+    await syncCircles();
+    expect(channels.ensureCircleNotificationChannel).toHaveBeenCalledTimes(1);
+
+    relay.listCircles.mockResolvedValue({ circles: [], requests: [] });
+    await syncCircles();
+    expect(channels.removeCircleNotificationChannel).toHaveBeenCalledWith(id);
+
+    channels.ensureCircleNotificationChannel.mockClear();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { name: 'Family' })], requests: [] });
+    await syncCircles();
+    expect(channels.ensureCircleNotificationChannel).toHaveBeenCalledWith(id, 'Family');
+  });
+
   test('a cover with a key version becomes a pending attachment other devices can fetch', async () => {
     const id = circleId();
     relay.listCircles.mockResolvedValue({
@@ -449,6 +511,156 @@ describe('a sync pass', () => {
     expect(request.circleName).toBe('Family');
   });
 
+  describe('queuing another member\'s avatar to be fetched', () => {
+    test('queues a fetch for a member\'s avatar this device does not have bytes for yet', async () => {
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [
+            { accountId: 'me', name: 'Me', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+            {
+              accountId: 'friend',
+              name: 'Friend',
+              avatarId: 'pic-1',
+              avatarKeyVersion: 1,
+              publicKey: 'bb',
+              role: 'member',
+              notifyLevel: 'all',
+              joinedAt: NOW,
+            },
+          ],
+        })
+      );
+
+      await syncCircles();
+
+      const attachment = await getAttachment(id, avatarEntryId('friend', 'pic-1'));
+      expect(attachment?.status).toBe(AttachmentStatuses.PENDING);
+      expect(attachment?.kind).toBe(AttachmentKinds.MEMBER_AVATAR);
+    });
+
+    test('does not queue a version this device has no key for yet', async () => {
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [
+            {
+              accountId: 'friend',
+              name: 'Friend',
+              avatarId: 'pic-1',
+              avatarKeyVersion: 9,
+              publicKey: 'bb',
+              role: 'member',
+              notifyLevel: 'all',
+              joinedAt: NOW,
+            },
+          ],
+        })
+      );
+
+      await syncCircles();
+
+      expect(await getAttachment(id, avatarEntryId('friend', 'pic-1'))).toBeNull();
+    });
+
+    test('does not reset an already-fetched avatar back to pending on a later sync', async () => {
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [
+            {
+              accountId: 'friend',
+              name: 'Friend',
+              avatarId: 'pic-1',
+              avatarKeyVersion: 1,
+              publicKey: 'bb',
+              role: 'member',
+              notifyLevel: 'all',
+              joinedAt: NOW,
+            },
+          ],
+        })
+      );
+      await syncCircles();
+      await markAttachmentFetched(id, avatarEntryId('friend', 'pic-1'), new Uint8Array([1, 2, 3]));
+
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
+      await syncCircles();
+
+      const attachment = await getAttachment(id, avatarEntryId('friend', 'pic-1'));
+      expect(attachment?.status).toBe(AttachmentStatuses.FETCHED);
+      expect(attachment?.bytes).not.toBeNull();
+    });
+
+    test('queues every member with an avatar in one pass, not just the first', async () => {
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [
+            { accountId: 'ali', name: 'Ali', avatarId: 'pic-1', avatarKeyVersion: 1, publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+            { accountId: 'ayse', name: 'Ayse', avatarId: 'pic-2', avatarKeyVersion: 1, publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+          ],
+        })
+      );
+
+      await syncCircles();
+
+      expect((await getAttachment(id, avatarEntryId('ali', 'pic-1')))?.status).toBe(AttachmentStatuses.PENDING);
+      expect((await getAttachment(id, avatarEntryId('ayse', 'pic-2')))?.status).toBe(AttachmentStatuses.PENDING);
+    });
+
+    // circle_members is one row per account, shared by every device that
+    // account has — this device's own avatarId can arrive from the roster
+    // exactly like anyone else's, when another of this account's devices
+    // set it first.
+    test('queues this device\'s own avatar too, when another of this account\'s devices already set one', async () => {
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [{ accountId: 'me', name: 'Me', avatarId: 'pic-1', avatarKeyVersion: 1, publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW }],
+        })
+      );
+
+      await syncCircles();
+
+      expect((await getAttachment(id, avatarEntryId('me', 'pic-1')))?.status).toBe(AttachmentStatuses.PENDING);
+    });
+
+    // avatarId is content-addressed — a changed picture is a new id, not
+    // the old one rewritten — so an already-fetched old avatar must never
+    // block queuing the new one it was replaced by.
+    test('queues a replacement avatarId even though the one it replaced was already fetched', async () => {
+      const id = circleId();
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [
+            { accountId: 'friend', name: 'Friend', avatarId: 'pic-1', avatarKeyVersion: 1, publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+          ],
+        })
+      );
+      await syncCircles();
+      await markAttachmentFetched(id, avatarEntryId('friend', 'pic-1'), new Uint8Array([1, 2, 3]));
+
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [
+            { accountId: 'friend', name: 'Friend', avatarId: 'pic-2', avatarKeyVersion: 1, publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+          ],
+        })
+      );
+      await syncCircles();
+
+      expect((await getAttachment(id, avatarEntryId('friend', 'pic-2')))?.status).toBe(AttachmentStatuses.PENDING);
+    });
+  });
+
   // A circle's roster is shared across every device this account has, so
   // avatarId can already be set here without this device having done it —
   // seeding again would just churn a new id over one another device chose.
@@ -504,5 +716,46 @@ describe('a sync pass', () => {
 
       expect(avatar.setMemberAvatar).not.toHaveBeenCalled();
     });
+  });
+});
+
+// runSync's own dedup only covers its callers — pull-to-refresh and a
+// feed's sync-and-reload call syncCircles directly, so the same circle
+// can otherwise get two real walks over its cursors at once.
+describe('two passes racing on the same circle', () => {
+  test('the second pass waits for the first rather than running alongside it', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
+
+    let releaseFirst: () => void = () => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const order: string[] = [];
+
+    relay.getRoster
+      .mockImplementationOnce(async () => {
+        order.push('first-start');
+        await firstGate;
+        order.push('first-end');
+        return roster({ rosterVersion: 2 });
+      })
+      .mockImplementationOnce(async () => {
+        order.push('second-start');
+        return roster({ rosterVersion: 2 });
+      });
+
+    const first = syncCircles({ force: true });
+    while (!order.includes('first-start')) await new Promise((resolve) => setTimeout(resolve, 0));
+    const second = syncCircles({ force: true });
+
+    // Give an unlocked second pass real time to reach its own getRoster
+    // call before the first is released — without the lock this is where
+    // 'second-start' would land ahead of 'first-end'.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(order).toEqual(['first-start', 'first-end', 'second-start']);
   });
 });

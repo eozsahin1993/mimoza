@@ -1,3 +1,4 @@
+import { addNotificationReceivedListener } from 'expo-notifications';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { getAuthToken } from '@/core/services/keystore/auth-token';
@@ -51,11 +52,13 @@ async function syncIfSignedIn(): Promise<void> {
  * Starts the background sync triggers and returns a function that stops
  * them. Call once, from the root layout.
  *
- * Three triggers, all foreground: once on startup, on every return to the
- * foreground (where new content is most likely waiting), and on a timer
- * while the app stays open. iOS has no sync-adapter equivalent, so
- * anything genuinely background is best-effort and additive on top of
- * these, never a replacement for them.
+ * Four triggers, all foreground: once on startup, on every return to the
+ * foreground (where new content is most likely waiting), on a timer while
+ * the app stays open, and on a push actually arriving while foregrounded —
+ * the OS already woke this thread for that, so it's a free trigger rather
+ * than waiting out the rest of the timer's interval. iOS has no
+ * sync-adapter equivalent, so anything genuinely background (app killed,
+ * or backgrounded outside a push's own wake window) is not covered here.
  *
  * Safe to start before sign-in, and left running across sign-out: every
  * trigger checks for a session first and does nothing without one, so
@@ -68,9 +71,11 @@ export function startSyncScheduler(): () => void {
     if (state === 'active') runSync();
   });
   const interval = setInterval(runSync, FOREGROUND_INTERVAL_MS);
+  const pushSubscription = addNotificationReceivedListener(() => runSync());
 
   return () => {
     subscription.remove();
     clearInterval(interval);
+    pushSubscription.remove();
   };
 }

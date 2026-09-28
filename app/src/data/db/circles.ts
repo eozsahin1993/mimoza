@@ -1,7 +1,7 @@
-import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
-import { activity, circles, posts } from '@/data/db/schema';
+import { activity, circles, postComments, posts } from '@/data/db/schema';
 
 export type Circle = typeof circles.$inferSelect;
 export type NewCircle = typeof circles.$inferInsert;
@@ -101,9 +101,14 @@ export async function markCircleViewed(circleId: string, at: number): Promise<vo
 }
 
 /**
- * Posts and activity newer than the last time this circle was opened,
- * excluding this account's own — posting or renaming a circle yourself is
- * not news to you, and would otherwise badge a circle you just touched.
+ * Posts and activity newer than the last time this circle was opened, plus
+ * older posts someone else has since commented on — reactions don't count,
+ * deliberately: they carry no per-event row from an ordinary sync (only a
+ * running total on the post), so there is nothing attributable or
+ * timestamped to badge on without guessing.
+ *
+ * Every count excludes this account's own — posting, commenting or
+ * renaming a circle yourself is not news to you.
  */
 export async function getUnreadCount(circleId: string, myAccountId: string): Promise<number> {
   const circle = await getCircle(circleId);
@@ -120,6 +125,20 @@ export async function getUnreadCount(circleId: string, myAccountId: string): Pro
         ne(posts.authorId, myAccountId)
       )
     );
+  const [commentedPosts] = await db
+    .select({ n: sql<number>`count(distinct ${posts.id})` })
+    .from(posts)
+    .innerJoin(postComments, eq(postComments.postId, posts.id))
+    .where(
+      and(
+        eq(posts.circleId, circleId),
+        isNull(posts.deletedAt),
+        lte(posts.createdAt, circle.lastViewedAt),
+        isNull(postComments.deletedAt),
+        gt(postComments.createdAt, circle.lastViewedAt),
+        ne(postComments.authorId, myAccountId)
+      )
+    );
   const [newActivity] = await db
     .select({ n: sql<number>`count(*)` })
     .from(activity)
@@ -127,7 +146,7 @@ export async function getUnreadCount(circleId: string, myAccountId: string): Pro
       and(eq(activity.circleId, circleId), gt(activity.receivedAt, circle.lastViewedAt), ne(activity.actorId, myAccountId))
     );
 
-  return (newPosts?.n ?? 0) + (newActivity?.n ?? 0);
+  return (newPosts?.n ?? 0) + (commentedPosts?.n ?? 0) + (newActivity?.n ?? 0);
 }
 
 export async function setNotifyLevel(circleId: string, level: string): Promise<void> {

@@ -11,6 +11,7 @@ import {
   markCircleViewed,
   saveCursors,
 } from '@/data/db/circles';
+import { applyComment } from '@/data/db/comments';
 import { applyPost } from '@/data/db/posts';
 
 const NOW = 1_700_000_000_000;
@@ -147,6 +148,89 @@ test('unread excludes this account\'s own posts and activity', async () => {
   });
 
   expect(await getUnreadCount(circle, 'me')).toBe(1);
+});
+
+// A comment on an old post is still news, even though the post itself
+// isn't new — the badge has to catch that too, not just brand-new posts.
+test('a comment on an older post counts as unread, once per post', async () => {
+  const circle = circleId();
+  await applyCircle(membership(circle), NOW);
+  await markCircleViewed(circle, NOW);
+
+  await applyPost({
+    id: 'post-touched',
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: 'old',
+    createdAt: NOW - 100,
+    receivedAt: NOW - 100,
+  });
+  expect(await getUnreadCount(circle, 'me')).toBe(0);
+
+  await applyComment({
+    id: 'comment-1',
+    postId: 'post-touched',
+    circleId: circle,
+    authorId: 'acc-2',
+    createdAt: NOW + 100,
+  });
+  expect(await getUnreadCount(circle, 'me')).toBe(1);
+
+  // A second new comment on the same post is still one unread post, not two.
+  await applyComment({
+    id: 'comment-2',
+    postId: 'post-touched',
+    circleId: circle,
+    authorId: 'acc-2',
+    createdAt: NOW + 200,
+  });
+  expect(await getUnreadCount(circle, 'me')).toBe(1);
+});
+
+// Reactions carry no attributable, timestamped row on an ordinary sync —
+// only a running total on the post — so they're deliberately not badged.
+test('a reaction alone does not count as unread', async () => {
+  const circle = circleId();
+  await applyCircle(membership(circle), NOW);
+  await markCircleViewed(circle, NOW);
+
+  await applyPost({
+    id: 'post-reacted',
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: 'old',
+    createdAt: NOW - 100,
+    receivedAt: NOW - 100,
+    updatedAt: NOW + 100,
+    reactionCounts: JSON.stringify({ '❤️': 1 }),
+  });
+
+  expect(await getUnreadCount(circle, 'me')).toBe(0);
+});
+
+// My own comment on someone else's post is not news to me either.
+test('unread excludes this account\'s own comments', async () => {
+  const circle = circleId();
+  await applyCircle(membership(circle), NOW);
+  await markCircleViewed(circle, NOW);
+
+  await applyPost({
+    id: 'post-mine-comment',
+    circleId: circle,
+    authorId: 'acc-1',
+    caption: 'old',
+    createdAt: NOW - 100,
+    receivedAt: NOW - 100,
+  });
+  await applyComment({
+    id: 'comment-mine',
+    postId: 'post-mine-comment',
+    circleId: circle,
+    authorId: 'me',
+    createdAt: NOW + 100,
+  });
+
+  expect(await getUnreadCount(circle, 'me')).toBe(0);
 });
 
 // A deleted post is still a row, so it must not be counted as news.
