@@ -1,5 +1,6 @@
 import { getProfile, listReactors, queueReactionChange, summarise, type ReactionSummary } from '@/data/db';
 import { reactionTag, reactionTagKey } from '@/core/crypto/reaction-tags';
+import { logEvent } from '@/core/services/analytics';
 import { getCircleKeyMap, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { drainOutbox } from '@/core/sync/drain-outbox';
 
@@ -38,6 +39,7 @@ export async function toggleReaction(circleId: string, postId: string, emoji: st
     }
   );
 
+  if (op === 'add') void logEvent('reaction_added');
   drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
 }
 

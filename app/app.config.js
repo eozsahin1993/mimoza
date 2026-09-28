@@ -27,15 +27,18 @@ function iosUrlScheme() {
  */
 const ENVIRONMENTS = {
   dev: {
-    googleServicesFile: './google-services.dev.json'
+    googleServicesFile: './google-services.dev.json',
+    iosGoogleServicesFile: './GoogleService-Info.dev.plist'
   },
   production: {
-    channel: 'production', 
-    googleServicesFile: './google-services.prod.json' 
+    channel: 'production',
+    googleServicesFile: './google-services.prod.json',
+    iosGoogleServicesFile: './GoogleService-Info.prod.plist'
   },
   staging: {
     channel: 'staging',
     googleServicesFile: './google-services.staging.json',
+    iosGoogleServicesFile: './GoogleService-Info.staging.plist',
     nameSuffix: ' Staging',
     idSuffix: '.staging',
     scheme: 'mimoza-staging',
@@ -52,7 +55,11 @@ module.exports = ({ config }) => {
   }
   requireEnvironment(name, env);
 
-  config = { ...config, android: { ...config.android, googleServicesFile: env.googleServicesFile } };
+  config = {
+    ...config,
+    android: { ...config.android, googleServicesFile: env.googleServicesFile },
+    ios: { ...config.ios, googleServicesFile: env.iosGoogleServicesFile },
+  };
 
   if (!env.idSuffix) return withBuildNumber(withGoogleScheme(withEnv(withPushEnvironment(config), name, env)));
 

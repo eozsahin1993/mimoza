@@ -17,6 +17,7 @@ import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 
 jest.mock('@/core/sync/drain-outbox', () => ({ drainOutbox: jest.fn(async () => undefined) }));
+jest.mock('@/core/services/analytics', () => ({ logEvent: jest.fn() }));
 jest.mock('@/core/services/keystore/circle-keys', () => ({
   getCircleKeyMap: jest.fn(async () => ({ 1: new Uint8Array(32).fill(1) })),
   getCurrentContentKey: jest.fn(async () => ({ version: 1, key: new Uint8Array(32).fill(1) })),
