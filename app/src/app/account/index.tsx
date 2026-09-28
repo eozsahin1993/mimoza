@@ -1,10 +1,11 @@
 import * as Application from 'expo-application';
+import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useLocales } from 'expo-localization';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -31,6 +32,10 @@ import type { ThemePreference } from '@/core/services/settings';
 
 /** From app.json's "version" — Constants.expoConfig is only ever missing in a context this screen doesn't run in. */
 const appVersion = Constants.expoConfig?.version ?? 'Unknown';
+
+/** Apple's Guideline 1.2 (user-generated content) wants a way to report content and reach us — this is that route. */
+const SUPPORT_EMAIL = 'hello@joinmimoza.com';
+const REPORT_PROBLEM_URL = `mailto:${SUPPORT_EMAIL}`;
 
 /**
  * What someone is actually running, as two numbers they can read out: the
@@ -116,6 +121,12 @@ export default function AccountScreen() {
           onPress: () => setPrivacyVisible(true),
         },
         {
+          label: t('settings.reportProblem'),
+          description: t('settings.reportProblemDescription'),
+          control: { kind: 'navigate' },
+          onPress: handleReportProblem,
+        },
+        {
           label: t('settings.credits'),
           control: { kind: 'navigate' },
           onPress: () => router.push('/account/credits'),
@@ -133,6 +144,7 @@ export default function AccountScreen() {
         },
         {
           label: signingOut ? t('settings.signingOut') : t('settings.signOut'),
+          description: t('settings.signOutDescription'),
           disabled: signingOut,
           onPress: handleSignOut,
         },
@@ -181,6 +193,15 @@ export default function AccountScreen() {
         },
       },
     ]);
+  }
+
+  function handleReportProblem() {
+    Linking.openURL(REPORT_PROBLEM_URL).catch(() => {
+      showAlert(t('settings.reportProblemFailedTitle'), t('settings.reportProblemFailedMessage', { email: SUPPORT_EMAIL }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('settings.copyEmail'), onPress: () => Clipboard.setStringAsync(SUPPORT_EMAIL) },
+      ]);
+    });
   }
 
   function handleSignOut() {
