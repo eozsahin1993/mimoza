@@ -21,7 +21,6 @@ import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import {
   countMembers,
-  getFeed,
   getProfile,
   getUnreadCount,
   listCircles,
@@ -63,8 +62,6 @@ type CircleListItem = Circle & {
   memberCount: number;
   photoUri?: string;
   newCount: number;
-  /** When the newest photo was added — null for a circle with none yet. */
-  newestPostAt: number | null;
 };
 
 /**
@@ -121,15 +118,12 @@ export default function CircleListScreen() {
     const allCircles = await listCircles();
     const withCounts = await Promise.all(
       allCircles.map(async (circle) => {
-        const [memberCount, photoUri, newCount, newest] = await Promise.all([
+        const [memberCount, photoUri, newCount] = await Promise.all([
           countMembers(circle.id),
           resolveCircleCoverUri(circle.id),
           resolveUnreadCount(circle, myAccountId),
-          getFeed(circle.id, 1),
         ]);
-        // The newest post's own clock, for the row's timestamp. The
-        // circle's lastEntryAt is the relay's and counts activity too.
-        return { ...circle, memberCount, photoUri, newCount, newestPostAt: newest[0]?.createdAt ?? null };
+        return { ...circle, memberCount, photoUri, newCount };
       }),
     );
     setCircles(withCounts);
@@ -321,7 +315,7 @@ export default function CircleListScreen() {
                     photoUri={item.circle.photoUri}
                     newCount={item.circle.newCount}
                     latestActivity={
-                      item.circle.newestPostAt === null ? undefined : formatRelative(item.circle.newestPostAt, language)
+                      item.circle.lastEntryAt > 0 ? formatRelative(item.circle.lastEntryAt, language) : undefined
                     }
                     onPress={() => router.push({ pathname: '/circle/feed', params: { circleId: item.circle.id } })}
                   />
