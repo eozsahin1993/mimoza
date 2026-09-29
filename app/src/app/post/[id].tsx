@@ -161,9 +161,22 @@ export default function PostDetailsScreen() {
   useEffect(
     () =>
       onPhotoFetched((event) => {
-        if (event.circleId === circleId && event.postId === postId) setPhotoUri(event.uri);
+        if (event.kind !== 'post' || event.circleId !== circleId || event.postId !== postId) return;
+        setPhotoUri(event.uri);
       }),
     [circleId, postId],
+  );
+
+  // Same idea for a commenter's avatar landing after their comment already rendered.
+  useEffect(
+    () =>
+      onPhotoFetched((event) => {
+        if (event.kind !== 'avatar' || event.circleId !== circleId) return;
+        setComments((current) =>
+          current.map((comment) => (comment.authorId === event.accountId ? { ...comment, authorPhotoUri: event.uri } : comment)),
+        );
+      }),
+    [circleId],
   );
 
   async function handleSelectReaction(emoji: string) {

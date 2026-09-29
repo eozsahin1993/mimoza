@@ -167,7 +167,8 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
   useEffect(
     () =>
       onPhotoFetched((event) => {
-        if (event.circleId === circleId) patchPost(event.postId, { photoUri: event.uri });
+        if (event.kind !== 'post' || event.circleId !== circleId) return;
+        patchPost(event.postId, { photoUri: event.uri });
       }),
     [circleId, patchPost],
   );

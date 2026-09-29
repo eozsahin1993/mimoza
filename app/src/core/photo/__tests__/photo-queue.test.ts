@@ -8,7 +8,9 @@ import {
   AttachmentStatuses,
   applyCircle,
   applyPost,
+  avatarEntryId,
   clearAttachmentBackoff,
+  coverEntryId,
   getAttachment,
   getFetchableAttachments,
   initDatabase,
@@ -18,6 +20,7 @@ import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
 import { getBlob } from '@/core/services/blob-relay';
 import { drainPhotoQueue, retryAttachment } from '@/core/photo/photo-queue';
+import { onPhotoFetched, type PhotoFetched } from '@/core/photo/photo-events';
 
 const NOW = 1_700_000_000_000;
 const KEY = new Uint8Array(32).fill(1);
@@ -61,13 +64,58 @@ async function makePendingPost(circleId: string, photo: Uint8Array, createdAt: n
   return postId;
 }
 
+/** A pending circle cover, same shape as makePendingPost but for the cover tier. */
+async function makePendingCover(circleId: string, photo: Uint8Array, createdAt: number, coverId = 'cover-1'): Promise<string> {
+  const entryId = coverEntryId(coverId);
+  await insertAttachment({
+    circleId,
+    entryId,
+    kind: AttachmentKinds.CIRCLE_COVER,
+    bytes: null,
+    hash: hashBytes(photo),
+    keyVersion: 1,
+    status: AttachmentStatuses.PENDING,
+    fetchAttempts: 0,
+    nextAttemptAt: null,
+    createdAt,
+  });
+  return entryId;
+}
+
+/** A pending member avatar, same shape as makePendingPost but for the cover tier. */
+async function makePendingAvatar(
+  circleId: string,
+  photo: Uint8Array,
+  createdAt: number,
+  accountId = 'sarah',
+  avatarId = 'avatar-1'
+): Promise<string> {
+  const entryId = avatarEntryId(accountId, avatarId);
+  await insertAttachment({
+    circleId,
+    entryId,
+    kind: AttachmentKinds.MEMBER_AVATAR,
+    bytes: null,
+    hash: hashBytes(photo),
+    keyVersion: 1,
+    status: AttachmentStatuses.PENDING,
+    fetchAttempts: 0,
+    nextAttemptAt: null,
+    createdAt,
+  });
+  return entryId;
+}
+
 test('downloads, decrypts, and stores a pending photo', async () => {
   const circleId = await makeCircle();
   const photo = new Uint8Array([4, 5, 6]);
   const postId = await makePendingPost(circleId, photo, 1000);
   (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
 
+  const events: PhotoFetched[] = [];
+  const unsubscribe = onPhotoFetched((event) => events.push(event));
   await drainPhotoQueue();
+  unsubscribe();
 
   const attachment = await getAttachment(circleId, postId);
   expect(attachment?.bytes).toEqual(photo);
@@ -75,6 +123,35 @@ test('downloads, decrypts, and stores a pending photo', async () => {
   expect(attachment?.fetchAttempts).toBe(0);
   // Addressed as (circle, the rest of the key) — no syncId any more.
   expect(getBlob).toHaveBeenCalledWith(circleId, postId);
+  expect(events).toEqual([{ kind: 'post', circleId, postId, uri: expect.any(String) }]);
+});
+
+test('notifies with kind "cover" when a circle cover finishes downloading', async () => {
+  const circleId = await makeCircle();
+  const photo = new Uint8Array([1, 2, 3]);
+  await makePendingCover(circleId, photo, 1000);
+  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
+
+  const events: PhotoFetched[] = [];
+  const unsubscribe = onPhotoFetched((event) => events.push(event));
+  await drainPhotoQueue();
+  unsubscribe();
+
+  expect(events).toEqual([{ kind: 'cover', circleId, uri: expect.any(String) }]);
+});
+
+test('notifies with kind "avatar" when a member avatar finishes downloading', async () => {
+  const circleId = await makeCircle();
+  const photo = new Uint8Array([1, 2, 3]);
+  await makePendingAvatar(circleId, photo, 1000, 'sarah');
+  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
+
+  const events: PhotoFetched[] = [];
+  const unsubscribe = onPhotoFetched((event) => events.push(event));
+  await drainPhotoQueue();
+  unsubscribe();
+
+  expect(events).toEqual([{ kind: 'avatar', circleId, accountId: 'sarah', uri: expect.any(String) }]);
 });
 
 test('stops without a session, rather than backing every photo off', async () => {
@@ -105,6 +182,30 @@ test('fetches newest first, across circles rather than finishing one circle at a
   // The newest photo wins even though its circle was created last and has
   // fewer pending items — an old backlog must never starve a fresh post.
   expect(first.entryId).toBe(newest);
+});
+
+test('drains every cover/avatar before any post, regardless of recency', async () => {
+  const circleId = await makeCircle();
+  const photo = new Uint8Array([1]);
+  await makePendingPost(circleId, photo, 9000); // newer than the cover below
+  const coverEntry = await makePendingCover(circleId, photo, 1000); // older, but must still win the tier
+
+  const [first] = await getFetchableAttachments(Date.now(), 1);
+
+  expect(first.kind).toBe(AttachmentKinds.CIRCLE_COVER);
+  expect(first.entryId).toBe(coverEntry);
+});
+
+test('within the cover/avatar tier, newest still wins', async () => {
+  const circleId = await makeCircle();
+  const photo = new Uint8Array([1]);
+  await makePendingPost(circleId, photo, 9000); // must still lose to both, despite being newest overall
+  await makePendingAvatar(circleId, photo, 1000, 'sarah');
+  const newerAvatar = await makePendingAvatar(circleId, photo, 2000, 'emre');
+
+  const [first] = await getFetchableAttachments(Date.now(), 1);
+
+  expect(first.entryId).toBe(newerAvatar);
 });
 
 test('records a failure with backoff and leaves the photo pending', async () => {

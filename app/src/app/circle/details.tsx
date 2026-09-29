@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
@@ -33,6 +33,7 @@ import {
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showAlert } from '@/core/services/alerts';
 import { showDone, showError } from '@/core/services/messages';
+import { onPhotoFetched } from '@/core/photo/photo-events';
 import { pickAndCompressImage } from '@/core/photo/image';
 import { formatMonth } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
@@ -87,6 +88,22 @@ export default function CircleDetailsScreen() {
     if (!circleId) return;
     setDetails(await loadCircleDetails(circleId));
     setCoverUri(await resolveCircleCoverUri(circleId));
+  }, [circleId]);
+
+  // A cover or a member's avatar landing while this screen is open
+  // patches just that piece, rather than waiting for the next focus.
+  useEffect(() => {
+    if (!circleId) return;
+    return onPhotoFetched((event) => {
+      if (event.circleId !== circleId) return;
+      if (event.kind === 'cover') {
+        resolveCircleCoverUri(circleId).then(setCoverUri).catch((err) => console.error('Failed to refresh the cover', err));
+      } else if (event.kind === 'avatar') {
+        setDetails((current) =>
+          current ? { ...current, avatarByAccount: new Map(current.avatarByAccount).set(event.accountId, event.uri) } : current,
+        );
+      }
+    });
   }, [circleId]);
 
   function formatExpiry(expiresAt: number): string {

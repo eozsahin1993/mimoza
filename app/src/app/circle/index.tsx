@@ -36,6 +36,7 @@ import { takePendingInviteCode } from '@/features/invite/services/pending-invite
 import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative } from '@/core/utils/time';
 import { upperCase } from '@/core/i18n/text';
+import { onPhotoFetched } from '@/core/photo/photo-events';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
 import { onSyncCompleted } from '@/core/sync/sync-events';
 import { showAlert } from '@/core/services/alerts';
@@ -177,6 +178,21 @@ export default function CircleListScreen() {
   useEffect(() => onSyncCompleted(() => loadFromDatabase().catch((err) => console.error('Failed to load circles', err))), [
     loadFromDatabase,
   ]);
+
+  // A cover landing while this list is open patches just that row,
+  // rather than waiting for the next full reload.
+  useEffect(
+    () =>
+      onPhotoFetched((event) => {
+        if (event.kind !== 'cover') return;
+        resolveCircleCoverUri(event.circleId)
+          .then((photoUri) =>
+            setCircles((current) => current.map((circle) => (circle.id === event.circleId ? { ...circle, photoUri } : circle))),
+          )
+          .catch((err) => console.error('Failed to refresh a circle cover', err));
+      }),
+    [],
+  );
 
   const handleNotificationAnswer = useCallback((turnOn: boolean) => {
     setOfferNotifications(false);

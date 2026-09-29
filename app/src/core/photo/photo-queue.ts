@@ -4,11 +4,13 @@ import {
   getFetchableAttachments,
   markAttachmentFailed,
   markAttachmentFetched,
+  parseAvatarEntryId,
   type FetchableAttachment,
 } from '@/data/db';
 import { decrypt, hashBytes } from '@/core/crypto/primitives';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { bytesToDataUri } from '@/core/photo/image';
 import { writeCoverFile, writePhotoFile } from '@/core/photo/photo-cache';
 import { notifyPhotoFetched } from '@/core/photo/photo-events';
 import { getBlob } from '@/core/services/blob-relay';
@@ -62,16 +64,24 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
     if (attachment.kind === AttachmentKinds.CIRCLE_COVER) {
       // Keyed by the cover's own id, which is the last path segment and
       // is already content-addressed — a new cover is a new key.
-      writeCoverFile(circleId, bytes, entryId.split('/').pop() ?? entryId);
+      const uri = writeCoverFile(circleId, bytes, entryId.split('/').pop() ?? entryId);
+      notifyPhotoFetched({ kind: 'cover', circleId, uri });
     } else if (attachment.kind === AttachmentKinds.MEMBER_AVATAR) {
       // Bytes only: a picture is small and its screens read it straight
-      // out of SQLite rather than through the file cache.
+      // out of SQLite rather than through the file cache — but a screen
+      // already showing this member's picture still needs telling.
+      const parsed = parseAvatarEntryId(entryId);
+      if (parsed) {
+        notifyPhotoFetched({ kind: 'avatar', circleId, accountId: parsed.accountId, uri: bytesToDataUri(bytes) });
+      } else {
+        console.error(`Fetched avatar attachment with an unparseable entryId: ${entryId}`);
+      }
     } else {
       // Whatever screen is showing this post's placeholder patches just
       // this row rather than reloading — a backlog of many photos landing
       // one by one must not mean a feed reload apiece.
       const uri = writePhotoFile(circleId, entryId, bytes);
-      notifyPhotoFetched({ circleId, postId: entryId, uri });
+      notifyPhotoFetched({ kind: 'post', circleId, postId: entryId, uri });
     }
   } catch (err) {
     const attempts = fetchAttempts + 1;

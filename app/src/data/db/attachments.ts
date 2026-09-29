@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
@@ -30,6 +30,13 @@ export function coverEntryId(coverId: string): string {
 
 export function avatarEntryId(accountId: string, avatarId: string): string {
   return `avatar/${accountId}/${avatarId}`;
+}
+
+/** Reverses avatarEntryId's format, so the queue can recover which account a just-fetched avatar belongs to. */
+export function parseAvatarEntryId(entryId: string): { accountId: string; avatarId: string } | null {
+  const [prefix, accountId, avatarId] = entryId.split('/');
+  if (prefix !== 'avatar' || !accountId || !avatarId) return null;
+  return { accountId, avatarId };
 }
 
 export function normalizeAttachment(attachment: Attachment): Attachment {
@@ -87,10 +94,13 @@ export type FetchableAttachment = Attachment;
 
 /**
  * The download queue's only read: attachments that still need bytes and
- * are past any backoff, **newest first across every circle** — global
- * rather than per-circle so a brand-new photo in one circle always beats
- * an old backlog in another (see photo-queue.ts, which re-runs this with
- * `limit: 1` on every iteration rather than snapshotting a batch).
+ * are past any backoff. Circle covers and member avatars are exhausted
+ * first — one per circle and one per member, so this tier never grows
+ * large enough to meaningfully delay posts — then post photos, each tier
+ * newest first across every circle (global rather than per-circle, so a
+ * brand-new item in one circle always beats an old backlog in another;
+ * see photo-queue.ts, which re-runs this with `limit: 1` on every
+ * iteration rather than snapshotting a batch).
  *
  * Resolves each row's `syncId` (the blob's relay address needs it) and
  * skips circles this device has left.
@@ -111,7 +121,10 @@ export async function getFetchableAttachments(now: number, limit: number): Promi
         or(isNull(attachments.nextAttemptAt), lte(attachments.nextAttemptAt, now))
       )
     )
-    .orderBy(desc(attachments.createdAt))
+    .orderBy(
+      sql`case when ${attachments.kind} = ${AttachmentKinds.POST_PHOTO} then 1 else 0 end`,
+      desc(attachments.createdAt)
+    )
     .limit(limit);
   // The circle id is the address now: a blob's key is the circle and
   // the rest, so nothing has to be looked up to fetch one.
