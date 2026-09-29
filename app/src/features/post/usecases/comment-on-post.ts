@@ -1,5 +1,6 @@
 import { getProfile, queueComment, queueCommentDeletion } from '@/data/db';
 import { generateUUID } from '@/core/crypto/primitives';
+import { logEvent } from '@/core/services/analytics';
 import { drainOutbox } from '@/core/sync/drain-outbox';
 
 /**
@@ -33,6 +34,7 @@ export async function commentOnPost(circleId: string, postId: string, body: stri
     }
   );
 
+  void logEvent('comment_created');
   drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
   return commentId;
 }

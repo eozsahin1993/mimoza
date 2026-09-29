@@ -67,6 +67,16 @@
           "cameraPermission": "Mimoza uses your camera to scan a device transfer code.",
           "recordAudioAndroid": false
         }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
+      [
+        "@react-native-firebase/analytics",
+        {
+          "ios": {
+            "withoutAdIdSupport": true
+          }
+        }
       ]
     ],
     "experiments": {
