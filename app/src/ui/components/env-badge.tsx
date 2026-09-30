@@ -16,6 +16,9 @@ const APP_ENV = (Constants.expoConfig?.extra as { appEnv?: string } | undefined)
  * and still look cut to fit.
  */
 export function EnvBadge() {
+  // Machine-local escape hatch for a clean screenshot without lying to
+  // the build about which environment it actually is — see .env.example.
+  if (process.env.EXPO_PUBLIC_HIDE_ENV_BADGE === 'true') return null;
   if (!APP_ENV || APP_ENV === 'production') return null;
 
   return (

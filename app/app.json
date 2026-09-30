@@ -62,13 +62,26 @@
       "@react-native-google-signin/google-signin",
       "expo-sharing",
       [
+        "expo-image-picker",
+        {
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Mimoza uses your camera to scan a device transfer code.",
           "recordAudioAndroid": false
         }
       ],
-      "@react-native-firebase/app",
+      [
+        "@react-native-firebase/app",
+        {
+          "ios": {
+            "disableSPM": true
+          }
+        }
+      ],
       "@react-native-firebase/crashlytics",
       [
         "@react-native-firebase/analytics",
@@ -77,7 +90,8 @@
             "withoutAdIdSupport": true
           }
         }
-      ]
+      ],
+      "./plugins/with-firebase-modular-headers"
     ],
     "experiments": {
       "typedRoutes": true,

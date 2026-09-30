@@ -70,3 +70,7 @@ fastlane/test_output
 # which isn't writable here. The lockfile is versioned; the gems are not.
 /vendor/bundle
 /.bundle
+
+# Local Expo modules build their own android/ the same way the app does.
+modules/*/android/build/
+modules/*/android/.cxx/

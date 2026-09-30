@@ -1,0 +1,13 @@
+Sign-in is with Apple or Google only, so there is no demo account to provide. Any Apple ID or Google account works, including a brand new one.
+
+Everything is reachable from one fresh account with no invite and no second device:
+1. Sign in with Apple, enter a name.
+2. Tap the plus button to create a circle.
+3. Open the circle and post a photo from the photo library, with a caption.
+4. Tap the photo to comment or react.
+
+Invites and joining: the circle's details screen (top right of the feed) has an invite link. Opening it on another signed-in account joins that circle after the admin approves the request.
+
+Content is end to end encrypted. Photos, captions, comments and reactions are encrypted on the device with keys held only by the circle's members; our servers store the ciphertext and cannot read it. Because of that, reporting is done from the reporting device: Settings, "Report a problem" reaches us by email, and a circle admin can remove any member, which also rotates the circle's keys so the removed member can read nothing new. Anyone can leave a circle at any time.
+
+Account deletion is in Settings and erases the account and everything it shared, server side.
