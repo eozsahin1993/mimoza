@@ -1,6 +1,7 @@
-import { Wordmark } from "../components/Wordmark";
-import { Icon } from "../components/Icon";
-import { APP_IS_LIVE } from "../config";
+import { Wordmark } from "../../components/wordmark";
+import { Icon } from "../../components/Icon";
+import { APP_IS_LIVE } from "../../config";
+import "./style.css";
 
 function scrollToId(id: string) {
   document.querySelector(`#${id}`)?.scrollIntoView({ behavior: "smooth" });

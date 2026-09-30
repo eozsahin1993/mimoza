@@ -1,0 +1,26 @@
+.steps-layout { display: grid; grid-template-columns: .9fr 1.1fr; gap: 90px; align-items: center; }
+.steps-list { border-top: 1px solid var(--line); }
+.step { display: grid; grid-template-columns: 56px 1fr; gap: 20px; border-bottom: 1px solid var(--line); padding: 24px 0; }
+.step-number { color: var(--rust); font-size: 11px; font-weight: 700; letter-spacing: 1px; padding-top: 4px; }
+.step-title { font-size: 22px; font-weight: 600; letter-spacing: -.4px; }
+.step p { color: var(--muted); line-height: 1.5; margin: 6px 0 0; font-size: 14px; }
+.flow-visual { width: fit-content; max-width: 100%; margin-inline: auto; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end; gap: 34px; }
+.flow-phone-one { transform: rotate(-5deg); margin-bottom: 34px; }
+.flow-phone-two { transform: rotate(4deg); }
+
+/*
+ * The two phones need more room side by side than a single text column
+ * leaves them once .steps-layout is down to roughly 950-1150px —
+ * narrower than that and they'd wrap onto a second row without
+ * warning, so this section drops to one column well before the 900px
+ * breakpoint the other two-column sections use.
+ */
+@media (max-width: 1250px) {
+  .steps-layout { grid-template-columns: 1fr; gap: 60px; }
+}
+
+@media (max-width: 600px) {
+  .steps-layout { gap: 48px; }
+  .step { grid-template-columns: 38px 1fr; gap: 10px; }
+  .flow-visual { gap: 20px; }
+}

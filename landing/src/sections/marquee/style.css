@@ -1,0 +1,6 @@
+.marquee { background: var(--rust); color: var(--paper); padding: 20px; display: flex; align-items: center; justify-content: center; gap: 22px; font-size: clamp(14px,2vw,24px); letter-spacing: 2.5px; font-weight: 600; white-space: nowrap; transform: rotate(-1deg) scale(1.02); }
+.marquee i { font-family: Georgia, serif; text-transform: lowercase; font-weight: 400; color: #efd79d; font-size: 1.4em; letter-spacing: 0; }
+
+@media (max-width: 600px) {
+  .marquee { justify-content: flex-start; overflow: hidden; }
+}

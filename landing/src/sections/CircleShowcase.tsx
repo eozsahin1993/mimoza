@@ -1,5 +1,6 @@
 import circlesShot from "../assets/screenshots/circles.jpg";
-import { PhoneFrame } from "../components/PhoneFrame";
+import { PhoneFrame } from "../components/phoneFrame";
+import "../styles/phone-showcase.css";
 
 export function CircleShowcase() {
   return (

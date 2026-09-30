@@ -1,6 +1,6 @@
 import feedShot from "../assets/screenshots/feed.jpg";
 import { Icon } from "./Icon";
-import { PhoneFrame } from "./PhoneFrame";
+import { PhoneFrame } from "./phoneFrame";
 
 export function PhoneMockup() {
   return (

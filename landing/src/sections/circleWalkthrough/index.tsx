@@ -1,6 +1,7 @@
-import inviteShot from "../assets/screenshots/invite.jpg";
-import albumShot from "../assets/screenshots/album.jpg";
-import { PhoneFrame } from "../components/PhoneFrame";
+import inviteShot from "../../assets/screenshots/invite.jpg";
+import albumShot from "../../assets/screenshots/album.jpg";
+import { PhoneFrame } from "../../components/phoneFrame";
+import "./style.css";
 
 const steps = [
   {

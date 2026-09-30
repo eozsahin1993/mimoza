@@ -1,0 +1,12 @@
+.waitlist { display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.waitlist.centered { margin-inline: auto; align-items: center; }
+.waitlist-form { display: flex; gap: 10px; width: 100%; }
+.waitlist-form input { flex: 1; min-width: 0; height: 54px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); font-family: inherit; font-size: 15px; color: var(--ink); }
+.waitlist-form input::placeholder { color: var(--muted); }
+.waitlist-form button { height: 54px; padding: 0 22px; border-radius: 10px; border: 0; background: var(--brown); color: var(--paper); font-family: inherit; font-weight: 600; font-size: 14px; white-space: nowrap; cursor: pointer; transition: transform .2s ease, background .2s ease; }
+.waitlist-form button:hover:not(:disabled) { transform: translateY(-2px); background: #2b231d; }
+.waitlist-form button:disabled { opacity: .6; cursor: default; }
+.waitlist-note { color: var(--muted); font-size: 12px; }
+.waitlist-error { color: var(--rust-dark); font-size: 13px; }
+.waitlist-done { font-size: 17px; font-weight: 500; max-width: 420px; }
+.waitlist-done.centered { margin-inline: auto; text-align: center; }

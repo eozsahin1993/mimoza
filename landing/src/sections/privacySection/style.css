@@ -1,0 +1,32 @@
+.privacy-section { background: var(--brown); color: var(--paper); min-height: 760px; padding: 64px max(36px, calc((100vw - 1110px)/2)); display: grid; grid-template-columns: 1fr 1fr; gap: 90px; align-items: center; }
+.privacy-copy > p { color: #b8aa9e; max-width: 580px; font-size: 17px; line-height: 1.7; margin: 28px 0; }
+.honesty-note { display: grid; grid-template-columns: 32px 1fr; gap: 15px; border-top: 1px solid rgba(255,255,255,.13); padding-top: 24px; }
+.honesty-mark { width: 28px; height: 28px; display: grid; place-items: center; color: var(--brown); background: var(--ochre); border-radius: 50%; font-family: Georgia,serif; font-weight: 700; }
+.honesty-note strong { font-size: 14px; }
+.honesty-note p { color: #8f8176; font-size: 13px; line-height: 1.55; margin: 6px 0 0; }
+/*
+ * The whole diagram is one SVG (see PrivacySection.tsx) so the connecting
+ * lines and the faces they connect share one coordinate system — scaling
+ * the SVG (by CSS width alone) can never pull them out of alignment the
+ * way independently-positioned, hand-rotated HTML elements could.
+ */
+.encryption-visual { width: 100%; max-width: 480px; margin-inline: auto; }
+.encryption-visual svg { display: block; width: 100%; height: auto; overflow: visible; }
+.connection-line { stroke: var(--ochre); stroke-width: 2; stroke-dasharray: 2 7; stroke-linecap: round; opacity: .55; }
+.lock-ring { fill: rgba(192,138,46,.05); }
+.lock-circle { fill: var(--ochre); }
+.lock-icon { fill: none; stroke: var(--brown); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.lock-title { fill: var(--brown); font-family: "Outfit", sans-serif; font-size: 17px; font-weight: 600; }
+.lock-sub { fill: var(--brown); font-family: "Outfit", sans-serif; font-size: 11px; opacity: .75; }
+.node-ring { fill: none; stroke: #302720; stroke-width: 4; }
+.node-label { fill: #ab9e92; font-family: "Outfit", sans-serif; font-size: 12px; }
+.encrypted-chip rect { fill: none; stroke: rgba(192,138,46,.35); }
+.encrypted-chip text { fill: var(--ochre); font-family: "Outfit", sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; text-anchor: middle; dominant-baseline: middle; }
+
+@media (max-width: 900px) {
+  .privacy-section { grid-template-columns: 1fr; gap: 30px; }
+}
+
+@media (max-width: 600px) {
+  .privacy-section { padding: 100px 20px; }
+}

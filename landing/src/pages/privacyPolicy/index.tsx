@@ -1,6 +1,7 @@
-import { Icon } from "../components/Icon";
-import { Wordmark } from "../components/Wordmark";
-import { Footer } from "../sections/Footer";
+import { Icon } from "../../components/Icon";
+import { Wordmark } from "../../components/wordmark";
+import { Footer } from "../../sections/footer";
+import "./style.css";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
 const LAST_UPDATED = "30 September 2026";

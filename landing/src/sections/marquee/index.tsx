@@ -1,3 +1,5 @@
+import "./style.css";
+
 export function Marquee() {
   return (
     <div className="marquee">

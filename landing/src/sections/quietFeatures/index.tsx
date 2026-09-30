@@ -1,5 +1,6 @@
-import { Icon } from "../components/Icon";
-import { Wordmark } from "../components/Wordmark";
+import { Icon } from "../../components/Icon";
+import { Wordmark } from "../../components/wordmark";
+import "./style.css";
 
 export function QuietFeatures() {
   return (

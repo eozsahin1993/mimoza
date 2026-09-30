@@ -1,0 +1,48 @@
+/*
+ * Design tokens, global resets, and the handful of utility classes used
+ * by three or more sections (.kicker, .display, .section, the shared
+ * heading-size formula). Everything specific to one section or one
+ * component lives in that section's or component's own .css file next
+ * to it, imported directly where it's used — not in here.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap");
+
+:root {
+  font-family: "Outfit", sans-serif;
+  color: #282019;
+  background: #f3ede2;
+  font-synthesis: none;
+  --cream: #f3ede2;
+  --cream-deep: #e9decf;
+  --paper: #fffaf1;
+  --brown: #14100c;
+  --ink: #282019;
+  --muted: #786b60;
+  --rust: #a6552f;
+  --rust-dark: #7d3d23;
+  --ochre: #c08a2e;
+  --line: rgba(40, 32, 25, 0.13);
+}
+
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; background: var(--cream); }
+* { box-sizing: border-box; }
+img { display: block; max-width: 100%; }
+main { overflow: hidden; }
+
+.kicker { display: inline-block; color: var(--rust); font-size: 12px; letter-spacing: 1.8px; text-transform: uppercase; font-weight: 700; margin-bottom: 24px; }
+.kicker-dark { color: var(--ochre); }
+.display { font-weight: 600; letter-spacing: -0.045em; line-height: .98; text-wrap: balance; }
+.centered { justify-content: center; }
+
+.section { max-width: 1180px; margin: auto; padding: 64px 36px; }
+.section-intro { max-width: 650px; margin-bottom: 72px; }
+/* One size shared by every big section heading, whatever section it's in. */
+.section-title, .profile-title, .privacy-title, .closing-title { font-size: clamp(44px, 5vw, 68px); }
+.section-intro p, .profile-copy > p { color: var(--muted); font-size: 18px; line-height: 1.65; }
+
+@media (max-width: 600px) {
+  .section { padding: 100px 20px; }
+  .section-intro { margin-bottom: 50px; }
+  .section-title, .profile-title, .privacy-title { font-size: 43px; }
+}

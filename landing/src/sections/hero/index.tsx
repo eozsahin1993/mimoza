@@ -1,8 +1,9 @@
-import { Icon } from "../components/Icon";
-import { StoreBadge } from "../components/StoreBadge";
-import { WaitlistForm } from "../components/WaitlistForm";
-import { PhoneMockup } from "../components/PhoneMockup";
-import { APP_IS_LIVE } from "../config";
+import { Icon } from "../../components/Icon";
+import { StoreBadge } from "../../components/storeBadge";
+import { WaitlistForm } from "../../components/waitlistForm";
+import { PhoneMockup } from "../../components/PhoneMockup";
+import { APP_IS_LIVE } from "../../config";
+import "./style.css";
 
 export function Hero() {
   return (

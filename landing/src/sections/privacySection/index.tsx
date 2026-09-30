@@ -1,6 +1,7 @@
-import mumPhoto from "../assets/privacy-mum.jpg";
-import alexPhoto from "../assets/privacy-alex.jpg";
-import janePhoto from "../assets/privacy-jane.jpg";
+import mumPhoto from "../../assets/privacy-mum.jpg";
+import alexPhoto from "../../assets/privacy-alex.jpg";
+import janePhoto from "../../assets/privacy-jane.jpg";
+import "./style.css";
 
 // One coordinate system for the whole diagram (a 520×460 SVG viewBox), so
 // the connecting lines and the faces they connect are computed from the

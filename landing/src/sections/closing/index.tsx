@@ -1,7 +1,8 @@
-import flowerIcon from "../assets/flower-icon.png";
-import { StoreBadge } from "../components/StoreBadge";
-import { WaitlistForm } from "../components/WaitlistForm";
-import { APP_IS_LIVE } from "../config";
+import flowerIcon from "../../assets/flower-icon.png";
+import { StoreBadge } from "../../components/storeBadge";
+import { WaitlistForm } from "../../components/waitlistForm";
+import { APP_IS_LIVE } from "../../config";
+import "./style.css";
 
 export function Closing() {
   return (

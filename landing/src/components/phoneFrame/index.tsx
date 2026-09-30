@@ -1,4 +1,5 @@
-import iphoneFrame from "../assets/iphone-frame.png";
+import iphoneFrame from "../../assets/iphone-frame.png";
+import "./style.css";
 
 type PhoneFrameProps = {
   src: string;

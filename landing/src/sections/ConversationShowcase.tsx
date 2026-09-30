@@ -1,5 +1,6 @@
 import postDetailShot from "../assets/screenshots/post-detail.jpg";
-import { PhoneFrame } from "../components/PhoneFrame";
+import { PhoneFrame } from "../components/phoneFrame";
+import "../styles/phone-showcase.css";
 
 export function ConversationShowcase() {
   return (

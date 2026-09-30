@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from "react";
-import { Icon } from "./Icon";
+import { Icon } from "../Icon";
+import "./style.css";
 
 const STORE_URLS = {
   Apple: "https://www.apple.com/app-store/",

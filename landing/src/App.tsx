@@ -1,15 +1,15 @@
-import { Nav } from "./sections/Nav";
-import { Hero } from "./sections/Hero";
-import { Marquee } from "./sections/Marquee";
+import { Nav } from "./sections/nav";
+import { Hero } from "./sections/hero";
+import { Marquee } from "./sections/marquee";
 import { CircleShowcase } from "./sections/CircleShowcase";
-import { CircleWalkthrough } from "./sections/CircleWalkthrough";
+import { CircleWalkthrough } from "./sections/circleWalkthrough";
 import { EncryptedShowcase } from "./sections/EncryptedShowcase";
-import { PrivacySection } from "./sections/PrivacySection";
+import { PrivacySection } from "./sections/privacySection";
 import { ConversationShowcase } from "./sections/ConversationShowcase";
-import { ProfileSection } from "./sections/ProfileSection";
-import { QuietFeatures } from "./sections/QuietFeatures";
-import { Closing } from "./sections/Closing";
-import { Footer } from "./sections/Footer";
+import { ProfileSection } from "./sections/profileSection";
+import { QuietFeatures } from "./sections/quietFeatures";
+import { Closing } from "./sections/closing";
+import { Footer } from "./sections/footer";
 
 function App() {
   return (

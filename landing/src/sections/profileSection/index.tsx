@@ -1,4 +1,5 @@
-import { Icon } from "../components/Icon";
+import { Icon } from "../../components/Icon";
+import "./style.css";
 
 export function ProfileSection() {
   return (

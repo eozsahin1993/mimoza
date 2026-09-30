@@ -1,5 +1,6 @@
 import createPostShot from "../assets/screenshots/create-post.jpg";
-import { PhoneFrame } from "../components/PhoneFrame";
+import { PhoneFrame } from "../components/phoneFrame";
+import "../styles/phone-showcase.css";
 
 export function EncryptedShowcase() {
   return (

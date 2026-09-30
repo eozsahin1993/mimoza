@@ -1,5 +1,6 @@
-import flowerIcon from "../assets/flower-icon.png";
-import { Wordmark } from "../components/Wordmark";
+import flowerIcon from "../../assets/flower-icon.png";
+import { Wordmark } from "../../components/wordmark";
+import "./style.css";
 
 export function Footer() {
   return (

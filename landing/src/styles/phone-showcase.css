@@ -1,0 +1,21 @@
+/*
+ * One layout — a phone next to a headline — reused for every "here's
+ * the real screen behind this claim" moment (the circle list, creating
+ * a post, a post's comments). .reverse puts the phone on the right
+ * instead of the left, just by swapping which column is wider; the DOM
+ * order in each section decides which side actually holds which — the
+ * copy goes first in the JSX for .reverse to land the phone in the
+ * narrower second column, or the .reverse won't visibly do anything.
+ */
+.phone-showcase { display: grid; grid-template-columns: .85fr 1.15fr; gap: 70px; align-items: center; }
+.phone-showcase.reverse { grid-template-columns: 1.15fr .85fr; }
+.phone-showcase-copy { min-width: 0; }
+.phone-showcase .phone-frame { margin-inline: auto; transform: rotate(-2deg); }
+.phone-showcase.reverse .phone-frame { transform: rotate(2deg); }
+.phone-showcase-title { font-size: clamp(38px, 4.4vw, 58px); text-wrap: wrap; }
+.phone-showcase-copy p { color: var(--muted); font-size: 18px; line-height: 1.65; margin-top: 20px; max-width: 460px; }
+
+@media (max-width: 900px) {
+  .phone-showcase, .phone-showcase.reverse { grid-template-columns: 1fr; gap: 40px; text-align: center; }
+  .phone-showcase-copy p { margin-inline: auto; }
+}
