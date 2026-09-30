@@ -51,14 +51,18 @@ export const onRequestPost = async ({ request, env }: Context): Promise<Response
     body: JSON.stringify({
       email,
       unsubscribed: false,
-      ...(env.RESEND_SEGMENT_ID ? { segments: [env.RESEND_SEGMENT_ID] } : {}),
+      // Each entry is {id: "..."}, not a bare string — got this wrong
+      // the first time and a 422 ("expected object, received string")
+      // confirmed the actual shape.
+      ...(env.RESEND_SEGMENT_ID ? { segments: [{ id: env.RESEND_SEGMENT_ID }] } : {}),
     }),
   });
 
-  // Resend's docs don't document what a duplicate email returns; treating
-  // a conflict-shaped response as success rather than an error, since
-  // "you're already on the list" isn't a failure from this form's side.
-  if (!resendResponse.ok && resendResponse.status !== 409 && resendResponse.status !== 422) {
+  // Resend's docs don't document what a duplicate email returns. Not
+  // guessing at another status code to swallow after getting 422 wrong
+  // once already — every non-2xx is a real failure until proven
+  // otherwise by an actual duplicate submission.
+  if (!resendResponse.ok) {
     return json({ error: "Could not add you to the list." }, 502);
   }
 
