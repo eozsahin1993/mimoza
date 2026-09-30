@@ -2,6 +2,7 @@ import { Nav } from "./sections/Nav";
 import { Hero } from "./sections/Hero";
 import { Marquee } from "./sections/Marquee";
 import { CircleWalkthrough } from "./sections/CircleWalkthrough";
+import { ScreenshotsShowcase } from "./sections/ScreenshotsShowcase";
 import { PrivacySection } from "./sections/PrivacySection";
 import { ProfileSection } from "./sections/ProfileSection";
 import { QuietFeatures } from "./sections/QuietFeatures";
@@ -15,6 +16,7 @@ function App() {
       <Hero />
       <Marquee />
       <CircleWalkthrough />
+      <ScreenshotsShowcase />
       <PrivacySection />
       <ProfileSection />
       <QuietFeatures />
