@@ -2,6 +2,7 @@
   height: 84px; max-width: 1240px; margin: auto; padding: 0 36px; display: flex;
   align-items: center; justify-content: space-between; position: relative; z-index: 20;
 }
+.nav-right { display: flex; align-items: center; gap: 34px; }
 .nav-links { display: flex; gap: 34px; color: var(--muted); font-size: 15px; font-weight: 500; }
 .nav-links div, .nav-download { cursor: pointer; }
 .nav-links div:hover { color: var(--rust); }

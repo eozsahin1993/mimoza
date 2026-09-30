@@ -11,16 +11,18 @@ export function Nav() {
   return (
     <nav className="nav">
       <Wordmark />
-      <div className="nav-links">
-        <div role="link" tabIndex={0} onClick={() => scrollToId("circles")}>
-          How it works
+      <div className="nav-right">
+        <div className="nav-links">
+          <div role="link" tabIndex={0} onClick={() => scrollToId("circles")}>
+            How it works
+          </div>
+          <div role="link" tabIndex={0} onClick={() => scrollToId("privacy")}>
+            Privacy
+          </div>
         </div>
-        <div role="link" tabIndex={0} onClick={() => scrollToId("privacy")}>
-          Privacy
+        <div className="nav-download" role="link" tabIndex={0} onClick={() => scrollToId("download")}>
+          {APP_IS_LIVE ? "Get Mimoza" : "Notify me"} <Icon name="arrow" size={17} />
         </div>
-      </div>
-      <div className="nav-download" role="link" tabIndex={0} onClick={() => scrollToId("download")}>
-        {APP_IS_LIVE ? "Get Mimoza" : "Notify me"} <Icon name="arrow" size={17} />
       </div>
     </nav>
   );
