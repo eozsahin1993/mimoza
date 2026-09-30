@@ -174,13 +174,19 @@ export function PrivacyPolicy() {
                 ourselves. The hosting provider sees it as any host does.
               </td>
             </tr>
+            <tr>
+              <td>App analytics</td>
+              <td>
+                Anonymous usage analytics: which screens you view and actions like posting or reacting. We never
+                track what you write, post, or view.
+              </td>
+            </tr>
           </tbody>
         </table>
 
         <h2 id="do-not">What we do not do</h2>
         <ul>
           <li>No advertising, and no advertising identifiers.</li>
-          <li>No analytics or tracking SDKs. We do not measure what you do inside the app.</li>
           <li>No selling, renting or trading of your information, ever.</li>
           <li>No uploading of your contacts. Inviting someone is a link you share yourself.</li>
           <li>No location data. The app never asks for your location and does not read location tags from photos.</li>
