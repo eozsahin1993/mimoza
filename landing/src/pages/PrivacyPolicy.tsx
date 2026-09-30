@@ -3,12 +3,13 @@ import { Wordmark } from "../components/Wordmark";
 import { Footer } from "../sections/Footer";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
-const LAST_UPDATED = "28 September 2026";
+const LAST_UPDATED = "30 September 2026";
 
 const SECTIONS = [
   ["cannot-see", "What we cannot see"],
   ["collect", "What we do collect"],
   ["do-not", "What we do not do"],
+  ["waitlist", "The launch waitlist"],
   ["third-parties", "Who else handles your data"],
   ["permissions", "Device permissions"],
   ["keys", "Your keys"],
@@ -186,6 +187,19 @@ export function PrivacyPolicy() {
           <li>No access to your camera roll beyond the photos you pick to share.</li>
         </ul>
 
+        <h2 id="waitlist">The launch waitlist</h2>
+        <p>
+          The one exception to "no email address, ever" above: if you enter your email on joinmimoza.com to be
+          notified when Mimoza launches, that address is stored with Resend, the email service we use to send that
+          one announcement. It is not linked to any Mimoza account — signing up for the waitlist before launch and
+          creating an account afterward are two separate things, and we do not connect them.
+        </p>
+        <p>
+          We use it for nothing but the launch announcement. Every email carries an unsubscribe link, and asking us
+          at {SUPPORT_EMAIL} removes you immediately. Once Mimoza is available on both stores, this list and the form
+          that feeds it go away.
+        </p>
+
         <h2 id="third-parties">Who else handles your data</h2>
         <p>
           We do not share your data with anyone except the providers below, each of which processes only what is
@@ -227,6 +241,13 @@ export function PrivacyPolicy() {
                 When the app opens it asks Expo's update service whether a newer version of the app's code is
                 available. That request carries the app version and platform, and Expo sees your IP address as any
                 web server does. It carries nothing about your account or circles.
+              </td>
+            </tr>
+            <tr>
+              <td>Resend</td>
+              <td>
+                Holds the launch waitlist's email addresses and sends the single launch announcement — see "The
+                launch waitlist" above. Not used for anything to do with the app itself.
               </td>
             </tr>
           </tbody>

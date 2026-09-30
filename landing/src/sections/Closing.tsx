@@ -1,5 +1,7 @@
 import appIcon from "../assets/app-icon.png";
 import { StoreBadge } from "../components/StoreBadge";
+import { WaitlistForm } from "../components/WaitlistForm";
+import { APP_IS_LIVE } from "../config";
 
 export function Closing() {
   return (
@@ -13,11 +15,15 @@ export function Closing() {
         <br />
         between us.
       </div>
-      <p>Mimoza is available for iPhone and Android.</p>
-      <div className="store-row centered">
-        <StoreBadge store="Apple" />
-        <StoreBadge store="Google" />
-      </div>
+      <p>{APP_IS_LIVE ? "Mimoza is available for iPhone and Android." : "Coming soon to iPhone and Android."}</p>
+      {APP_IS_LIVE ? (
+        <div className="store-row centered">
+          <StoreBadge store="Apple" />
+          <StoreBadge store="Google" />
+        </div>
+      ) : (
+        <WaitlistForm centered />
+      )}
       <div className="domain">joinmimoza.com</div>
     </section>
   );

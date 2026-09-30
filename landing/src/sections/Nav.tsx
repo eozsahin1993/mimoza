@@ -1,5 +1,6 @@
 import { Wordmark } from "../components/Wordmark";
 import { Icon } from "../components/Icon";
+import { APP_IS_LIVE } from "../config";
 
 function scrollToId(id: string) {
   document.querySelector(`#${id}`)?.scrollIntoView({ behavior: "smooth" });
@@ -18,7 +19,7 @@ export function Nav() {
         </div>
       </div>
       <div className="nav-download" role="link" tabIndex={0} onClick={() => scrollToId("download")}>
-        Get Mimoza <Icon name="arrow" size={17} />
+        {APP_IS_LIVE ? "Get Mimoza" : "Notify me"} <Icon name="arrow" size={17} />
       </div>
     </nav>
   );
