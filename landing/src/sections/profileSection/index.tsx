@@ -33,11 +33,11 @@ export function ProfileSection() {
       <div className="profile-copy">
         <span className="kicker">Less to collect. Less to worry about.</span>
         <div className="display profile-title" role="heading" aria-level={2}>
-          A name and a picture. That is the whole profile.
+          Just a full name. A picture, if you want one.
         </div>
         <p>
-          No username to claim. No bio to fill. Sign in with Google or Apple, and we only read the identifier they
-          send. Your email address is never stored.
+          Sign in with Google or Apple is built right in, so there's no new password to invent. No username to
+          claim, no bio to fill in, and we only read the identifier they send. Your email address is never stored.
         </p>
         <div className="continuity-row">
           <span className="continuity-icon">
