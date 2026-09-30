@@ -94,8 +94,8 @@ export function PrivacyPolicy() {
 
         <h2 id="collect">What we do collect</h2>
         <p>
-          Everything below is collected because the app can't work without it. Nothing is collected for analytics or
-          marketing.
+          Everything below is collected because the app can't work without it, except the anonymous usage analytics
+          noted at the bottom of the table. Nothing is collected for marketing.
         </p>
         <table>
           <thead>
