@@ -1,0 +1,10 @@
+{
+  "avatar": {
+    "use": "Your own profile picture, picked during profile setup. Shows in the header on the circle list slide.",
+    "url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=1200&fit=clip"
+  },
+  "create-post": {
+    "use": "The photo you pick in Create a post for the encrypted slide, posted to Weekend Hikers.",
+    "url": "https://images.unsplash.com/photo-1758272959994-f1a4beffa257?q=80&w=1600&fit=clip"
+  }
+}

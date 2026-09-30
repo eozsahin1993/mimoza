@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -20,6 +21,7 @@ import (
 	accountsdynamo "mimoza-relay/internal/accounts/dynamo"
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/config"
 	"mimoza-relay/internal/util/localstack"
 )
 
@@ -34,19 +36,35 @@ func main() {
 		log.Fatalf("failed to configure AWS for LocalStack: %v", err)
 	}
 
+	// Shared() unless a caller wants its own set, isolated from the
+	// integration suite's tables.
+	names := localstack.Shared()
+	if prefix := os.Getenv("TESTRELAY_RESOURCE_PREFIX"); prefix != "" {
+		names = config.ResourcesFor(prefix)
+	}
+
 	// Idempotent, so restarting this between runs is free and CI needs no
 	// separate provisioning step.
+	ddbClient := awsdynamodb.NewFromConfig(awsCfg)
 	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = true })
-	if err := localstack.Provision(ctx, awsdynamodb.NewFromConfig(awsCfg), s3Client); err != nil {
+	if err := localstack.ProvisionSet(ctx, ddbClient, s3Client, names); err != nil {
 		log.Fatalf("failed to provision LocalStack: %v", err)
 	}
 
-	// Shared() rather than Unique(): this process lives for the run, not
-	// one test, so there's nothing to isolate it from — and its tables are
-	// the ones internal/util/testsupport already expects to find.
-	deps := app.AWSDeps(localstack.RelayConfig(localstack.Shared()), awsCfg)
+	relayConfig := localstack.RelayConfig(names)
+	// Empty unless set — /testonly/session covers a fake account, but a
+	// real Apple or Google sign-in still needs an audience to verify against.
+	relayConfig.GoogleClientIDIOS = os.Getenv("GOOGLE_CLIENT_ID_IOS")
+	relayConfig.GoogleClientIDAndroid = os.Getenv("GOOGLE_CLIENT_ID_ANDROID")
+	relayConfig.GoogleClientIDWeb = os.Getenv("GOOGLE_CLIENT_ID_WEB")
+	relayConfig.AppleClientIDIOS = os.Getenv("APPLE_CLIENT_ID_IOS")
+
+	deps := app.AWSDeps(relayConfig, awsCfg)
+	clock := &shiftedClock{}
+	deps.Accounts.Now = clock.now
+	deps.Circles.Now = clock.now
 	mux := app.NewRouter(deps)
-	registerTestOnly(mux, deps.Auth, deps.Accounts)
+	registerTestOnly(mux, deps.Auth, deps.Accounts, clock)
 
 	address := addr()
 	slog.Info("testrelay listening", "address", address, "localstack", localstack.Endpoint())
@@ -77,15 +95,42 @@ func addr() string {
 	return host + ":" + port()
 }
 
-// registerTestOnly mounts the one route that doesn't exist in a real
-// relay: a session for an account, without a Google or Apple ID token.
+// shiftedClock is the store clock with an offset a caller can move, so a
+// seed can place a write days or months back and the relay stamps it
+// there: lastEntryAt, joinedAt, and entry order all follow this clock.
+// Sessions, invite and request expiry read the real clock instead, which
+// is what keeps an invite minted now usable by a join placed in the past.
+type shiftedClock struct{ offset atomic.Int64 }
+
+func (c *shiftedClock) now() time.Time {
+	return time.Now().Add(time.Duration(c.offset.Load()))
+}
+
+// registerTestOnly mounts the routes that don't exist in a real relay: a
+// session for an account without a Google or Apple ID token, and the
+// store clock's offset.
 //
-// A bypass rather than a fake issuer because the alternative is worse —
-// standing up a fake OIDC provider here would mean the integration suite
-// testing the fake's JWKS round-trip rather than the relay. Real provider
-// verification is covered where it belongs, by internal/app's own tests
-// against testsupport.FakeOIDCProvider.
-func registerTestOnly(mux *http.ServeMux, sessions auth.Store, accountStore *accountsdynamo.Table) {
+// The session route is a bypass rather than a fake issuer because the
+// alternative is worse — standing up a fake OIDC provider here would mean
+// the integration suite testing the fake's JWKS round-trip rather than
+// the relay. Real provider verification is covered where it belongs, by
+// internal/app's own tests against testsupport.FakeOIDCProvider.
+func registerTestOnly(mux *http.ServeMux, sessions auth.Store, accountStore *accountsdynamo.Table, clock *shiftedClock) {
+	mux.HandleFunc("POST /testonly/clock", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			// OffsetMs is added to the real clock on every store write
+			// until the next call; zero puts the relay back on real time.
+			OffsetMs *int64 `json:"offsetMs"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.OffsetMs == nil {
+			http.Error(w, `{"error":"offsetMs is required"}`, http.StatusBadRequest)
+			return
+		}
+		clock.offset.Store(*body.OffsetMs * int64(time.Millisecond))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]int64{"offsetMs": *body.OffsetMs, "now": clock.now().UnixMilli()})
+	})
+
 	mux.HandleFunc("POST /testonly/session", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			// Subject stands in for what a provider would have verified.

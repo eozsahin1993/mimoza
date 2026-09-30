@@ -17,5 +17,10 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+  ],
+  // Has its own tsconfig (scripts/seed/tsconfig.json): it shims
+  // @/core/services/relay for a script that drives many accounts at
+  // once, and this tsconfig would resolve that import to the real,
+  // single-account one instead.
+  "exclude": ["scripts/seed/**"]
 }

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/core/services/relay": ["./shims/relay.ts"],
+      "expo-crypto": ["./shims/expo-crypto.ts"],
+      "expo-file-system": ["./shims/expo-file-system.ts"],
+      "@/*": ["../../src/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

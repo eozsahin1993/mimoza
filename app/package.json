@@ -77,6 +77,7 @@
     "expo-sqlite-mock": "^4.0.0",
     "jest": "^29.7.0",
     "jest-expo": "^57.0.5",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -90,16 +91,17 @@
     "android": "dotenv -e .env.dev -- expo run:android",
     "android:staging": "dotenv -e .env.staging -- expo run:android",
     "android:prod": "dotenv -e .env.production -- expo run:android",
-    "ios": "dotenv -e .env.dev -- expo run:ios --device \"iPhone 17\"",
-    "ios:staging": "dotenv -e .env.staging -- expo run:ios --device \"iPhone 17\"",
-    "ios:prod": "dotenv -e .env.production -- expo run:ios --device \"iPhone 17\"",
+    "ios": "dotenv -e .env.dev -- expo run:ios --device \"${IOS_SIM:-iPhone 17 Pro Max}\"",
+    "ios:staging": "dotenv -e .env.staging -- expo run:ios --device \"${IOS_SIM:-iPhone 17 Pro Max}\"",
+    "ios:prod": "dotenv -e .env.production -- expo run:ios --device \"${IOS_SIM:-iPhone 17 Pro Max}\"",
     "fingerprint:dev": "dotenv -e .env.dev -- fingerprint fingerprint:generate",
     "fingerprint:staging": "dotenv -e .env.staging -- fingerprint fingerprint:generate",
     "fingerprint:prod": "dotenv -e .env.production -- fingerprint fingerprint:generate",
     "lint": "expo lint",
     "test": "fnm exec --using=22.23.2 -- jest",
     "db:generate": "drizzle-kit generate",
-    "i18n:push": "node scripts/generate-push-strings.js"
+    "i18n:push": "node scripts/generate-push-strings.js",
+    "seed:screenshots": "tsx --tsconfig scripts/seed/tsconfig.json scripts/seed/seed.ts"
   },
   "private": true,
   "jest": {
