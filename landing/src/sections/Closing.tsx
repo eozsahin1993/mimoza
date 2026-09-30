@@ -1,11 +1,11 @@
-import { Flower } from "../components/Flower";
+import appIcon from "../assets/app-icon.png";
 import { StoreBadge } from "../components/StoreBadge";
 
 export function Closing() {
   return (
     <section className="closing" id="download">
       <div className="closing-flower">
-        <Flower light />
+        <img className="closing-icon" src={appIcon} alt="" />
       </div>
       <span className="kicker kicker-dark">Your people. Your moments.</span>
       <div className="display closing-title" role="heading" aria-level={2}>
