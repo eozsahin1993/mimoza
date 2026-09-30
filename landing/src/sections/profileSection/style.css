@@ -10,7 +10,7 @@
 .profile-copy > p { margin: 28px 0 30px; }
 .continuity-row { display: grid; grid-template-columns: 48px 1fr; gap: 14px; border-top: 1px solid var(--line); padding-top: 24px; }
 .continuity-icon { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 14px; background: rgba(166,85,47,.1); color: var(--rust); }
-.continuity-row strong, .continuity-row span { display: block; }.continuity-row strong { font-size: 14px; }.continuity-row span { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 5px; }
+.continuity-row > div strong, .continuity-row > div span { display: block; }.continuity-row > div strong { font-size: 14px; }.continuity-row > div span { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 5px; }
 
 @media (max-width: 900px) {
   .profile-section { grid-template-columns: 1fr; gap: 50px; }
