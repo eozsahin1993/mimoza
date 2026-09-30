@@ -157,6 +157,17 @@ footer { background: var(--brown); color: #776b62; border-top: 1px solid rgba(25
 .footer-icon { width: 30px; height: 30px; border-radius: 8px; }
 footer .wordmark { color: var(--paper); font-size: 21px; } footer span:nth-child(2) { text-align: center; } footer span:last-child { text-align: right; }
 
+/*
+ * The walkthrough's two phones need more room side by side than a single
+ * text column leaves them once .steps-layout is down to roughly
+ * 950-1150px — narrower than that and they'd wrap onto a second row
+ * without warning, so this section drops to one column well before the
+ * shared 900px breakpoint below does it for the others.
+ */
+@media (max-width: 1250px) {
+  .walkthrough .steps-layout { grid-template-columns: 1fr; gap: 60px; }
+}
+
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; text-align: center; padding-top: 70px; }
   .hero-lede { margin-inline: auto; }.store-row { justify-content: center; }.hero-note { justify-content: center; }
