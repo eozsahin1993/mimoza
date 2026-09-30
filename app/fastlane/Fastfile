@@ -52,6 +52,30 @@ platform :ios do
       readonly: false,
     )
   end
+
+  # The listing copy lives in fastlane/metadata (App Store) and
+  # fastlane/metadata/android (Play), one folder per locale, so it is
+  # reviewed like code and a resubmit is one command. Only en-US exists;
+  # another market is a copy of that folder under the store's own code —
+  # App Store: tr, es-ES, fr-FR, de-DE; Play: tr-TR, es-ES, fr-FR, de-DE.
+  # Screenshots are exported from Figma and uploaded in the store consoles
+  # by hand; neither listing lane touches them.
+  desc 'Upload the App Store listing: copy and review notes'
+  lane :listing do
+    version = JSON.parse(File.read(File.join(app_root, 'app.json')))['expo']['version']
+    upload_to_app_store(
+      app_identifier: ENVIRONMENTS['production'][:app_identifier],
+      app_version: version,
+      metadata_path: File.join(__dir__, 'metadata'),
+      skip_screenshots: true,
+      skip_binary_upload: true,
+      submit_for_review: false,
+      run_precheck_before_submit: false,
+      precheck_include_in_app_purchases: false,
+      # No HTML preview to confirm: the diff was the review.
+      force: true,
+    )
+  end
 end
 
 platform :android do
@@ -63,6 +87,23 @@ platform :android do
   desc 'Build production and upload it to Play internal testing'
   lane :production do
     ship_android('production')
+  end
+
+  # See the iOS listing lane for the folder layout. The privacy policy URL,
+  # support email, Data safety and "App access" answers are console-only;
+  # supply has no field for them.
+  desc 'Upload the Play listing: copy only'
+  lane :listing do
+    upload_to_play_store(
+      package_name: ENVIRONMENTS['production'][:package_name],
+      json_key: ENV.fetch('PLAY_JSON_KEY'),
+      metadata_path: File.join(__dir__, 'metadata', 'android'),
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
   end
 end
 
@@ -169,7 +210,7 @@ def ship_android(name)
     track: 'internal',
     aab: aab,
     json_key: ENV.fetch('PLAY_JSON_KEY'),
-    # The listing is managed in the console, not here.
+    # The listing has its own lane (`android listing`); a build never touches it.
     skip_upload_metadata: true,
     skip_upload_images: true,
     skip_upload_screenshots: true,
