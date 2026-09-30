@@ -2,20 +2,22 @@
  * Cloudflare Pages Function — deployed automatically alongside the static
  * build for anything under functions/, with no separate service to run.
  * This is the only place RESEND_API_KEY is used; the browser never sees
- * it. Needs two secrets set in the Pages project (Settings > Environment
- * variables): RESEND_API_KEY and RESEND_AUDIENCE_ID (create an Audience
- * in the Resend dashboard first and copy its id).
+ * it. Needs RESEND_API_KEY set as a Pages secret (an API key with Full
+ * access — a Sending-access key can't create contacts). RESEND_SEGMENT_ID
+ * is optional: Resend has no separate "Audience" to create first, a
+ * contact just belongs to the account, and a Segment is only an
+ * organizational tag for later — set it if you want the waitlist tagged,
+ * leave it unset otherwise.
  *
  * If the site ends up on a different host than Cloudflare Pages, this
- * file's shape (a default export taking a Fetch API Request and
- * returning a Response) also works unchanged as a Vercel or Netlify edge
- * function — only where it lives and how its env vars are set would
- * change.
+ * file's shape (a function taking a Fetch API Request and returning a
+ * Response) also works unchanged as a Vercel or Netlify edge function —
+ * only where it lives and how its env vars are set would change.
  */
 
 interface Env {
   RESEND_API_KEY: string;
-  RESEND_AUDIENCE_ID: string;
+  RESEND_SEGMENT_ID?: string;
 }
 
 // Deliberately just {request, env}, not the @cloudflare/workers-types
@@ -26,7 +28,7 @@ type Context = { request: Request; env: Env };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const onRequestPost = async ({ request, env }: Context): Promise<Response> => {
-  if (!env.RESEND_API_KEY || !env.RESEND_AUDIENCE_ID) {
+  if (!env.RESEND_API_KEY) {
     return json({ error: "Waitlist isn't configured yet." }, 500);
   }
 
@@ -40,18 +42,23 @@ export const onRequestPost = async ({ request, env }: Context): Promise<Response
     return json({ error: "That doesn't look like an email address." }, 400);
   }
 
-  const resendResponse = await fetch(`https://api.resend.com/audiences/${env.RESEND_AUDIENCE_ID}/contacts`, {
+  const resendResponse = await fetch("https://api.resend.com/contacts", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, unsubscribed: false }),
+    body: JSON.stringify({
+      email,
+      unsubscribed: false,
+      ...(env.RESEND_SEGMENT_ID ? { segments: [env.RESEND_SEGMENT_ID] } : {}),
+    }),
   });
 
-  // Resend returns 409 for an email already on the list — that's success
-  // from this form's point of view, not an error to surface.
-  if (!resendResponse.ok && resendResponse.status !== 409) {
+  // Resend's docs don't document what a duplicate email returns; treating
+  // a conflict-shaped response as success rather than an error, since
+  // "you're already on the list" isn't a failure from this form's side.
+  if (!resendResponse.ok && resendResponse.status !== 409 && resendResponse.status !== 422) {
     return json({ error: "Could not add you to the list." }, 502);
   }
 
