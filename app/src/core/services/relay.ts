@@ -59,15 +59,24 @@ let announced: string | null = null;
  * applied on a real phone, where 10.0.2.2 is unroutable and every call
  * would hang ~20s before the kernel gave up.
  */
+
+/**
+ * The URL as this device can actually open it. Only the Android emulator
+ * changes anything: loopback there is the emulator, and 10.0.2.2 is the
+ * host. Applied to the relay's own address and to every presigned storage
+ * link it hands back, which LocalStack signs against localhost too.
+ */
+export function reachableFromThisDevice(url: string): string {
+  if (Platform.OS !== 'android' || Device.isDevice) return url;
+  return url.replace('//localhost', '//10.0.2.2').replace('//127.0.0.1', '//10.0.2.2');
+}
+
 export function baseUrl(): string {
   const host = __DEV__ && isLoopback(process.env.EXPO_PUBLIC_RELAY_URL) ? devHost() : null;
   const configured = host ? `http://${host}:${DEV_RELAY_PORT}` : process.env.EXPO_PUBLIC_RELAY_URL;
   if (!configured) throw new Error('EXPO_PUBLIC_RELAY_URL is not set.');
 
-  const url =
-    Platform.OS === 'android' && !Device.isDevice
-      ? configured.replace('//localhost', '//10.0.2.2').replace('//127.0.0.1', '//10.0.2.2')
-      : configured;
+  const url = reachableFromThisDevice(configured);
 
   if (__DEV__ && url !== announced) {
     announced = url;

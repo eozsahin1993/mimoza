@@ -1,7 +1,7 @@
 import { File, Paths, UploadType } from 'expo-file-system';
 
 import { generateUUID } from '@/core/crypto/primitives';
-import { authorizedFetch, describeError } from '@/core/services/relay';
+import { authorizedFetch, describeError, reachableFromThisDevice } from '@/core/services/relay';
 import { BlobAlreadyExistsError, NetworkUnreachableError, RateLimitedError } from '@/core/services/relay-errors';
 
 /**
@@ -54,7 +54,7 @@ export async function getBlob(circleId: string, path: string): Promise<Uint8Arra
   if (!response.ok) throw new Error(await describeError(response, 'reading a blob'));
 
   const { url } = (await response.json()) as { url: string };
-  const bytes = await fetch(url).catch(() => {
+  const bytes = await fetch(reachableFromThisDevice(url)).catch(() => {
     throw new NetworkUnreachableError();
   });
   if (bytes.status === 404) return null;
@@ -69,7 +69,7 @@ export async function uploadBlob(target: UploadTarget, bytes: Uint8Array): Promi
   file.write(bytes);
   try {
     const result = await file
-      .upload(target.url, { uploadType: UploadType.MULTIPART, fieldName: 'file', parameters: target.fields })
+      .upload(reachableFromThisDevice(target.url), { uploadType: UploadType.MULTIPART, fieldName: 'file', parameters: target.fields })
       .catch(() => {
         throw new NetworkUnreachableError();
       });

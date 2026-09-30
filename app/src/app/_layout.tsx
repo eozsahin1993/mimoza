@@ -3,6 +3,7 @@ import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useFonts } from 'expo-font';
+import { StatusBar } from 'expo-status-bar';
 import { AndroidNotificationPriority, setNotificationHandler } from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
@@ -102,6 +103,9 @@ function AppShell() {
 
   return (
     <ThemeProvider value={scheme === 'dark' ? MimozaDarkTheme : MimozaLightTheme}>
+      {/* Follows the resolved scheme, not the OS one: with edge-to-edge,
+          Android otherwise keeps light icons over a light screen. */}
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,
