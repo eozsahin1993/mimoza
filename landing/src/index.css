@@ -90,7 +90,7 @@ main { overflow: hidden; }
 .marquee { background: var(--rust); color: var(--paper); padding: 20px; display: flex; align-items: center; justify-content: center; gap: 22px; font-size: clamp(14px,2vw,24px); letter-spacing: 2.5px; font-weight: 600; white-space: nowrap; transform: rotate(-1deg) scale(1.02); }
 .marquee i { font-family: Georgia, serif; text-transform: lowercase; font-weight: 400; color: #efd79d; font-size: 1.4em; letter-spacing: 0; }
 
-.section { max-width: 1180px; margin: auto; padding: 130px 36px; }
+.section { max-width: 1180px; margin: auto; padding: 64px 36px; }
 .section-intro { max-width: 650px; margin-bottom: 72px; }
 .section-title, .profile-title, .privacy-title, .closing-title { font-size: clamp(44px, 5vw, 68px); }
 .section-intro p, .profile-copy > p { color: var(--muted); font-size: 18px; line-height: 1.65; }
@@ -119,7 +119,7 @@ main { overflow: hidden; }
 .phone-showcase-title { font-size: clamp(38px, 4.4vw, 58px); text-wrap: wrap; }
 .phone-showcase-copy p { color: var(--muted); font-size: 18px; line-height: 1.65; margin-top: 20px; max-width: 460px; }
 
-.privacy-section { background: var(--brown); color: var(--paper); min-height: 760px; padding: 130px max(36px, calc((100vw - 1110px)/2)); display: grid; grid-template-columns: 1fr 1fr; gap: 90px; align-items: center; }
+.privacy-section { background: var(--brown); color: var(--paper); min-height: 760px; padding: 64px max(36px, calc((100vw - 1110px)/2)); display: grid; grid-template-columns: 1fr 1fr; gap: 90px; align-items: center; }
 .kicker-dark { color: var(--ochre); }
 .privacy-copy > p { color: #b8aa9e; max-width: 580px; font-size: 17px; line-height: 1.7; margin: 28px 0; }
 .honesty-note { display: grid; grid-template-columns: 32px 1fr; gap: 15px; border-top: 1px solid rgba(255,255,255,.13); padding-top: 24px; }
@@ -159,7 +159,7 @@ main { overflow: hidden; }
 .continuity-icon, .feature-icon { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 14px; background: rgba(166,85,47,.1); color: var(--rust); }
 .continuity-row strong, .continuity-row span { display: block; }.continuity-row strong { font-size: 14px; }.continuity-row span { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 5px; }
 
-.quiet-features { max-width: 1110px; margin: 130px auto 140px; padding: 0 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.quiet-features { max-width: 1110px; margin: 64px auto 140px; padding: 0 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 .feature-card { min-height: 380px; padding: 38px; border-radius: 30px; background: var(--cream-deep); overflow: hidden; }
 .feature-card > p { color: var(--muted); line-height: 1.6; max-width: 430px; }
 .feature-title { margin-top: 24px; font-size: 27px; }
@@ -170,7 +170,7 @@ main { overflow: hidden; }
 .reaction-demo { margin-top: 55px; display: flex; flex-wrap: wrap; gap: 8px; }
 .reaction-demo span { padding: 9px 13px; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.16); border-radius: 99px; font-size: 13px; }
 
-.closing { background: var(--brown); color: var(--paper); text-align: center; padding: 130px 32px 90px; position: relative; }
+.closing { background: var(--brown); color: var(--paper); text-align: center; padding: 64px 32px 90px; position: relative; }
 .closing-flower { display: grid; place-items: center; margin-bottom: 26px; }
 .closing-icon { width: 46px; height: 46px; }
 .closing-title { font-size: clamp(52px,7vw,94px); }
