@@ -35,8 +35,8 @@ export function ProfileSection() {
           A name and a picture. That is the whole profile.
         </div>
         <p>
-          No username to claim. No bio to fill. No email address or phone number required for your profile. There is
-          nothing else to collect.
+          No username to claim. No bio to fill. Sign-in is Google or Apple, and we read only the identifier they
+          send—your email address is never stored.
         </p>
         <div className="continuity-row">
           <span className="continuity-icon">

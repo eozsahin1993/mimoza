@@ -1,7 +1,6 @@
-import familyPhoto from "../assets/family.jpg";
-import friendsPhoto from "../assets/friends.jpg";
-import kitchenPhoto from "../assets/kitchen.jpg";
-import { Icon } from "../components/Icon";
+import inviteShot from "../assets/screenshots/invite.jpg";
+import albumShot from "../assets/screenshots/album.jpg";
+import { PhoneFrame } from "../components/PhoneFrame";
 
 const steps = [
   {
@@ -53,33 +52,13 @@ export function CircleWalkthrough() {
             </div>
           ))}
         </div>
-        <div className="album-visual">
-          <div className="album-top">
-            <div>
-              <span className="eyebrow">THE FAMILY</span>
-              <strong>Our album</strong>
-            </div>
-            <span className="album-count">126 moments</span>
-          </div>
-          <div className="album-grid">
-            <img className="album-tall" src={kitchenPhoto} alt="Grandparent cooking with grandchildren" />
-            <img src={familyPhoto} alt="Grandfather and grandchild together" />
-            <div className="album-quote">
-              <span>“Same time next Sunday?”</span>
-              <small>— Nina</small>
-            </div>
-            <img className="album-wide" src={friendsPhoto} alt="Friends relaxing together at home" />
-          </div>
-          <div className="roster-event">
-            <div className="tiny-avatar">J</div>
-            <div>
-              <strong>Jane joined the circle</strong>
-              <span>Welcomed by Alex · Today</span>
-            </div>
-            <span className="event-check">
-              <Icon name="check" size={16} />
-            </span>
-          </div>
+        <div className="flow-visual">
+          <PhoneFrame
+            className="phone-frame-sm flow-phone-one"
+            src={inviteShot}
+            alt="Circle details, with invite options and the member list"
+          />
+          <PhoneFrame className="phone-frame-sm flow-phone-two" src={albumShot} alt="A circle's album, grouped by month" />
         </div>
       </div>
     </section>
