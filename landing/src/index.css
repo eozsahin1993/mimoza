@@ -104,11 +104,20 @@ main { overflow: hidden; }
 .flow-phone-one { transform: rotate(-5deg); margin-bottom: 34px; }
 .flow-phone-two { transform: rotate(4deg); }
 
-.circle-showcase { display: grid; grid-template-columns: .85fr 1.15fr; gap: 70px; align-items: center; }
-.circle-showcase-copy { min-width: 0; }
-.circle-showcase .phone-frame { margin-inline: auto; transform: rotate(-2deg); }
-.circle-showcase-title { font-size: clamp(38px, 4.4vw, 58px); text-wrap: wrap; }
-.circle-showcase-copy p { color: var(--muted); font-size: 18px; line-height: 1.65; margin-top: 20px; max-width: 460px; }
+/*
+ * One layout — a phone next to a headline — reused for every "here's
+ * the real screen behind this claim" moment (the circle list, creating
+ * a post, a post's comments). .reverse puts the phone on the right
+ * instead of the left, just by swapping which column is wider; the DOM
+ * order in each section decides which side actually holds which.
+ */
+.phone-showcase { display: grid; grid-template-columns: .85fr 1.15fr; gap: 70px; align-items: center; }
+.phone-showcase.reverse { grid-template-columns: 1.15fr .85fr; }
+.phone-showcase-copy { min-width: 0; }
+.phone-showcase .phone-frame { margin-inline: auto; transform: rotate(-2deg); }
+.phone-showcase.reverse .phone-frame { transform: rotate(2deg); }
+.phone-showcase-title { font-size: clamp(38px, 4.4vw, 58px); text-wrap: wrap; }
+.phone-showcase-copy p { color: var(--muted); font-size: 18px; line-height: 1.65; margin-top: 20px; max-width: 460px; }
 
 .privacy-section { background: var(--brown); color: var(--paper); min-height: 760px; padding: 130px max(36px, calc((100vw - 1110px)/2)); display: grid; grid-template-columns: 1fr 1fr; gap: 90px; align-items: center; }
 .kicker-dark { color: var(--ochre); }
@@ -163,7 +172,7 @@ main { overflow: hidden; }
 
 .closing { background: var(--brown); color: var(--paper); text-align: center; padding: 130px 32px 90px; position: relative; }
 .closing-flower { display: grid; place-items: center; margin-bottom: 26px; }
-.closing-icon { width: 46px; height: 46px; border-radius: 12px; }
+.closing-icon { width: 46px; height: 46px; }
 .closing-title { font-size: clamp(52px,7vw,94px); }
 .closing > p { color: #9f9185; font-size: 17px; margin: 28px 0; }
 .centered { justify-content: center; }
@@ -171,7 +180,7 @@ main { overflow: hidden; }
 .domain { margin-top: 70px; color: var(--ochre); font-size: 12px; letter-spacing: 1.8px; text-transform: uppercase; }
 footer { background: var(--brown); color: #776b62; border-top: 1px solid rgba(255,255,255,.09); padding: 28px max(36px, calc((100vw - 1180px)/2)); display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; font-size: 11px; }
 .footer-brand { display: inline-flex; align-items: center; gap: 10px; }
-.footer-icon { width: 30px; height: 30px; border-radius: 8px; }
+.footer-icon { width: 30px; height: 30px; }
 footer .wordmark { color: var(--paper); font-size: 21px; } footer span:nth-child(2) { text-align: center; } footer span:last-child { text-align: right; }
 
 /*
@@ -189,10 +198,10 @@ footer .wordmark { color: var(--paper); font-size: 21px; } footer span:nth-child
   .hero { grid-template-columns: 1fr; text-align: center; padding-top: 70px; }
   .hero-lede { margin-inline: auto; }.store-row { justify-content: center; }.hero-note { justify-content: center; }
   .phone-stage { margin-top: 30px; }
-  .steps-layout, .profile-section, .privacy-section, .circle-showcase { grid-template-columns: 1fr; }
+  .steps-layout, .profile-section, .privacy-section, .phone-showcase, .phone-showcase.reverse { grid-template-columns: 1fr; }
   .steps-layout { gap: 60px; }.privacy-section { gap: 30px; }.profile-section { gap: 50px; }
-  .circle-showcase { gap: 40px; text-align: center; }
-  .circle-showcase-copy p { margin-inline: auto; }
+  .phone-showcase { gap: 40px; text-align: center; }
+  .phone-showcase-copy p { margin-inline: auto; }
   .quiet-features { grid-template-columns: 1fr; }
 }
 

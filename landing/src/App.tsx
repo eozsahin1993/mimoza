@@ -3,7 +3,9 @@ import { Hero } from "./sections/Hero";
 import { Marquee } from "./sections/Marquee";
 import { CircleShowcase } from "./sections/CircleShowcase";
 import { CircleWalkthrough } from "./sections/CircleWalkthrough";
+import { EncryptedShowcase } from "./sections/EncryptedShowcase";
 import { PrivacySection } from "./sections/PrivacySection";
+import { ConversationShowcase } from "./sections/ConversationShowcase";
 import { ProfileSection } from "./sections/ProfileSection";
 import { QuietFeatures } from "./sections/QuietFeatures";
 import { Closing } from "./sections/Closing";
@@ -17,7 +19,9 @@ function App() {
       <Marquee />
       <CircleShowcase />
       <CircleWalkthrough />
+      <EncryptedShowcase />
       <PrivacySection />
+      <ConversationShowcase />
       <ProfileSection />
       <QuietFeatures />
       <Closing />

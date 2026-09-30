@@ -1,11 +1,11 @@
-import appIcon from "../assets/app-icon.png";
+import flowerIcon from "../assets/flower-icon.png";
 import { Wordmark } from "../components/Wordmark";
 
 export function Footer() {
   return (
     <footer>
       <a className="footer-brand" href="/" aria-label="Mimoza home">
-        <img className="footer-icon" src={appIcon} alt="" />
+        <img className="footer-icon" src={flowerIcon} alt="" />
         <Wordmark light />
       </a>
       <span className="footer-links">

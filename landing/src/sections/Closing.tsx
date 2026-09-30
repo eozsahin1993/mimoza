@@ -1,4 +1,4 @@
-import appIcon from "../assets/app-icon.png";
+import flowerIcon from "../assets/flower-icon.png";
 import { StoreBadge } from "../components/StoreBadge";
 import { WaitlistForm } from "../components/WaitlistForm";
 import { APP_IS_LIVE } from "../config";
@@ -7,7 +7,7 @@ export function Closing() {
   return (
     <section className="closing" id="download">
       <div className="closing-flower">
-        <img className="closing-icon" src={appIcon} alt="" />
+        <img className="closing-icon" src={flowerIcon} alt="" />
       </div>
       <span className="kicker kicker-dark">Your people. Your moments.</span>
       <div className="display closing-title" role="heading" aria-level={2}>
