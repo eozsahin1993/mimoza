@@ -1,0 +1,52 @@
+name: Deploy Landing
+
+# Cloudflare Pages rather than GitHub Pages because of functions/ (the
+# waitlist's subscribe endpoint) — GitHub Pages only serves static files,
+# it can't run that. Once the app is live and functions/ is deleted (see
+# src/config.ts: APP_IS_LIVE), this whole workflow can be replaced with a
+# plain actions/deploy-pages one and the two Cloudflare secrets dropped.
+
+on:
+  push:
+    branches: [main]
+    paths: ['landing/**', '.github/workflows/landing-deploy.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-landing
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: landing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: app/.node-version
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      # functions/ is picked up because it sits beside dist/ here (working
+      # directory: landing) — wrangler looks for it as a sibling of the
+      # directory being deployed, not inside it.
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: landing
+          command: pages deploy dist --project-name=mimoza-landing --branch=main
