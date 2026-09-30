@@ -49,9 +49,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: landing
-          # `pages deploy` only auto-creates a missing project when it can
-          # prompt for confirmation, which it can't do here — no TTY — so
-          # it fails with "project does not exist" instead. Creating it
-          # explicitly first, and ignoring failure once it already does.
-          preCommands: npx wrangler pages project create mimoza-landing --production-branch=main || true
           command: pages deploy dist --project-name=mimoza-landing --branch=main
