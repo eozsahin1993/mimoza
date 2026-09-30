@@ -1,4 +1,7 @@
 import feedShot from "../assets/screenshots/feed.jpg";
+import crewPhotoOne from "../assets/hero-crew-1.jpg";
+import crewPhotoTwo from "../assets/hero-crew-2.jpg";
+import crewPhotoThree from "../assets/hero-crew-3.jpg";
 import { Icon } from "./Icon";
 import { PhoneFrame } from "./phoneFrame";
 
@@ -9,11 +12,11 @@ export function PhoneMockup() {
       <div className="orbit orbit-two" />
       <div className="floating-note note-left">
         <div className="mini-avatars">
-          <span className="avatar avatar-one">M</span>
-          <span className="avatar avatar-two">J</span>
-          <span className="avatar avatar-three">A</span>
+          <img className="avatar" src={crewPhotoOne} alt="" />
+          <img className="avatar" src={crewPhotoTwo} alt="" />
+          <img className="avatar" src={crewPhotoThree} alt="" />
         </div>
-        <div>
+        <div className="floating-note-copy">
           <strong>Sunday crew</strong>
           <span>8 people</span>
         </div>
@@ -23,7 +26,7 @@ export function PhoneMockup() {
         <span className="activity-icon ochre">
           <Icon name="lock" size={16} />
         </span>
-        <div>
+        <div className="floating-note-copy">
           <strong>Only your circle</strong>
           <span>End-to-end encrypted</span>
         </div>

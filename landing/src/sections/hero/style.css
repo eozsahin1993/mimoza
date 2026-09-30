@@ -11,15 +11,14 @@
 .activity-icon { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; background: var(--rust); color: white; flex: 0 0 auto; }
 .activity-icon.ochre { background: var(--ochre); color: var(--brown); }
 .floating-note { position: absolute; z-index: 4; display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: rgba(255,250,241,.94); border: 1px solid rgba(255,255,255,.8); border-radius: 16px; box-shadow: 0 15px 40px rgba(40,32,25,.14); backdrop-filter: blur(12px); }
-.floating-note strong, .floating-note span { display: block; }
-.floating-note strong { font-size: 12px; }
-.floating-note span { color: var(--muted); font-size: 9px; }
+.floating-note-copy strong, .floating-note-copy span { display: block; }
+.floating-note-copy strong { font-size: 12px; }
+.floating-note-copy span { color: var(--muted); font-size: 9px; }
 .note-left { left: 3%; top: 18%; }
 .note-right { right: 0; bottom: 18%; }
 .mini-avatars { display: flex; }
-.avatar { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--paper); margin-left: -8px; font-size: 9px; color: white; font-weight: 700; }
+.avatar { width: 28px; height: 28px; object-fit: cover; border-radius: 50%; border: 2px solid var(--paper); margin-left: -8px; }
 .avatar:first-child { margin-left: 0; }
-.avatar-one { background: #7d6a58; }.avatar-two { background: var(--rust); }.avatar-three { background: var(--ochre); color: var(--brown); }
 
 @media (prefers-reduced-motion: no-preference) {
   .phone-stage .phone-frame { animation: float 6s ease-in-out infinite; }
