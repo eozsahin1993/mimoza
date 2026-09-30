@@ -4,17 +4,11 @@ Everything between here and both stores. Grouped by what blocks what, not
 by store — several items gate others, and two of them cost calendar time
 rather than work.
 
-Status as of 2026-09-28. Tick items as they land; add a date when you do,
+Status as of 2026-09-30. Tick items as they land; add a date when you do,
 so a stale "done" is visible.
 
 ## Start these first — they cost waiting, not doing
 
-- [ ] **Play closed test: 12 testers, 14 continuous days.** Personal Play
-      accounts created after 2023-11-13 can't reach production without it.
-      Testers must accept, install *and actually open* the app — Google
-      checks engagement now, and rejects a test where nobody used it.
-      Two weeks minimum, so start it the day the build is installable.
-      ([rules](https://support.google.com/googleplay/android-developer/answer/14151465))
 - [ ] **Apple Developer Program** — $99/year, and the Apple ID takes a day
       or two to clear.
 - [ ] **Google Play Console** — $25 once.
@@ -33,8 +27,8 @@ Prod is 852138521113, staging 223057859233. See
 - [x] AWS account for prod, `mimoza-prod-admin` IAM user, and two local
       profiles: `mimoza-prod-admin` via `aws login`, and `mimoza-prod-tf`
       with static keys because Terraform can't read a `login_session` one.
-- [ ] Root MFA, and Activate IAM Access so the billing pages open to an
-      IAM user at all.
+- [x] Root MFA, and Activate IAM Access so the billing pages open to an
+      IAM user at all. — 2026-09-30
 - [x] Alarm email confirmed in both accounts, and delivery tested by
       publishing to each topic. The listing lies while a confirmation is
       pending, so publish rather than trust it.
@@ -85,10 +79,10 @@ Prod is 852138521113, staging 223057859233. See
 - [ ] **Guideline 1.2 / Play UGC policy: a report path.** Photos shared
       between people trigger it on both stores. Removing a member and
       leaving a circle cover "block"; the "Report a problem" row in
-      settings is the "report" half. It exists in the working tree with a
-      fallback for a device with no mail app (alert + copy the address),
-      but is not committed — land it. Then tap it on a simulator with no
-      mail account, which is what a reviewer's device looks like.
+      settings is the "report" half. Landed and committed (f096ce8,
+      2026-09-28), with a fallback for a device with no mail app (alert +
+      copy the address). Still open: actually tap it on a simulator with
+      no mail account, which is what a reviewer's device looks like.
 - [ ] **Review notes, both stores.** Apple's "App Review Information" and
       Play's "App access" section. Sign-in is Google or Apple only, so
       there is no demo account to hand over — say that any account works,
@@ -104,21 +98,34 @@ Prod is 852138521113, staging 223057859233. See
 
 ## Store listings
 
-- [ ] **The website.** `joinmimoza.com` still has no DNS records — checked
-      2026-09-28, nothing resolves. The privacy page is built and committed
-      (38c0447) but unreachable, and the in-app link points at it. One
-      deploy covers the three items below; they are one piece of work.
-- [ ] Privacy policy URL, live. Required by both, and the App Privacy /
-      Data safety answers must match it.
-- [ ] Support URL (Apple requires a URL, Play takes an email) — the same
-      host.
+- [x] **The website.** `joinmimoza.com` resolves and serves over HTTPS —
+      confirmed 2026-09-30. Deployed to Cloudflare Pages on push.
+- [x] Privacy policy URL, live — `joinmimoza.com/privacy/` confirmed
+      2026-09-30, and the in-app link (`privacy-info-modal.tsx`) points at
+      the same URL. Content was corrected the same day: it had claimed "no
+      analytics" while the app ships Firebase Analytics for screen views
+      and a few named events (`post_created`, `comment_created`,
+      `reaction_added`, no content); the policy now discloses that
+      honestly. The App Privacy / Data safety answers must match this —
+      see below, they don't yet.
+- [ ] Support URL (Apple requires a URL, Play takes an email) — confirmed
+      2026-09-30 this doesn't exist yet. `/support` and `/delete-account`
+      both currently 200 on joinmimoza.com, but that's Cloudflare Pages'
+      catch-all serving `index.html` for any unmatched path (any random
+      path 200s the same way) — not a real page. `SUPPORT_EMAIL` in
+      `account/index.tsx` (`hello@joinmimoza.com`) covers Play; Apple still
+      needs an actual URL.
 - [ ] **Play account deletion URL**: a *web* page where someone can
       request deletion without installing the app, declared in Data
-      safety. The mailto paragraph inside the privacy policy is not one.
+      safety. Still doesn't exist — same catch-all false positive as
+      above. The privacy page's deletion section (`#delete-account`) is
+      in-app-first with a mailto fallback, which isn't the same thing.
       Add a page beside `privacy/` in `landing/vite.config.ts`'s inputs.
 - [ ] App Privacy (Apple) and Data safety (Play): account identifier from
-      Apple/Google, push token. Content is E2EE and unreadable by you —
-      state it, it's the product.
+      Apple/Google, push token, **and now Analytics / Usage Data** —
+      screen views and the three named events above. This wasn't true
+      when this line was first written; it is now. Content is E2EE and
+      unreadable by you — state it, it's the product.
 - [ ] Age rating questionnaires — IARC for Play, Apple's own.
 - [ ] Availability: every territory on both stores. Apple defaults to all;
       Play makes you tick them ("add all countries"). The listing stays
@@ -137,10 +144,10 @@ Prod is 852138521113, staging 223057859233. See
 
 Both stores, same shot list in the same order.
 
-- [ ] **Capture from a production-config build.** `EnvBadge` draws a
+- [x] **Capture from a production-config build.** `EnvBadge` draws a
       STAGING/DEV ribbon in the bottom-left of every screen unless
-      `APP_ENV=production`, and it is deliberately always in frame.
-- [ ] Staged content only. These get indexed; no real people's photos, no
+      `APP_ENV=production`, and it is deliberately always in frame. — 2026-09-30
+- [x] Staged content only. These get indexed; no real people's photos, no
       real names. `npm run seed:screenshots` (2026-09-29) builds three
       fixture circles — fake people, photos, captions, comments, reactions,
       all committed in `app/scripts/seed/fixtures/screenshots.json` — against
@@ -150,14 +157,14 @@ Both stores, same shot list in the same order.
       reseed never touches the integration suite's own tables:
       `TESTRELAY_RESOURCE_PREFIX=screenshots go run ./cmd/testrelay`, then
       `SEED_RELAY_URL=http://127.0.0.1:8099 npm run seed:screenshots` from
-      `app/`. Re-running deletes each circle it made last time first.
-- [ ] Clean status bar. iOS simulator: `xcrun simctl status_bar booted
+      `app/`. Re-running deletes each circle it made last time first. — 2026-09-30
+- [x] Clean status bar. iOS simulator: `xcrun simctl status_bar booted
       override --time 9:41 --batteryState charged --batteryLevel 100
       --cellularBars 4 --wifiBars 3`. Android emulator: `adb shell settings
       put global sysui_demo_allowed 1`, then `adb shell am broadcast -a
       com.android.systemui.demo -e command enter` and `... -e command
-      clock -e hhmm 0941`.
-- [ ] Shot list, portrait:
+      clock -e hhmm 0941`. — 2026-09-30
+- [x] Shot list, portrait:
       1. Circle list (`circle/index`): two or three circles, an unread
          badge, the Encrypted pill in the header.
       2. A circle feed (`circle/feed`): photos with captions, a reaction,
@@ -168,26 +175,26 @@ Both stores, same shot list in the same order.
       6. Account (`account`) with the privacy notice open — the E2EE
          story in one frame.
       Leave the sign-in screen out, or last; Apple reads a login wall as
-      the first shot as "nothing to see".
+      the first shot as "nothing to see". — 2026-09-30
 
 **Apple (App Store Connect)**
 
-- [ ] iPhone only: `ios.supportsTablet` is unset, so no iPad set is asked
+- [x] iPhone only: `ios.supportsTablet` is unset, so no iPad set is asked
       for.
-- [ ] 6.9" iPhone: 1320 × 2868 px portrait (1290 × 2796 is also accepted
+- [x] 6.9" iPhone: 1320 × 2868 px portrait (1290 × 2796 is also accepted
       in that slot). App Store Connect scales it for smaller iPhones, so
-      one set covers all. Capture on the latest Pro Max simulator.
-- [ ] 1 to 10 per localization. PNG or JPEG, RGB, no alpha.
+      one set covers all. Capture on the latest Pro Max simulator. — 2026-09-30
+- [x] 1 to 10 per localization. PNG or JPEG, RGB, no alpha. — 2026-09-30
 - [ ] App preview video optional, 15 to 30 s, same resolution.
-- [ ] Icon comes from the build's asset catalog; nothing to upload.
+- [x] Icon comes from the build's asset catalog; nothing to upload.
 
 **Google Play**
 
-- [ ] Phone screenshots: 2 to 8. PNG or JPEG, each side 320 to 3840 px,
+- [x] Phone screenshots: 2 to 8. PNG or JPEG, each side 320 to 3840 px,
       long side at most twice the short. A raw phone capture is taller
       than 2:1 and gets rejected, so these are composed: the 1080 × 1920
       templates in the Figma file "Mimoza store screenshots" take the
-      same 1320 × 2868 capture as the App Store set.
+      same 1320 × 2868 capture as the App Store set. — 2026-09-30
 - [ ] Feature graphic: 1024 × 500 PNG or JPEG, required. No transparency,
       nothing important near the edges — it's cropped in some placements.
 - [ ] App icon: 512 × 512 PNG, under 1 MB, from the same source as the
