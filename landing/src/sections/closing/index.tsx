@@ -1,4 +1,4 @@
-import flowerIcon from "../../assets/flower-icon.png";
+import flowerIcon from "../../assets/flower-icon.svg";
 import { StoreBadge } from "../../components/storeBadge";
 import { WaitlistForm } from "../../components/waitlistForm";
 import { APP_IS_LIVE } from "../../config";
@@ -25,7 +25,6 @@ export function Closing() {
       ) : (
         <WaitlistForm centered />
       )}
-      <div className="domain">joinmimoza.com</div>
     </section>
   );
 }

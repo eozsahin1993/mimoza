@@ -1,4 +1,4 @@
-import flowerIcon from "../../assets/flower-icon.png";
+import flowerIcon from "../../assets/flower-icon.svg";
 import { Wordmark } from "../../components/wordmark";
 import "./style.css";
 

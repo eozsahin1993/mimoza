@@ -1,6 +1,6 @@
 .closing { background: var(--brown); color: var(--paper); text-align: center; padding: 64px 32px 90px; position: relative; }
-.closing-flower { display: grid; place-items: center; margin-bottom: 26px; }
-.closing-icon { width: 46px; height: 46px; }
+.closing-flower { display: grid; place-items: center; margin-bottom: 30px; }
+.closing-icon { width: 72px; height: 72px; }
 .closing-title { font-size: clamp(52px,7vw,94px); }
 .closing > p { color: #9f9185; font-size: 17px; margin: 28px 0; }
 .closing .store-badge { background: var(--paper); color: var(--brown); border-color: transparent; }.closing .store-badge:hover { background: var(--cream-deep); }
@@ -8,9 +8,9 @@
 .closing .waitlist-note, .closing .waitlist-error { color: #9f9185; }
 .closing .waitlist-form button { background: var(--paper); color: var(--brown); }
 .closing .waitlist-form button:hover:not(:disabled) { background: var(--cream-deep); }
-.domain { margin-top: 70px; color: var(--ochre); font-size: 12px; letter-spacing: 1.8px; text-transform: uppercase; }
 
 @media (max-width: 600px) {
   .closing { padding: 100px 20px 70px; }
   .closing-title { font-size: 50px; }
+  .closing-icon { width: 58px; height: 58px; }
 }
