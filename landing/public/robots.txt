@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://joinmimoza.com/sitemap.xml
