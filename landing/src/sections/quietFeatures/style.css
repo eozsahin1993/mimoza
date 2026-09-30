@@ -1,11 +1,15 @@
 .quiet-features { max-width: 1110px; margin: 64px auto 140px; padding: 0 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 .feature-card { min-height: 380px; padding: 38px; border-radius: 30px; background: var(--cream-deep); overflow: hidden; }
-.feature-card > p { color: var(--muted); line-height: 1.6; max-width: 430px; }
+.feature-card > p { margin-top: 14px; color: var(--muted); line-height: 1.6; max-width: 430px; }
 .feature-icon { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 14px; background: rgba(166,85,47,.1); color: var(--rust); }
 .feature-title { margin-top: 24px; font-size: 27px; font-weight: 600; letter-spacing: -.4px; }
-.notification { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; margin-top: 42px; padding: 16px; background: rgba(255,250,241,.8); border: 1px solid rgba(255,255,255,.7); backdrop-filter: blur(12px); border-radius: 18px; box-shadow: 0 14px 35px rgba(56,40,27,.12); }
-.notification .wordmark { font-size: 13px; background: var(--rust); color: white; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; letter-spacing: -.5px; }
-.notification > div { display: grid; }.notification strong { font-size: 11px; }.notification span,.notification small { color: var(--muted); font-size: 9px; }
+
+.feed-end-demo { max-width: 340px; margin-top: 42px; display: grid; gap: 10px; }
+.feed-end-row { height: 44px; border-radius: 14px; background: rgba(255,255,255,.55); }
+.feed-end-row:last-of-type { opacity: .55; }
+.feed-end-caughtup { justify-self: center; display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 10px 18px; background: rgba(255,250,241,.8); border: 1px solid rgba(255,255,255,.7); color: var(--muted); font-size: 12px; font-weight: 600; border-radius: 99px; box-shadow: 0 14px 35px rgba(56,40,27,.12); }
+.feed-end-check { display: flex; color: var(--rust); }
+
 .reaction-card { background: var(--rust); color: white; }.reaction-card .feature-icon { background: rgba(255,255,255,.13); color: white; }.reaction-card > p { color: #eccfc0; }
 .reaction-demo { margin-top: 55px; display: flex; flex-wrap: wrap; gap: 8px; }
 .reaction-demo span { padding: 9px 13px; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.16); border-radius: 99px; font-size: 13px; }

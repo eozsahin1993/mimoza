@@ -1,27 +1,29 @@
 import { Icon } from "../../components/Icon";
-import { Wordmark } from "../../components/wordmark";
 import "./style.css";
 
 export function QuietFeatures() {
   return (
     <section className="quiet-features">
-      <div className="feature-card notification-card">
+      <div className="feature-card feed-end-card">
         <span className="feature-icon">
-          <Icon name="bell" size={23} />
+          <Icon name="check" size={23} />
         </span>
         <div className="feature-title" role="heading" aria-level={3}>
-          A useful nudge, without the preview.
+          Caught up means caught up.
         </div>
         <p>
-          Push notifications are composed server-side, so nothing private needs to be decrypted on your lock screen.
+          No algorithm stretches the feed to keep you scrolling. Once you've seen what your circle shared, that's
+          it, until someone posts again.
         </p>
-        <div className="notification">
-          <Wordmark />
-          <div>
-            <strong>New activity in The family</strong>
-            <span>Open Mimoza to see what's new</span>
+        <div className="feed-end-demo">
+          <div className="feed-end-row" />
+          <div className="feed-end-row" />
+          <div className="feed-end-caughtup">
+            <span className="feed-end-check">
+              <Icon name="check" size={14} />
+            </span>
+            <span>You're all caught up</span>
           </div>
-          <small>now</small>
         </div>
       </div>
       <div className="feature-card reaction-card">
