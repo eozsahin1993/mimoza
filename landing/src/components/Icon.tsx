@@ -30,7 +30,7 @@ const paths: Record<string, ReactNode> = {
   ),
   cloud: (
     <>
-      <path d="M7 18h11a4 4 0 0 0 .5-8A7 7 0 0 0 5 11.5 3.5 3.5 0 0 0 7 18Z" />
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10Z" />
       <path d="m9.5 14 2.5-2.5 2.5 2.5M12 11.5V17" />
     </>
   ),
