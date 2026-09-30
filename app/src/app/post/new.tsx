@@ -70,7 +70,10 @@ export default function NewPostScreen() {
         </View>
 
         <KeyboardAvoider style={styles.form}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
             <PhotoPicker
               uri={picture?.uri}
               aspectRatio={PhotoAspect.post}

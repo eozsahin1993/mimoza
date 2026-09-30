@@ -3,6 +3,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { missingPhotoFor, PhotoPlaceholder } from '@/ui/components/photo-placeholder';
@@ -130,7 +131,7 @@ export default function AlbumScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <ThemedSafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {/* The header keeps the screen's usual inset; the grid below runs
             edge to edge, so nothing competes with the photos. */}
         <View style={styles.headerInset}>
@@ -181,6 +182,8 @@ export default function AlbumScreen() {
               </View>
             ) : null
           }
+          // Native padding, not `useSafeAreaInsets` — see the feed's own footer.
+          ListFooterComponent={<SafeAreaView edges={['bottom']} />}
         />
       </ThemedSafeAreaView>
     </ThemedView>

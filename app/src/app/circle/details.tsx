@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ActionSheet, type ActionSheetOption } from '@/ui/components/action-sheet';
@@ -511,10 +512,10 @@ export default function CircleDetailsScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <ThemedSafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScreenHeader title={t('circle.details.title')} />
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <ThemedText type="headlineSmall">{circle?.name ?? ''}</ThemedText>
           <ThemedText type="labelSmall" themeColor="muted" style={styles.memberCount}>
             {t('circle.peopleCount', { count: members.length })}
@@ -526,6 +527,7 @@ export default function CircleDetailsScreen() {
 
           <SettingsGroups groups={settingsGroups} />
 
+          <SafeAreaView edges={['bottom']} />
         </ScrollView>
       </ThemedSafeAreaView>
 

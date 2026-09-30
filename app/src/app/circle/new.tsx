@@ -48,7 +48,10 @@ export default function NewCircleScreen() {
         <ScreenHeader variant="close" title={t('circle.create.title')} />
 
         <KeyboardAvoider style={styles.form}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
             <View>
               <ThemedText type="labelMedium" style={styles.fieldLabel}>
                 {t('circle.create.name')}

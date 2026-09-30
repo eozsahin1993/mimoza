@@ -85,7 +85,7 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
           <ThemedSafeAreaView edges={['bottom']} style={styles.column}>
             <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
               <ThemedText type="titleLarge" style={styles.title}>
                 {t('account.privacy.title')}
               </ThemedText>

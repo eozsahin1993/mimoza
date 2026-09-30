@@ -104,7 +104,10 @@ export default function ProfileSetupScreen() {
         <ScreenHeader title={t('onboarding.profile.header')} hideBack={isOnboarding} />
 
         <KeyboardAvoider style={styles.form}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
             <ThemedText type="headlineSmall">{t('onboarding.profile.title')}</ThemedText>
             <ThemedText type="bodyMedium" themeColor="secondary" style={styles.body}>
               {t('onboarding.profile.body')}
