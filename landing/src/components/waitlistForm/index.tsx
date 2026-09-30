@@ -31,7 +31,7 @@ export function WaitlistForm({ centered = false }: { centered?: boolean }) {
   }
 
   if (status === "done") {
-    return <p className={centered ? "waitlist-done centered" : "waitlist-done"}>You're on the list—we'll email you the day we launch.</p>;
+    return <p className={centered ? "waitlist-done centered" : "waitlist-done"}>You're on the list. We'll email you the day we launch.</p>;
   }
 
   return (
@@ -50,7 +50,7 @@ export function WaitlistForm({ centered = false }: { centered?: boolean }) {
           {status === "loading" ? "Joining…" : "Notify me at launch"}
         </button>
       </form>
-      {status === "error" && <p className="waitlist-error">Something went wrong—try again in a moment.</p>}
+      {status === "error" && <p className="waitlist-error">Something went wrong. Try again in a moment.</p>}
       <p className="waitlist-note">Not live yet. One email when it is, nothing else. Unsubscribe anytime.</p>
     </div>
   );

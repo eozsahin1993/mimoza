@@ -26,7 +26,7 @@ export function PrivacySection() {
         </div>
         <p>
           Photos, captions, comments, and reactions are encrypted on your phone before they're ever sent. We pass
-          along locked packages—never the key that opens them.
+          along locked packages, never the key that opens them.
         </p>
         <div className="honesty-note">
           <span className="honesty-mark">i</span>

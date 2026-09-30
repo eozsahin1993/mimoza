@@ -11,7 +11,7 @@ export function ConversationShowcase() {
         <div className="display phone-showcase-title" role="heading" aria-level={2}>
           Every photo starts a conversation.
         </div>
-        <p>More than one reaction, and comments that actually get read—because it's ten people, not ten thousand.</p>
+        <p>More than one reaction, and comments that actually get read, because it's ten people, not ten thousand.</p>
       </div>
     </section>
   );

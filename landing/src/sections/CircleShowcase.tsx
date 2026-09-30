@@ -11,7 +11,7 @@ export function CircleShowcase() {
         <div className="display phone-showcase-title" role="heading" aria-level={2}>
           A circle for every part of your life.
         </div>
-        <p>The family, the cousins, the hiking group, the regulars at your table—each one gets its own circle.</p>
+        <p>The family, the cousins, the hiking group, the regulars at your table. Each one gets its own circle.</p>
       </div>
     </section>
   );

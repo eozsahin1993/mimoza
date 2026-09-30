@@ -7,7 +7,7 @@ const steps = [
   {
     number: "01",
     title: "Start your circle",
-    copy: "Name it for the people it belongs to—your family, cousins, or the friends who feel like family.",
+    copy: "Name it for the people it belongs to: your family, cousins, or the friends who feel like family.",
   },
   {
     number: "02",
@@ -35,7 +35,7 @@ export function CircleWalkthrough() {
           How circles work
         </div>
         <p>
-          One place for the people who would already be in the group chat—only calmer, easier to look back on, and
+          One place for the people who'd already be in your group chat, just calmer, easier to look back on, and
           made for photos.
         </p>
       </div>
