@@ -4,13 +4,20 @@ Everything between here and both stores. Grouped by what blocks what, not
 by store — several items gate others, and two of them cost calendar time
 rather than work.
 
-Status as of 2026-09-30. Tick items as they land; add a date when you do,
+Status as of 2026-10-01. Tick items as they land; add a date when you do,
 so a stale "done" is visible.
 
 ## Start these first — they cost waiting, not doing
 
-- [ ] **Apple Developer Program** — $99/year, and the Apple ID takes a day
-      or two to clear.
+- [x] **Apple Developer Program** — paid 2026-10-01 as an individual
+      membership. Convert to organization once the D-U-N-S arrives:
+      Contact Us → Membership and Account → Program Enrollment, with the
+      legal name, D-U-N-S, Northwest address, and the business phone.
+      Same Apple ID and Team ID carry over.
+- [ ] **D-U-N-S for RareKiwi Software LLC** — requested via Apple's
+      lookup page with Northwest's address. Gates the Apple conversion
+      and the Play organization account. Apple copies this address to EU
+      product pages for traders, so it must never be a home address.
 - [ ] **Google Play Console** — $25 once.
 - [ ] **BIS notification email.** One message, no reply expected, to
       `crypt@bis.doc.gov` and `enc@nsa.gov` with the GitHub URL. Publicly

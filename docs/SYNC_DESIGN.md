@@ -103,10 +103,14 @@ Order is load-bearing — a comment must never reach the relay before the
 post it is on — so a row that fails holds back everything queued behind
 it rather than being skipped.
 
-A failure the relay *returned* spends one of five attempts and backs off;
-past that the row is marked failed and surfaces as a banner. A request
-that never reached the relay spends nothing and waits a flat thirty
-seconds, so no amount of time offline can fail a write.
+A failure the relay *returned* spends one of five attempts and backs off
+(2 s, 4 s, 8 s, 16 s); past that the row is marked failed and surfaces as
+a banner. A request that never reached the relay spends nothing and waits
+a flat thirty seconds, so no amount of time offline can fail a write.
+
+An entry of a type this build does not know is logged and skipped, and
+the cursor moves past it. That is what lets a relay deploy ahead of the
+app: an older client never fails a pass on something newer.
 
 Content is sealed at drain time, not when the row was queued, so a key
 rotation in between is not a problem.
@@ -130,6 +134,11 @@ nobody else's. They are opened with the account keypair and merged in; a
 version that will not open is skipped rather than failing the pass —
 it was sealed to a keypair this device replaced, and a member reseals it
 once they see `needsRewrap`.
+
+How the account keypair itself reaches a new device is the relay's story
+(`RELAY_DESIGN.md`, *New device*): the synced platform keychain, a QR
+hand-off from a phone that still has it, or a fresh pair plus a reseal.
+Sync only ever asks the keystore for it.
 
 Reaction tags are derived from the circle's *first* content key and never
 rotate. See `RELAY_DESIGN.md` for why.

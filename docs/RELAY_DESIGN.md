@@ -1,7 +1,8 @@
 # Relay design
 
-What the relay stores and what its routes promise. `SYNC_DESIGN.md` is
-the other half: how a device keeps in step with it.
+What the relay is trusted with, what it stores, and what its routes
+promise. `SYNC_DESIGN.md` is the other half: how a device keeps in step
+with it.
 
 The relay owns accounts, circles, membership, roles, devices and invites
 in plaintext. Content is end-to-end encrypted: photos, captions, comments,
@@ -15,14 +16,52 @@ device
         │
         ▼  HTTPS, session bearer token
 relay (Lambda)
- ├─ accounts table     account#<id>: profile, devices, providers
+ ├─ accounts table     account#<id>: profile, devices, providers,
+ │                                   device-link sessions
  │                     provider#<p>:<sub>: sign-in lookup
  ├─ circles table      circle#<id>: meta, members, sealed keys,
  │                     invites, requests, posts, activity, children
  ├─ sessions, rate-limit tables
- ├─ S3 (via CloudFront) encrypted photo and cover bytes
+ ├─ S3 (via CloudFront) encrypted photo, cover and avatar bytes
  └─ APNs / FCM         push, text composed from names + action
 ```
+
+## Trust model
+
+**The claim is content privacy, not metadata privacy.** The relay knows
+who you are, which circles you are in, who else is in them, and when
+anything happened. It cannot read a caption, a comment, a photo, a cover
+or a reaction's emoji. This is the same trade WhatsApp asks for, stated
+plainly rather than implied. (An earlier design hid membership too; it
+cost most of the codebase, and the property never held in flight — ids
+were on every request.)
+
+What that buys: the relay can count, order, route and explain. Reaction
+counts are server-side, so a card renders from one row. Notification
+text is composed centrally, so no notification extension ships and
+nothing decrypts on a lock screen. A failed sync says what failed.
+
+What it costs, two places where the relay holds real authority:
+
+- **It could substitute a public key.** An approving member seals content
+  keys to whatever key the relay says the joiner published, and a
+  resealing member does the same for a `needsRewrap` key. A compromised
+  relay could publish its own and be handed the circle's keys. There is
+  no key-transparency log and no safety-number check. The one exchange
+  that does not take the relay's word is the device hand-off (*New
+  device*), where the key comes off a screen.
+- **It holds an Apple refresh token.** App Store Review Guideline
+  5.1.1(v) requires deleting an account to revoke the Sign in with Apple
+  grant. Apple only revokes a refresh token and only issues one in
+  exchange for an authorization code that dies within minutes — so
+  `/v1/auth/apple` banks it at sign-in and `DELETE /v1/account` spends
+  it. The relay can therefore act against the Apple account, not just
+  the Mimoza one.
+
+Neither is hidden behind a claim the product does not make. A relay that
+can delete everything is already trusted with a great deal. What it is
+never trusted with is a key: there is no recovery phrase and no escrow,
+for the reasons under *New device*.
 
 ## What is encrypted
 
@@ -54,10 +93,14 @@ reaction tag      HMAC-SHA256(HKDF(K_v, "reaction-tag"), emoji), hex
 | `account#<id>` | `profile` | name, pubkey, pubkeyUpdatedAt, createdAt |
 | `account#<id>` | `device#<deviceId>` | pushToken, platform, locale, updatedAt |
 | `account#<id>` | `provider#<provider>:<sub>` | linkedAt, refreshToken (Apple only, for revoking on deletion) |
+| `account#<id>` | `devicelink#<sessionId>` | publicKey (the throwaway one), sealedKeypair once answered, createdAt, expiresAt |
 | `provider#<provider>:<sub>` | `lookup` | accountId |
 
 Account ids are minted by the relay at first sign-in; sign-in resolves
-through the `lookup` row.
+through the `lookup` row. Sign-in is `POST /auth/google` or
+`POST /auth/apple` with the provider's ID token, answered with a bearer
+token of the relay's own that every other route requires;
+`POST /auth/logout` ends one.
 
 ## Circles table
 
@@ -88,7 +131,9 @@ through the `lookup` row.
 - `memberCount` exists so the member cap is a condition on the write rather than a count read beforehand, which two admins approving at once would both pass.
 - `needsRewrap` means the member replaced their keypair and their `key#` item is unreadable until another member re-seals it.
 - Activity events: `created`, `joined`, `left`, `removed`, `account_deleted`, `promoted`, `demoted`, `renamed`, `cover_changed`. The relay writes each one in the same transaction as the change it records.
-- Invites and requests carry `expiresAt`; nothing else expires.
+- Invites and requests carry `expiresAt` (seven days,
+  `INVITE_RETENTION_DAYS`), and so does a device-link session on the
+  accounts side (an hour). Nothing else expires.
 
 | index | hash | range | used for |
 |---|---|---|---|
@@ -143,10 +188,14 @@ outlives it.
 | react / unreact | read this member's rows on the post; one transaction: put or delete the one for that tag, `ADD` +1/−1 on it, and set or clear the `reactors` flag — clearing only when it was their last |
 | delete post | strip ciphertext, set `deletedAt` and `updatedAt`, delete the blob |
 | approve join | one transaction: `member#`, the joiner's `key#` with every version, `rosterVersion + 1`, request approved, `activity{joined}` |
+| deny join | the request marked denied; nothing else moves, and the asker sees the answer on their next `GET /circles` |
+| rewrap | `POST /circles/{id}/keys`: a member writes every version sealed to a `needsRewrap` member's new key; stored on that `key#`, flag cleared |
 | kick | one transaction: delete `member#` and the leaver's `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read, `activity{removed}` |
 | leave | same shape as kick, self-directed: delete own `member#` and `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read and, for an admin, on another admin remaining, `activity{left}` |
 | role change, rename, cover | row update with an admin check, `rosterVersion + 1` where membership changes, matching activity. A request that sets both a name and a cover records both |
-| notification level | the member's own row, no activity — nobody else needs to know — but `rosterVersion + 1`, so that account's other devices refetch |
+| notification level | the member's own row (`PATCH /circles/{id}/members/{accountId}`, `all \| comments \| photos \| none`), no activity — nobody else needs to know — but `rosterVersion + 1`, so that account's other devices refetch |
+| publish a public key | `PUT /account/pubkey`; with `reset`, every membership is flagged `needsRewrap` and each circle's members get a silent push |
+| device link | `POST /account/device-link` opens a session holding a throwaway public key; `POST …/{sessionId}` stores the sealed keypair once, first answer wins; `GET …/{sessionId}` is the poll. See *New device* |
 | visibility, delete post, delete comment | see Reads: each stamps `updatedAt` and the forward index key, so the change reaches every device through the walk |
 | delete circle | every row in the partition, in batches, plus the lookup row each invite code owns |
 
@@ -195,6 +244,11 @@ GET /circles/{id}/entries?type=post|activity&cursor=<opaque>&limit=200
 
 GET /circles/{id}/entries/{postId}/children
   → comments, reactions
+
+GET /circles/{id}/invites        → this circle's live codes, any admin
+GET /circles/{id}/requests       → pending asks, each with the joiner's public key
+GET /invites/{code}              → the preview a joiner sees: name, member
+                                   count, who shared it. No blob, no roster
 
 POST /circles/{id}/blobs/{postId}/upload-target
 POST /circles/{id}/blobs/cover/{coverId}/upload-target
@@ -303,6 +357,10 @@ tag the relay cannot read back, so a card says someone reacted and not
 what with. Roster changes send a silent push so members' devices sync,
 whatever level they have set: a level governs cards, not syncing.
 
+A member's `notifyLevel` is `all`, `comments`, `photos` or `none`. The
+author of a post hears about comments and reactions on it at any level
+but `none`; everyone else is filtered by what their level covers.
+
 Because the card arrives finished, nothing decrypts on receipt and no
 notification extension ships. The cost is that the wording lives in the
 app's native string tables, so a new kind of notification needs an app
@@ -310,14 +368,36 @@ release rather than a relay deploy.
 
 ## New device
 
-- With the keypair in the synced keychain: sign in, list the circles, fetch rosters, open sealed keys.
-- Without it: the device makes a new keypair and sends it with `reset`. The relay marks every membership `needsRewrap` and pushes the other members silently. The first member device to sync seals every version it holds to the new pubkey; the relay stores it and clears the flag.
+Three ways the account keypair reaches a phone that signed in without
+it, in the order the app tries them:
 
-A relay that swapped in its own pubkey could have a member seal keys to
-it. Accepted: the relay already controls delivery and deletion. The same
-holds for whoever controls the Google or Apple account, since a session
-is all that is needed to publish a key. Neither can read what is already
-stored; both are granted the circle by the next member who reseals.
+- **The synced keychain has it** (iCloud Keychain, Block Store): sign
+  in, list the circles, fetch rosters, open sealed keys.
+- **Another signed-in phone is to hand — device link.** The new phone
+  mints a throwaway keypair, opens a session with its public half
+  (`POST /account/device-link`) and shows the session id and that key as
+  a QR. The old phone scans it, seals the account keypair to the key it
+  read off the screen and posts the blob (`POST …/{sessionId}`; the
+  first answer wins, a second gets 409). The new phone polls
+  (`GET …/{sessionId}`) and opens it with the private half that never
+  left it. The relay is a dead drop: the key was never fetched from it,
+  so it holds nothing it could open the blob with. A session lasts an
+  hour and takes one answer.
+- **Neither — reset and reseal.** The device makes a new keypair and
+  sends it with `reset` (`PUT /account/pubkey`). The relay marks every
+  membership `needsRewrap` and pushes the other members silently. The
+  first member device to sync seals every version it holds to the new
+  pubkey (`POST /circles/{id}/keys`); the relay stores it and clears the
+  flag.
+
+On the reset path, a relay that swapped in its own pubkey could have a
+member seal keys to it. Accepted: the relay already controls delivery and
+deletion. The same holds for whoever controls the Google or Apple
+account, since a session is all that is needed to publish a key. Neither
+can read what is already stored; both are granted the circle by the next
+member who reseals. The device-link path is the one exchange that does
+not extend this trust, which is why the app offers it first when another
+phone exists.
 
 **There is no key escrow, and deliberately so.** The private key is never
 recovered, only replaced, and what comes back is entitlement rather than
@@ -341,3 +421,31 @@ entries and blobs, delete its `key#` and `member#`, write
 `activity{account_deleted}`, and promote the longest-standing member if
 it was the last admin. Then delete its requests, invites, devices,
 provider rows, profile and sessions.
+
+## Telemetry
+
+Not the relay's, but part of the same claim. The app ships Firebase
+Crashlytics and Firebase Analytics. Crashlytics takes native and JS
+crashes plus errors the code chooses to record. Analytics takes a screen
+view per route change and three events — `post_created`,
+`comment_created`, `reaction_added` — with no parameters. A screen view
+is the route's *pattern* (`/post/[id]`), never the interpolated path, so
+no circle, post or account id reaches Firebase, and nothing in either
+stream is content. Accepted because a relay that cannot read content
+cannot explain a client-side failure either; the privacy policy states
+both in the same terms.
+
+## Rejected
+
+- **Contact discovery.** Uploading other people's numbers, who consented
+  to nothing; doing it privately needs an enclave service, not a bolt-on.
+- **Hiding membership from the relay.** See *Trust model*.
+- **A recovery phrase or escrowed keys.** Self-service recovery at the
+  price of the only claim that matters.
+- **Comment text on the lock screen.** Needs an extension that decrypts
+  on receipt, which relay-composed push exists to avoid.
+- **Email/OTP sign-in.** No platform account to hang keypair sync on, so
+  it permanently weakens recovery for one fewer tap.
+- **Session replay, or parameters on analytics events.** Either carries
+  what the content claim protects to a third party the policy says never
+  sees it.

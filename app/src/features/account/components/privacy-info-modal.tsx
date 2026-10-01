@@ -18,18 +18,14 @@ export type PrivacyInfoModalProps = {
   onClose: () => void;
 };
 
-// The copy states the claim `docs/DESIGN.md` makes and no more: content
-// is end-to-end encrypted, membership is not. Keep it in step with that
-// file and `RELAY_DESIGN.md` ("What is encrypted"), not with what the
+// The copy states the claim `docs/RELAY_DESIGN.md` makes ("Trust model",
+// "What is encrypted") and no more: content is end-to-end encrypted,
+// membership is not. Keep it in step with that file, not with what the
 // design hopes to do next.
 const POINTS = ['content', 'account', 'sharing'] as const;
 
 const BLOOM_SIZE = 14;
-/**
- * The domain the launch checklist reserves for the policy. Nothing is
- * deployed there yet, so this leads nowhere until the site is — see
- * `docs/LAUNCH_CHECKLIST.md`, "Store listings".
- */
+/** The policy the store listings declare; the same page, so the two can't drift. */
 const PRIVACY_POLICY_URL = 'https://joinmimoza.com/privacy/';
 /** The circle list's section titles, at the same size: `code` is sized for an invite code standing on its own. */
 const LABEL_SIZE = 12;

@@ -1,42 +1,47 @@
 # Infrastructure
 
-Status: **staging is built** — its own account, both distributions, the
-relay behind `api.staging.joinmimoza.com`. Blobs are the exception:
-Terraform writes the settings parameter with the distribution, so signing
-waits only on the hand-created `cloudfront-signing-key` in SSM — without
-it downloads stay on presigned S3, silently (below). Prod is not built:
-the Terraform is written and its settings decided, but there is no
-account yet, and `env_domain` is unset. Each section marks what is
-decided, open, or deferred.
+Status: **both environments are built.** Staging is `api.staging.` /
+`cdn.staging.joinmimoza.com`, prod is `api.` / `cdn.joinmimoza.com`,
+each in its own AWS account with its own alarms, signing key and deploy
+role. The website is `joinmimoza.com`, on Cloudflare Pages. What is
+still open is on the [launch checklist](LAUNCH_CHECKLIST.md); each
+section below marks what is deferred.
 
 ---
 
 ## The shape of it
 
 One Go binary on Lambda, two CloudFront distributions in front of it, and
-six DynamoDB tables plus one S3 bucket behind. No servers, no containers,
+four DynamoDB tables plus one S3 bucket behind. No servers, no containers,
 no VPC, no database to patch or scale. Everything is on-demand, so an idle
 environment costs almost nothing and a busy one needs no capacity plan.
 
 ```
-Cloudflare DNS — "DNS only", never proxied: proxying would stack two CDNs
+Cloudflare DNS
   │
   ├─ api.<zone> ──→ CloudFront ──→ Lambda URL ──→ relay (Go, arm64)
-  │                 CachingDisabled                no VPC, on-demand
+  │   DNS only      CachingDisabled                no VPC, on-demand
   │                 all headers but Host                │
-  │                                                     ├─→ DynamoDB ×6
+  │                                                     ├─→ DynamoDB ×4
   │                                                     │   PAY_PER_REQUEST
   │                                                     ├─→ S3  issue URLs,
   │                                                     │       delete objects
-  │                                                     └─→ SSM config + keys
+  │                                                     ├─→ SSM config + keys
+  │                                                     └─→ APNs / FCM
   │
-  └─ cdn.<zone> ──→ CloudFront ──→ S3 bucket
-                    cached          OAC only — no direct reads
-                    signed URLs      ▲
-                                     └── presigned POST, straight from the app
+  ├─ cdn.<zone> ──→ CloudFront ──→ S3 bucket
+  │   DNS only      cached          OAC only — no direct reads
+  │                 signed URLs      ▲
+  │                                  └── presigned POST, straight from the app
+  │
+  └─ joinmimoza.com ──→ Cloudflare Pages ──→ static site (Vite)
+      proxied                                └─ /api/subscribe → Resend (waitlist)
 
 One AWS account per environment, all of it in us-east-1.
 ```
+
+`api.` and `cdn.` are **"DNS only"**, never proxied — proxying would
+stack two CDNs. The apex is proxied because that is what Pages is.
 
 ACM issues one wildcard certificate per environment, in us-east-1 because
 CloudFront accepts them from nowhere else. Validation is a DNS record
@@ -55,13 +60,14 @@ every member of a circle.
 | | |
 |---|---|
 | `<prefix>-circles` | One partition per circle: meta, members, sealed keys, invites, requests, posts, activity and children. |
-| `<prefix>-accounts` | One partition per account: profile, devices, linked providers, and the Apple refresh token deletion revokes with. |
-| `<prefix>-sessions` | Bearer tokens this relay issued. |
+| `<prefix>-accounts` | One partition per account: profile, devices, linked providers, device-link sessions, and the Apple refresh token deletion revokes with. |
+| `<prefix>-sessions` | Bearer tokens this relay issued. TTL on `expiresAt`. |
 | `<prefix>-rate-limit` | Per-account request budgets. |
-| `<prefix>-blobs` (S3) | Photo ciphertext. Glacier IR after 90 days. |
+| `<prefix>-blobs` (S3) | Photo, cover and avatar ciphertext. Glacier IR after 90 days. |
 | SSM `/<prefix>/*` | Settings, and the four SecureString credentials. |
+| Firebase, one project per env | Outside AWS: push (FCM), crash reports and usage analytics from the app. Route patterns and three parameterless events — no ids, no content; see `RELAY_DESIGN.md`, *Telemetry*. |
 
-Every one of those names derives from `RESOURCE_PREFIX` on both sides —
+Every AWS name derives from `RESOURCE_PREFIX` on both sides —
 `internal/config` and `modules/storage` — so an environment is one string,
 and nothing can be pointed at another environment's data piecemeal.
 
@@ -90,10 +96,10 @@ cannot select a circle's rows to fix them.
 **Auth and rate limiting are both the relay's own, not AWS's.** Sign-in
 verifies a Google or Apple ID token against that provider's JWKS over
 plain HTTPS — no AWS permission involved — and issues a bearer token of
-the relay's own. Every route requires it except sign-in.
-Budgets are counters in DynamoDB, applied per handler: writes and reads
-carry different limits, and push recipients carry a third. There is no
-WAF; see *Cost* for why.
+the relay's own. Every route requires it except sign-in. Budgets are
+counters in DynamoDB, two per account in a fixed ten-minute window: 500
+writes and 2,000 reads by default (`RATE_LIMIT_*`). There is no WAF; see
+*Cost* for why.
 
 ---
 
@@ -149,8 +155,7 @@ export TF_VAR_aws_account_id=<account>
 
 ## The front door
 
-**CloudFront over the Lambda function URL, at `api.<env_domain>`** —
-`api.staging.joinmimoza.com` today, and whatever zone prod is given.
+**CloudFront over the Lambda function URL, at `api.<env_domain>`.**
 
 `EXPO_PUBLIC_RELAY_URL` is compiled into each app build
 (`app/src/core/services/relay.ts`), so installed apps dial that hostname
@@ -160,7 +165,6 @@ we control before any build ships to a real user.
 - Cache policy `CachingDisabled`, origin request policy
   `AllViewerExceptHostHeader` — the relay serves per-user encrypted data,
   so nothing here is cached. Blobs are the opposite; see below.
-- DNS at Cloudflare, **"DNS only"**. Proxying would stack two CDNs.
 - **The function URL stays publicly callable** (`behind_cloudfront` and
   `sign_origin_requests`, both false in every env). Origin access control
   is built and can be switched on, but Lambda rejects unsigned payloads:
@@ -179,10 +183,10 @@ we control before any build ships to a real user.
 Sync payloads still gain from the nearby TLS handshake and the AWS
 backbone on the long leg.
 
-Built as `modules/cdn`, wired into both envs but inert until `env_domain`
-is set — with it empty, `api_endpoint` stays the raw function URL.
-Certificate validation is manual: the first apply blocks on the record,
-which the `cdn` output prints for adding at Cloudflare.
+Built as `modules/cdn`, inert until `env_domain` is set — with it empty,
+`api_endpoint` stays the raw function URL. Certificate validation is
+manual: the first apply blocks on the record, which the `cdn` output
+prints for adding at Cloudflare.
 
 ---
 
@@ -246,9 +250,9 @@ Consequences worth knowing:
   or immediately after a deploy.
 - Deploy Terraform before code that needs a new field: old parameter plus
   new code fails the shape check and falls back to S3, quietly.
-- Generating the key is manual, once per environment:
+- The key was generated by hand, once per environment:
   `openssl genrsa 2048` → private half to SSM, public half to
-  `blob_signing_public_key`.
+  `envs/<env>/cloudfront-signing-key.pub`. Both environments have one.
 
 ---
 
@@ -261,7 +265,7 @@ changes continuously and restores to any second in the last 35 days, by
 building a **new table**. It cannot roll one row back and it cannot be
 queried as history — it is disaster recovery, not an audit log, and not a
 debugging tool. It also only covers what happened after it was switched
-on, which is why it goes on before launch rather than after the first
+on, which is why it went on before launch rather than after the first
 incident.
 
 Those two tables because they are the ones holding what nobody else can
@@ -270,11 +274,11 @@ them. `sessions` and `rate-limit` are ephemeral by design (expiry,
 counters). Losing `circles` loses the photos outright — devices hold
 only what they have synced, and no member can rebuild another's.
 
-There is no floor under this any more. A device holds only the circles
-it belongs to and only what it has synced, so relay data loss is not
-something the fleet can heal from. At $0.20/GB-month against tables
-holding ciphertext and metadata — the photos are in S3, not here — this
-is cents a month for years.
+There is no floor under this. A device holds only the circles it belongs
+to and only what it has synced, so relay data loss is not something the
+fleet can heal from. At $0.20/GB-month against tables holding ciphertext
+and metadata — the photos are in S3, not here — this is cents a month
+for years.
 
 **Blobs have no backup, and the obvious fix is ruled out.** Versioning is
 off deliberately (`modules/storage/s3.tf`): deleting a post, a circle or
@@ -284,61 +288,126 @@ to work while quietly keeping everything. So the gap is real, but closing
 it needs something that can tell "deleted on purpose" from "lost", which
 versioning cannot. Nothing here is built.
 
+---
+
 ## Deploys
 
-GitHub Environments (`staging`, `production`), each holding its own
-`AWS_ROLE_ARN`, `AWS_ACCOUNT_ID`, `ENV_DOMAIN` and `ALERT_EMAIL` as
-secrets. OIDC — no stored AWS keys; the trust policy names the repo and
-environment.
+Three pipelines, all in `.github/workflows/`, all with the same shape:
+`main` is staging, a tag is production.
 
-- Server Tests green on `main` → staging, or `workflow_dispatch` by hand.
-  Those tests only run on `server/**`, so a merge touching only `app/`
-  deploys nothing.
-- A `server-v*` tag → prod, through the `production` environment.
+```
+                 push to main              tag
+relay    server/**  ─→ Server Tests ─→ staging     server-v*  ─→ prod
+app      app/**     ─→ Deploy App   ─→ staging     app-v*     ─→ production
+website  landing/** ─→ Deploy Landing ─→ joinmimoza.com (one environment)
+```
 
-The app has no pipeline of its own: `app-unit-test.yml` runs Jest and
-stops there, so builds and submissions are local.
+GitHub Environments (`staging`, `production`) hold each side's secrets.
+AWS access is OIDC — no stored keys; the trust policy names the repo and
+environment. Everything else (store API keys, signing, EAS, Firebase,
+Cloudflare) is a plain Environment secret.
 
 **Relay first, then the app.** One relay serves every installed version,
 and a rollback can't unwrite what new clients appended — older clients
-discard entry types they don't know (`SYNC_DESIGN.md` invariant 5).
+skip entry types they don't know (`SYNC_DESIGN.md`, *The outbox*).
 
-### App builds
+### The relay
 
-One build per environment; `EXPO_PUBLIC_RELAY_URL` is compiled in, so the
-environment is fixed at build time.
+Server Tests green on `main` → `terraform apply` + function update in
+staging. Those tests only run on `server/**`, so a merge touching only
+`app/` deploys nothing. A `server-v*` tag does the same in prod. One
+deploy at a time per environment, and **never cancel one midway**:
+Terraform holds a state lock, and a killed apply leaves it held by a run
+that no longer exists.
 
-| | Staging | Prod |
-|---|---|---|
-| Bundle ID | `com.eozsahin.mimoza.staging` | `com.eozsahin.mimoza` |
-| Relay URL | `api.staging.joinmimoza.com` | `api.<prod zone>` |
-| Distribution | TestFlight internal | App Store |
+### The app
 
-A separate bundle ID means its own Firebase app, its own Google/Apple
-sign-in client IDs (the relay's `GOOGLE_CLIENT_ID_*` / `APPLE_CLIENT_ID_IOS`
-must match per env), and its own `APNS_TOPIC` — the topic *is* the bundle
-ID. The APNs `.p8` key is shared. `APNS_PRODUCTION` already selects
-sandbox versus production.
+`Deploy App` decides per push whether the installed binaries can run this
+JavaScript, and ships one of two things — never both:
 
-Version is plain semver; the build number is separate
-(`ios.buildNumber`, `android.versionCode` — iOS needs a unique build per
-version, Android a strictly increasing integer). Neither is set in
-`app.json` today, and nothing increments them: there is no EAS config and
-no app build workflow. Surface `1.0.0 (15) · <commit> · <env>` in-app:
-the SHA is the only identifier that can't drift.
+```
+test (lint + jest, Ubuntu)
+  └─ fingerprint: expo-updates fingerprint per platform
+       vs shipped-fingerprints.json (repo root)
+         ├─ unchanged ──→ eas update --channel <staging|production>
+         └─ changed   ──→ fastlane ios      → TestFlight
+                          fastlane android  → staging: Firebase App Distribution (APK)
+                                              production: Play internal track (AAB)
+                          then record the new fingerprints (a commit, [skip ci])
+```
 
-### Verifying an upgrade
+- A release tag, `[build]` in the commit message, or the `force` input
+  on a manual run makes it a native build regardless.
+- Signing: iOS certificates and profiles through `match`; the Android
+  upload keystore lives in the same certificates repo, its password in
+  `ANDROID_KEYSTORE_PASSWORD`. `prebuild --clean` regenerates `ios/` and
+  `android/` every run, so nothing is edited in place.
+- Updates are unsigned: EAS code signing is gated behind a paid tier, so
+  `EXPO_TOKEN` is the only thing between a compromise and arbitrary JS on
+  a device. Worth remembering when deciding who may hold it.
+- Production lands in TestFlight and Play internal; submitting to the
+  stores is a hand step from there. The listings have their own lanes
+  (`fastlane ios listing`, `fastlane android listing`).
+
+**Build numbers come from CI, never from `app.json`.** The run number,
+floored at the store's latest plus one (TestFlight for iOS, the Play
+internal track for Android), so iOS and Android land on the same number
+and a re-run can't claim one the store already has. Locally
+`APP_BUILD_NUMBER` is unset and `app.json`'s `1` is the fallback; every
+upload burns a number permanently, so two builds from one commit still
+need two. The version is plain semver in `app.json`. The account screen
+shows version, native build and the run that published the current JS
+(`extra.jsBuild`) — the last two differ once an update has landed, which
+is the point.
+
+**A push that only changes JavaScript ships as an update within minutes
+of merging.** That includes anything under `migrations/`: the fingerprint
+covers native code, not SQL, and `decide-build.sh` does not look at
+paths. A JS-only update can carry a migration, and rolling that update
+back leaves old JS against a newer schema. Put `[build]` in the commit
+message for anything touching `migrations/`, so it goes out as a binary.
 
 Client migrations apply by index in one transaction and are gap-safe
 (`app/src/data/db/migrations/run.ts`), but every test starts from an empty
 database — the **upgrade-with-data path is untested**. Install the previous
-staging build, use it, then install the new one *over* it. Deleting the app
-between builds is what makes staging pass and real upgrades fail.
+staging build, use it, then install the new one *over* it. Deleting the
+app between builds is what makes staging pass and real upgrades fail.
 
-Adopting OTA (`expo-updates`, not installed) changes this: a JS-only
-update can carry a migration, and rolling that update back leaves old JS
-against a newer schema. Treat anything touching `migrations/` as a native
-release.
+| | Staging | Prod |
+|---|---|---|
+| Bundle ID | `com.eozsahin.mimoza.staging` | `com.eozsahin.mimoza` |
+| Relay URL | `api.staging.joinmimoza.com` | `api.joinmimoza.com` |
+| iOS | TestFlight, internal | TestFlight → App Store |
+| Android | Firebase App Distribution | Play internal → production |
+| Update channel | `staging` | `production` |
+
+A separate bundle ID means its own Firebase app, its own Google/Apple
+sign-in client IDs (the relay's `GOOGLE_CLIENT_ID_*` / `APPLE_CLIENT_ID_IOS`
+must match per env), and its own `APNS_TOPIC` — the topic *is* the bundle
+ID. The APNs `.p8` key is shared.
+
+**Push has two environments, and a build registers against one.** The
+`aps-environment` entitlement is keyed on `APNS_PRODUCTION`
+(`app.config.js`), which CI sets for every TestFlight build and a local
+Xcode run does not — only a distribution profile may carry the production
+entitlement. A sandbox token sent to production APNs is rejected as
+unregistered, silently: the build registers, the relay accepts the token,
+and nothing ever arrives. So a relay's `APNS_PRODUCTION` must agree with
+the builds it serves, and push on a build run from Xcode can only be
+tested against a relay set to sandbox.
+
+### The website
+
+`landing/` is a Vite site plus one Cloudflare Pages Function
+(`functions/api/subscribe.ts`, the waitlist, which is the only place
+`RESEND_API_KEY` is used). `Deploy Landing` builds and runs
+`wrangler pages deploy` on every push touching `landing/**`. The site is
+on Pages rather than GitHub Pages only because of that function; once
+the app is live and the waitlist goes (`src/config.ts`, `APP_IS_LIVE`),
+a plain `actions/deploy-pages` would do. Pages serves `index.html` for
+any path it has no file for, so an unbuilt route 200s with the homepage —
+`/privacy/` is a second Vite input, not a client route, for exactly that
+reason.
 
 ---
 
@@ -365,7 +434,8 @@ tier. Storage accumulates; nothing deletes photos unless asked.
 
 1. Billing alarm — free, and the one that catches a month going wrong.
    Built as `modules/alarms` beside the relay's throttle, error and
-   latency alarms; all of them off until `alert_email` is set.
+   latency alarms and the tables' throttle alarms; on in both
+   environments, each to its own confirmed address.
 2. Lambda reserved concurrency — free, caps how fast money can leave.
    Off in both envs today (`reserved_concurrency = -1`): a new account's
    10-execution limit refuses a reservation. Every table is

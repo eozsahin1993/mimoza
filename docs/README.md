@@ -1,19 +1,25 @@
 # Design docs
 
 Architecture and design decisions for Mimoza, kept separate from the
-`server/` and `app/` code they describe so neither directory's README has
-to double as both a map of the code and a design history.
+`app/`, `server/` and `landing/` code they describe so no directory's
+README has to double as both a map of the code and a design history.
 
-- [RELAY_DESIGN.md](RELAY_DESIGN.md) — what the relay stores and what its
-  routes promise: accounts and circles tables, sealed keys, cursors,
-  joining, push, new devices, deletion.
-- [SYNC_DESIGN.md](SYNC_DESIGN.md) — the other half: how a device keeps
-  in step, what it keeps locally, cursors and the outbox.
-- [DESIGN.md](DESIGN.md) — the reasoning behind the shape: what is
-  encrypted, what the relay is trusted with, and why.
-- [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — accounts, environments, the
-  CloudFront front door, blob delivery, deploys, cost.
-- [STAGING_CHECKLIST.md](STAGING_CHECKLIST.md) — cutting an internal
-  build: what to run, and what a wrong-environment build looks like.
+Two documents describe the system, one per half:
+
+- [RELAY_DESIGN.md](RELAY_DESIGN.md) — **the server.** The trust model
+  (content is encrypted, membership is not, and what that costs), what
+  the relay stores row by row, what each route promises: keys and
+  sealing, cursors, joining, push, device hand-off, deletion, telemetry,
+  and what was rejected.
+- [SYNC_DESIGN.md](SYNC_DESIGN.md) — **the client.** How a device keeps
+  in step with the relay: what it keeps locally, the sync pass, cursors,
+  the outbox, and the ordering that must hold.
+
+The other two are operational:
+
+- [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — AWS accounts and
+  environments, the CloudFront front door, blob delivery, backups, the
+  deploy pipelines for the relay, the app and the website
+  (`joinmimoza.com`, Cloudflare Pages), cost.
 - [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) — what stands between here
   and both stores, and which items cost waiting rather than work.
