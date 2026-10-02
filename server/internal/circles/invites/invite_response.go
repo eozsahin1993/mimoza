@@ -58,10 +58,11 @@ func (h *PreviewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, previewResponse{
-		CircleID:    preview.CircleID,
-		Name:        preview.Name,
-		MemberCount: preview.MemberCount,
-		InvitedBy:   preview.InvitedBy,
+		CircleID:          preview.CircleID,
+		Name:              preview.Name,
+		MemberCount:       preview.MemberCount,
+		InvitedBy:         preview.InvitedBy,
+		ProfilePictureURL: preview.ProfilePictureURL,
 	})
 }
 

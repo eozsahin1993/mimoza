@@ -62,6 +62,67 @@ func TestStore_AProfileIsWrittenAndReadBack(t *testing.T) {
 	}
 }
 
+// The picture is an id on the row: set, replaced wholesale, and cleared
+// by removing the attribute rather than writing an empty string, so a
+// profile with no picture reads back the same whether it never had one
+// or had it taken away.
+func TestStore_ThePictureIsRecordedReplacedAndCleared(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewAccountTable(t)
+	store := profile.NewStore(table)
+	accountID := newAccount(t, table)
+
+	if err := store.SetProfilePicture(ctx, accountID, "pic-1"); err != nil {
+		t.Fatal(err)
+	}
+	first, err := store.GetProfile(ctx, accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ProfilePictureID != "pic-1" {
+		t.Fatalf("expected pic-1, got %+v", first)
+	}
+	if first.ProfilePictureSetAt.IsZero() {
+		t.Error("expected a stamp saying when the picture was set")
+	}
+
+	if err := store.SetProfilePicture(ctx, accountID, "pic-2"); err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.GetProfile(ctx, accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ProfilePictureID != "pic-2" {
+		t.Fatalf("expected the replacement, got %+v", second)
+	}
+
+	if err := store.SetProfilePicture(ctx, accountID, ""); err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := store.GetProfile(ctx, accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.ProfilePictureID != "" || !cleared.ProfilePictureSetAt.IsZero() {
+		t.Fatalf("expected no picture and no stamp after clearing, got %+v", cleared)
+	}
+	// The name shares the row and must survive all of it.
+	if err := store.SetProfile(ctx, accountID, "Sarah"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetProfilePicture(ctx, accountID, "pic-3"); err != nil {
+		t.Fatal(err)
+	}
+	after, err := store.GetProfile(ctx, accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Name != "Sarah" || after.ProfilePictureID != "pic-3" {
+		t.Fatalf("expected the name and the picture to share the row, got %+v", after)
+	}
+}
+
 // Every write is conditioned on the account existing, so a session that
 // outlived its account writes nothing rather than resurrecting it as a
 // bare profile row.
@@ -74,6 +135,9 @@ func TestStore_WritingToAnAccountThatIsGone(t *testing.T) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 	if err := store.SetPublicKey(ctx, missing, []byte("key")); !errors.Is(err, accounts.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+	if err := store.SetProfilePicture(ctx, missing, "pic-1"); !errors.Is(err, accounts.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 	if _, err := store.GetProfile(ctx, missing); !errors.Is(err, accounts.ErrNotFound) {

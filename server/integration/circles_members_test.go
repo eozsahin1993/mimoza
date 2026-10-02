@@ -96,16 +96,17 @@ func TestCircles_APendingRequestNamesWhoIsAsking(t *testing.T) {
 
 	var pending struct {
 		Requests []struct {
-			AccountID string `json:"accountId"`
-			Name      string `json:"name"`
-			AvatarID  string `json:"avatarId"`
+			AccountID        string `json:"accountId"`
+			Name             string `json:"name"`
+			ProfilePictureID string `json:"profilePictureId"`
 		} `json:"requests"`
 	}
 	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
 	harness.AssertEqual(t, len(pending.Requests), 1, "one ask")
 	harness.AssertEqual(t, pending.Requests[0].Name, "Ali", "named")
-	// A name and no face: the asker holds no key to seal one with yet.
-	harness.AssertEqual(t, pending.Requests[0].AvatarID, "", "and no picture, since they hold no key")
+	// No picture set on this account, so none to show — see
+	// TestProfilePictures for one that has.
+	harness.AssertEqual(t, pending.Requests[0].ProfilePictureID, "", "and no picture, since they set none")
 	harness.AssertEqual(t, pending.Requests[0].AccountID, joiner.AccountID(), "and the account behind it")
 }
 

@@ -1,7 +1,8 @@
 # CloudFront over the blob bucket. Every member of a circle downloads the
-# same ciphertext, so the second reader onward should be served from an
-# edge rather than S3 — bandwidth, and the latency that actually shows up
-# for someone far from the origin.
+# same ciphertext — and, for a profile picture, every circle an account
+# is in downloads the same plain bytes — so the second reader onward
+# should be served from an edge rather than S3: bandwidth, and the
+# latency that actually shows up for someone far from the origin.
 #
 # Reads move from presigned S3 GETs to CloudFront signed URLs; uploads
 # stay presigned S3 POSTs straight to the bucket, so this is download-only.

@@ -15,7 +15,7 @@ type patchRequest struct {
 	Name    string `json:"name"`
 	CoverID string `json:"coverId"`
 	// CoverKeyVersion is which content key the cover was sealed under —
-	// required alongside CoverID, same as a member's avatarId+keyVersion.
+	// required alongside CoverID.
 	CoverKeyVersion int64 `json:"coverKeyVersion"`
 }
 

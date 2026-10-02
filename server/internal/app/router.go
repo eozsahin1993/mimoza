@@ -122,10 +122,12 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		Store:     circleinvites.NewStore(deps.Circles),
 		Retention: deps.InviteRetention,
 		Profiles:  deps.Accounts,
+		Blobs:     deps.Blobs,
 	}, readLimit, writeLimit)
 	requests.Register(circlesMux, &requests.Service{
 		Store:     requests.NewStore(deps.Circles),
 		Profiles:  deps.Accounts,
+		Blobs:     deps.Blobs,
 		Retention: deps.InviteRetention,
 		Notify:    notifier,
 	}, readLimit, writeLimit)
@@ -138,6 +140,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 		Store:   profile.NewStore(deps.Accounts),
 		Circles: members.NewStore(deps.Circles),
 		Notify:  notifier,
+		Blobs:   deps.Blobs,
 	}, readLimit, writeLimit)
 	devices.Register(accountMux, devicesService, writeLimit)
 	devicelink.Register(accountMux, &devicelink.Service{Store: devicelink.NewStore(deps.Accounts)}, readLimit, writeLimit)

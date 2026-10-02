@@ -126,7 +126,8 @@ func millis(t time.Time) int64 {
 func Status(err error) (int, string) {
 	switch {
 	case errors.Is(err, ErrCircleNotFound), errors.Is(err, ErrEntryNotFound),
-		errors.Is(err, ErrInviteNotFound), errors.Is(err, ErrRequestNotFound):
+		errors.Is(err, ErrInviteNotFound), errors.Is(err, ErrRequestNotFound),
+		errors.Is(err, ErrPictureNotFound):
 		return http.StatusNotFound, err.Error()
 	case errors.Is(err, ErrNotMember), errors.Is(err, ErrNotAdmin),
 		errors.Is(err, ErrNotTheAuthor):

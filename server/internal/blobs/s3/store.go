@@ -1,8 +1,8 @@
 // Package s3 is the relay's blob storage. Bytes move directly between
 // the device and S3 through presigned URLs; the relay only signs.
 //
-// It takes keys, not ids: which key a post, a cover or an avatar belongs
-// at is the column that owns it deciding.
+// It takes keys, not ids: which key a post, a cover or a profile picture
+// belongs at is the column that owns it deciding.
 package s3
 
 import (
@@ -69,9 +69,13 @@ func (s *Store) WithDownloads(cdn Downloads) *Store {
 	return s
 }
 
-// UploadTarget refuses a key that already holds bytes: being allowed to
-// upload proves membership, never authorship, so without this any member
-// could replace someone else's photo with one that still decrypts.
+// UploadTarget refuses a key that already holds bytes. For a
+// circle-scoped blob (a post, a cover), being allowed to upload proves
+// membership, never authorship, so without this any member could
+// replace someone else's photo with one that still decrypts. A profile
+// picture's own endpoint is self-only, so this instead guards against
+// replaying an id — which a fresh one every call (accounts.ProfilePictureKey)
+// already makes vanishingly unlikely.
 func (s *Store) UploadTarget(ctx context.Context, key string, maxBytes int64) (blobs.UploadTarget, error) {
 	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),

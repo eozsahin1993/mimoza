@@ -96,6 +96,14 @@ func (s *Service) eraseCircles(ctx context.Context, accountID string) error {
 				"reason", "blobs_not_deleted", "error", err, "prefix", prefix)
 		}
 	}
+	// The account's own objects sit outside every circle's prefix, so no
+	// circle sweep reaches them. The whole prefix rather than the one
+	// current picture: retiring a replaced picture is best-effort, so an
+	// older one may still be there.
+	if err := s.Blobs.DeletePrefix(ctx, accounts.ProfileBlobPrefix(accountID)); err != nil {
+		slog.ErrorContext(ctx, "deleted an account but not its profile picture",
+			"reason", "profile_blobs_not_deleted", "error", err, "accountId", accountID)
+	}
 	return nil
 }
 

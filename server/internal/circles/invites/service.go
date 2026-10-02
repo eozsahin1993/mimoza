@@ -24,22 +24,32 @@ type profiles interface {
 	GetProfile(ctx context.Context, accountID string) (accounts.Profile, error)
 }
 
+// bucket signs the inviter's profile picture for whoever holds the code.
+type bucket interface {
+	DownloadURL(ctx context.Context, key string) (string, error)
+}
+
 type Service struct {
 	Store store
 	// Retention is how long a new code lasts. A code that never expired
 	// would be a standing way in, long after whoever shared it forgot.
 	Retention time.Duration
 	Profiles  profiles
+	// Blobs is nil in tests that do not care about bytes.
+	Blobs bucket
 }
 
 // Preview is what a circle looks like from outside: enough to decide
 // whether to ask, and nothing about who is in it. InvitedBy is a
-// display name, not an id.
+// display name, not an id; ProfilePictureURL is already a signed URL —
+// whoever opens a preview is going to see it right there, so there is no
+// "might not need it" case worth a second round trip for.
 type Preview struct {
-	CircleID    string
-	Name        string
-	MemberCount int
-	InvitedBy   string
+	CircleID          string
+	Name              string
+	MemberCount       int
+	InvitedBy         string
+	ProfilePictureURL string
 }
 
 func (s *Service) Create(ctx context.Context, circleID, accountID string) (circles.Invite, error) {
@@ -100,18 +110,33 @@ func (s *Service) Preview(ctx context.Context, code string) (Preview, error) {
 	}
 	// Nameless rather than failing: a profile that cannot be read is no
 	// reason to refuse someone a look at the circle.
-	invitedBy := ""
+	var inviter accounts.Profile
 	if s.Profiles != nil {
 		if profile, err := s.Profiles.GetProfile(ctx, invite.CreatedBy); err == nil {
-			invitedBy = profile.Name
+			inviter = profile
 		}
 	}
 	return Preview{
-		CircleID:    circle.ID,
-		Name:        circle.Name,
-		MemberCount: len(roster),
-		InvitedBy:   invitedBy,
+		CircleID:          circle.ID,
+		Name:              circle.Name,
+		MemberCount:       len(roster),
+		InvitedBy:         inviter.Name,
+		ProfilePictureURL: s.pictureURL(ctx, inviter.AccountID, inviter.ProfilePictureID),
 	}, nil
+}
+
+// pictureURL signs a picture inline, or answers empty rather than
+// erroring: a missing or unsignable picture is not a reason to refuse
+// the preview.
+func (s *Service) pictureURL(ctx context.Context, accountID, pictureID string) string {
+	if s.Blobs == nil || pictureID == "" {
+		return ""
+	}
+	url, err := s.Blobs.DownloadURL(ctx, accounts.ProfilePictureKey(accountID, pictureID))
+	if err != nil {
+		return ""
+	}
+	return url
 }
 
 func (s *Service) requireAdmin(ctx context.Context, circleID, accountID string) error {

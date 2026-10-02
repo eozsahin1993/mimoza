@@ -35,11 +35,13 @@ func (t *Table) GetProfile(ctx context.Context, accountID string) (accounts.Prof
 
 func profileFrom(accountID string, item map[string]types.AttributeValue) accounts.Profile {
 	return accounts.Profile{
-		AccountID:      accountID,
-		Name:           dynamoutil.StringAt(item, AttrName),
-		PublicKey:      dynamoutil.BytesAt(item, AttrPublicKey),
-		PublicKeySetAt: dynamoutil.TimeAt(item, AttrPublicKeyAt),
-		CreatedAt:      dynamoutil.TimeAt(item, AttrCreatedAt),
+		AccountID:           accountID,
+		Name:                dynamoutil.StringAt(item, AttrName),
+		PublicKey:           dynamoutil.BytesAt(item, AttrPublicKey),
+		PublicKeySetAt:      dynamoutil.TimeAt(item, AttrPublicKeyAt),
+		ProfilePictureID:    dynamoutil.StringAt(item, AttrProfilePictureID),
+		ProfilePictureSetAt: dynamoutil.TimeAt(item, AttrProfilePictureAt),
+		CreatedAt:           dynamoutil.TimeAt(item, AttrCreatedAt),
 	}
 }
 

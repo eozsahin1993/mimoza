@@ -13,10 +13,9 @@ import (
 type memberResponse struct {
 	AccountID string `json:"accountId"`
 	Name      string `json:"name,omitempty"`
-	// AvatarID is this member's picture in this circle, sealed under
-	// AvatarKeyVersion.
-	AvatarID         string `json:"avatarId,omitempty"`
-	AvatarKeyVersion int64  `json:"avatarKeyVersion,omitempty"`
+	// ProfilePictureID is the account's current picture, fetched through
+	// GET /circles/{circleId}/blobs/picture/{accountId}/{pictureId}.
+	ProfilePictureID string `json:"profilePictureId,omitempty"`
 	// PublicKey is what a member seals this member's content keys to.
 	PublicKey   string `json:"publicKey,omitempty"`
 	Role        string `json:"role"`
@@ -54,8 +53,7 @@ func (h *RosterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		body.Members = append(body.Members, memberResponse{
 			AccountID:        member.AccountID,
 			Name:             member.Name,
-			AvatarID:         member.AvatarID,
-			AvatarKeyVersion: member.AvatarKeyVersion,
+			ProfilePictureID: member.ProfilePictureID,
 			PublicKey:        base64.StdEncoding.EncodeToString(member.PublicKey),
 			Role:             member.Role,
 			NotifyLevel:      member.NotifyLevel,

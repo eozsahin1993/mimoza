@@ -25,8 +25,7 @@ func TestAccounts_ProfileBelongsToTheSession(t *testing.T) {
 	harness.AssertEqual(t, profile.AccountID, device.AccountID(), "the profile is the caller's own")
 	harness.AssertEqual(t, profile.Name, "", "and starts without a name")
 
-	// No picture here: a face is circle content, kept on the membership
-	// rather than the account — see TestCircleAvatars.
+	// The picture is set through its own route — see TestProfilePictures.
 	device.Put(api("/account/profile"), harness.Body{"name": "Sarah"}).
 		Expect(http.StatusOK).Decode(&profile)
 	harness.AssertEqual(t, profile.Name, "Sarah", "the name took")

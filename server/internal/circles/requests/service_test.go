@@ -15,6 +15,7 @@ type fakeStore struct {
 	members  map[string]circles.Member
 	created  circles.Request
 	requests []circles.Request
+	denied   string
 	approved struct {
 		requestID       string
 		member          circles.Member
@@ -64,7 +65,10 @@ func (f *fakeStore) ApproveRequest(_ context.Context, _, requestID, _ string, me
 	return nil
 }
 
-func (f *fakeStore) DenyRequest(context.Context, string, string) error { return nil }
+func (f *fakeStore) DenyRequest(_ context.Context, _, requestID string) error {
+	f.denied = requestID
+	return nil
+}
 
 type fakeNotifier struct{ sent []circles.Notification }
 
@@ -111,6 +115,13 @@ func person(accountID, name string) accounts.Profile {
 		Name:      name,
 		PublicKey: []byte(accountID + "-key"),
 	}
+}
+
+type fakeBucket struct{ key string }
+
+func (f *fakeBucket) DownloadURL(_ context.Context, key string) (string, error) {
+	f.key = key
+	return "https://cdn.example/" + key, nil
 }
 
 // The key an approver seals the circle to is the one on the requester's
@@ -206,8 +217,11 @@ func TestCreate_RefusesAMemberAskingAgain(t *testing.T) {
 }
 
 // An admin answers a person, so the list carries who is asking rather
-// than an account id alone.
+// than an account id alone — a name, and a picture already signed, since
+// an admin reviewing the list is going to look at every row.
 func TestList_NamesWhoIsAsking(t *testing.T) {
+	asker := person("asker-1", "Sarah")
+	asker.ProfilePictureID = "pic-1"
 	store := &fakeStore{
 		members: map[string]circles.Member{"admin-1": {AccountID: "admin-1", Role: circles.RoleAdmin}},
 		requests: []circles.Request{
@@ -215,7 +229,8 @@ func TestList_NamesWhoIsAsking(t *testing.T) {
 			{ID: "request-2", CircleID: "circle-1", AccountID: "ghost-2", Status: circles.RequestPending},
 		},
 	}
-	service := &Service{Store: store, Profiles: people(person("asker-1", "Sarah"))}
+	bucket := &fakeBucket{}
+	service := &Service{Store: store, Profiles: people(asker), Blobs: bucket}
 
 	pending, err := service.List(context.Background(), "circle-1", "admin-1")
 	if err != nil {
@@ -227,10 +242,16 @@ func TestList_NamesWhoIsAsking(t *testing.T) {
 	if pending[0].Name != "Sarah" {
 		t.Errorf("expected the asker named, got %+v", pending[0])
 	}
+	if pending[0].ProfilePictureURL != "https://cdn.example/account/asker-1/picture/pic-1" {
+		t.Errorf("url = %q", pending[0].ProfilePictureURL)
+	}
 	// An account deleted between the two reads leaves the ask standing
 	// with nobody behind it; an admin can still deny it.
 	if pending[1].Name != "" || pending[1].ID != "request-2" {
 		t.Errorf("expected a nameless ask to survive, got %+v", pending[1])
+	}
+	if pending[1].ProfilePictureURL != "" {
+		t.Errorf("expected no picture for a nameless ask, got %q", pending[1].ProfilePictureURL)
 	}
 }
 
@@ -292,5 +313,31 @@ func TestApprove_RefusesWhenTheRequestersKeyHasChangedSinceTheAsk(t *testing.T) 
 	}
 	if store.approved.requestID != "" {
 		t.Error("nothing should have been admitted")
+	}
+}
+
+// Only an admin may turn someone away — the same gate as Approve, since
+// both are an admin deciding, not the requester.
+func TestDeny_RefusesANonAdmin(t *testing.T) {
+	store := &fakeStore{members: map[string]circles.Member{"member-1": {AccountID: "member-1", Role: circles.RoleMember}}}
+	service := &Service{Store: store}
+
+	if err := service.Deny(context.Background(), "circle-1", "request-1", "member-1"); !errors.Is(err, circles.ErrNotAdmin) {
+		t.Fatalf("expected ErrNotAdmin, got %v", err)
+	}
+	if store.denied != "" {
+		t.Error("nothing should have been denied")
+	}
+}
+
+func TestDeny_AnAdminTurnsTheRequestAway(t *testing.T) {
+	store := &fakeStore{members: map[string]circles.Member{"admin-1": {AccountID: "admin-1", Role: circles.RoleAdmin}}}
+	service := &Service{Store: store}
+
+	if err := service.Deny(context.Background(), "circle-1", "request-1", "admin-1"); err != nil {
+		t.Fatal(err)
+	}
+	if store.denied != "request-1" {
+		t.Errorf("denied %q, want request-1", store.denied)
 	}
 }

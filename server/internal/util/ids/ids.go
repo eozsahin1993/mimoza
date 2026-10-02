@@ -1,9 +1,9 @@
 // Package ids says what the relay accepts as a client-minted id.
 //
 // These become sort keys and object keys, so the shape matters. Clients
-// use a content hash, which is what makes a cover or avatar URL safe to
-// cache forever; the relay never computes one, and only checks that an
-// id is safe to put in a key.
+// mint a fresh id per cover or picture, which is what makes its URL safe
+// to cache forever; the relay never computes one, and only checks that
+// an id is safe to put in a key.
 package ids
 
 // MaxLength fits any digest in use with room to spare.

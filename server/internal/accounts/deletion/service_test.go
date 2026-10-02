@@ -228,8 +228,14 @@ func TestDeleteErasesTheCirclesAndTheirBytes(t *testing.T) {
 	if len(blobs.deleted) != 1 || blobs.deleted[0] != "circle-1/post-1" {
 		t.Errorf("deleted %v", blobs.deleted)
 	}
-	if len(blobs.swept) != 1 || blobs.swept[0] != "circle-2/" {
-		t.Errorf("swept %v", blobs.swept)
+	// The circle's prefix, and the account's own: its profile picture
+	// sits outside every circle, so no circle sweep reaches it.
+	swept := map[string]bool{}
+	for _, prefix := range blobs.swept {
+		swept[prefix] = true
+	}
+	if len(blobs.swept) != 2 || !swept["circle-2/"] || !swept["account/account-1/"] {
+		t.Errorf("swept %v, want the circle and the account prefixes", blobs.swept)
 	}
 	if len(sessions.sessionsDeletedFor) != 1 {
 		t.Error("expected the sessions to go last")

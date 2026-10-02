@@ -16,8 +16,11 @@ type requestResponse struct {
 	CircleID  string `json:"circleId"`
 	AccountID string `json:"accountId"`
 	// Name is who is asking: an admin answers a person, not an account
-	// id. No picture — see Pending.
-	Name string `json:"name,omitempty"`
+	// id. ProfilePictureID is absent when they have none; ProfilePictureURL
+	// is a signed URL for the bytes, already resolved — see Service.List.
+	Name              string `json:"name,omitempty"`
+	ProfilePictureID  string `json:"profilePictureId,omitempty"`
+	ProfilePictureURL string `json:"profilePictureUrl,omitempty"`
 	// PublicKey is what an approving admin seals every content key
 	// version to. Without it there is nothing to approve against: the
 	// requester is not on the roster yet, so this is the only place
@@ -49,6 +52,8 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, request := range requests {
 		row := asResponse(request.Request)
 		row.Name = request.Name
+		row.ProfilePictureID = request.ProfilePictureID
+		row.ProfilePictureURL = request.ProfilePictureURL
 		body.Requests = append(body.Requests, row)
 	}
 	httputil.WriteJSON(w, http.StatusOK, body)

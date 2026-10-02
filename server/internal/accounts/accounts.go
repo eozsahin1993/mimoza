@@ -16,10 +16,29 @@ import "time"
 type Profile struct {
 	AccountID string
 	Name      string
+	// ProfilePictureID names the picture in the bucket, under
+	// ProfilePictureKey. Like the name it is stored as uploaded, not
+	// sealed: it is shown to people who hold no circle key yet (an admin
+	// answering a join request, someone opening an invite), so there is
+	// nothing it could be sealed to. A changed picture is a new id, never
+	// bytes rewritten in place, so every cached copy stays right.
+	ProfilePictureID    string
+	ProfilePictureSetAt time.Time
 	// PublicKey is X25519, for sealing.
 	PublicKey      []byte
 	PublicKeySetAt time.Time
 	CreatedAt      time.Time
+}
+
+// ProfileBlobPrefix is where an account's own objects live in the bucket.
+// It sits outside every circle's prefix, so a circle sweep never touches
+// it and deleting the account has to sweep it itself.
+func ProfileBlobPrefix(accountID string) string { return "account/" + accountID + "/" }
+
+// ProfilePictureKey is one picture's object key. Every slice that signs
+// or deletes a picture derives it from here, so they cannot drift apart.
+func ProfilePictureKey(accountID, pictureID string) string {
+	return ProfileBlobPrefix(accountID) + "picture/" + pictureID
 }
 
 // Device is one phone this account is signed in on. Push goes to these,

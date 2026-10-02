@@ -1,7 +1,8 @@
-# Holds only encrypted ciphertext — the relay itself can never read what's
-# in here. Stays
-# private regardless: access is entirely gated by short-lived presigned
-# URLs, never by bucket policy or public access.
+# Holds mostly encrypted ciphertext the relay itself can never read, plus
+# one disclosed exception: a profile picture, stored as uploaded rather
+# than sealed (see RELAY_DESIGN.md's trust model). Stays private
+# regardless: access is entirely gated by short-lived presigned URLs,
+# never by bucket policy or public access.
 resource "aws_s3_bucket" "blobs" {
   bucket        = "${var.name_prefix}-blobs"
   force_destroy = !var.deletion_protection
@@ -18,9 +19,11 @@ resource "aws_s3_bucket_public_access_block" "blobs" {
 
 # Presigned PUT/GET need CORS to work from a browser context (e.g. Expo
 # web) — native mobile HTTP clients don't enforce CORS, but this covers
-# both without needing to know which client is uploading. The bucket only
-# ever holds ciphertext, so a permissive origin list doesn't expose
-# anything a same-origin policy would have protected.
+# both without needing to know which client is uploading. Access is
+# already gated by whoever holds the one-time presigned URL, not by
+# origin — a plain <img> load needs no CORS at all — so a permissive
+# origin list doesn't open a path that wasn't already open, ciphertext
+# or the one disclosed exception (a profile picture).
 resource "aws_s3_bucket_cors_configuration" "blobs" {
   bucket = aws_s3_bucket.blobs.id
 

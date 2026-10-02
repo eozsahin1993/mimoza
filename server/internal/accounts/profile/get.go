@@ -15,7 +15,11 @@ type profileResponse struct {
 	// PublicKey is what other members seal this account's content keys
 	// to. Empty until a device publishes one.
 	PublicKey string `json:"publicKey,omitempty"`
-	CreatedAt int64  `json:"createdAt"`
+	// ProfilePictureID is the current picture, absent when there is none.
+	// Fetched through a circle, an invite or a join request rather than
+	// from here: see Service.
+	ProfilePictureID string `json:"profilePictureId,omitempty"`
+	CreatedAt        int64  `json:"createdAt"`
 }
 
 type GetHandler struct{ Service *Service }
@@ -35,9 +39,10 @@ func (h *GetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // twice.
 func asResponse(profile accounts.Profile) profileResponse {
 	return profileResponse{
-		AccountID: profile.AccountID,
-		Name:      profile.Name,
-		PublicKey: base64.StdEncoding.EncodeToString(profile.PublicKey),
-		CreatedAt: profile.CreatedAt.UnixMilli(),
+		AccountID:        profile.AccountID,
+		Name:             profile.Name,
+		PublicKey:        base64.StdEncoding.EncodeToString(profile.PublicKey),
+		ProfilePictureID: profile.ProfilePictureID,
+		CreatedAt:        profile.CreatedAt.UnixMilli(),
 	}
 }

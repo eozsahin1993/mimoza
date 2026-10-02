@@ -29,12 +29,21 @@ type profiles interface {
 	GetProfiles(ctx context.Context, accountIDs []string) (map[string]accounts.Profile, error)
 }
 
-// Pending is one request with the person behind it. A name and no
-// picture: the asker holds no content key yet, so there is nothing they
-// could have sealed a face to.
+// bucket signs the requester's profile picture for the admin answering.
+type bucket interface {
+	DownloadURL(ctx context.Context, key string) (string, error)
+}
+
+// Pending is one request with the person behind it: a name, and the
+// picture on their account if they have one, already signed — an admin
+// opening the list is going to look at every row, so there is no "might
+// not need it" case worth a second round trip for, the way there is for
+// a roster a device may have most of cached already.
 type Pending struct {
 	circles.Request
-	Name string
+	Name              string
+	ProfilePictureID  string
+	ProfilePictureURL string
 }
 
 type Service struct {
@@ -44,6 +53,8 @@ type Service struct {
 	// Profiles names the requester, and holds the public key their copy
 	// of the content keys is sealed to.
 	Profiles profiles
+	// Blobs is nil in tests that do not care about bytes.
+	Blobs bucket
 	// Retention is how long an unanswered request lasts, matching the
 	// code that allowed it.
 	Retention time.Duration
@@ -139,12 +150,28 @@ func (s *Service) List(ctx context.Context, circleID, accountID string) ([]Pendi
 
 	pending := make([]Pending, 0, len(requests))
 	for _, request := range requests {
+		identity := identities[request.AccountID]
 		pending = append(pending, Pending{
-			Request: request,
-			Name:    identities[request.AccountID].Name,
+			Request:           request,
+			Name:              identity.Name,
+			ProfilePictureID:  identity.ProfilePictureID,
+			ProfilePictureURL: s.pictureURL(ctx, request.AccountID, identity.ProfilePictureID),
 		})
 	}
 	return pending, nil
+}
+
+// pictureURL signs a picture inline, or answers empty rather than erroring:
+// a missing or unsignable picture is not a reason to fail the whole list.
+func (s *Service) pictureURL(ctx context.Context, accountID, pictureID string) string {
+	if s.Blobs == nil || pictureID == "" {
+		return ""
+	}
+	url, err := s.Blobs.DownloadURL(ctx, accounts.ProfilePictureKey(accountID, pictureID))
+	if err != nil {
+		return ""
+	}
+	return url
 }
 
 // Approve admits the requester with every content key sealed to them by

@@ -89,8 +89,9 @@ func (s *Signer) Configured(ctx context.Context) bool {
 // SignedURL returns a URL for one blob key, valid for ttl.
 //
 // The signature covers the path and the expiry, so it can't be moved to
-// another object or replayed later. It says nothing about the bytes: they
-// are ciphertext the relay never sees.
+// another object or replayed later. It says nothing about the bytes:
+// they are ciphertext the relay never sees, except for a profile
+// picture, which is stored as uploaded (see accounts.ProfilePictureKey).
 func (s *Signer) SignedURL(ctx context.Context, key string, ttl time.Duration) (string, error) {
 	cfg, privateKey, err := s.load(ctx)
 	if err != nil {

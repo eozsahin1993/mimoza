@@ -6,14 +6,18 @@ import (
 	"testing"
 
 	"mimoza-relay/internal/accounts"
+	"mimoza-relay/internal/blobs"
 	"mimoza-relay/internal/circles"
 )
 
 type fakeStore struct {
-	profile   accounts.Profile
-	publicKey []byte
-	setErr    error
-	keyErr    error
+	profile    accounts.Profile
+	publicKey  []byte
+	setErr     error
+	keyErr     error
+	pictureErr error
+	// pictures is every id written, in order, "" for a clear.
+	pictures []string
 }
 
 func (f *fakeStore) GetProfile(context.Context, string) (accounts.Profile, error) {
@@ -36,15 +40,46 @@ func (f *fakeStore) SetPublicKey(_ context.Context, _ string, publicKey []byte) 
 	return nil
 }
 
+func (f *fakeStore) SetProfilePicture(_ context.Context, _, pictureID string) error {
+	if f.pictureErr != nil {
+		return f.pictureErr
+	}
+	f.pictures = append(f.pictures, pictureID)
+	f.profile.ProfilePictureID = pictureID
+	return nil
+}
+
 type fakeCircles struct {
 	waiting []string
 	err     error
 	calls   int
+	touched int
 }
 
 func (f *fakeCircles) MarkMembershipsNeedRewrap(context.Context, string) ([]string, error) {
 	f.calls++
 	return f.waiting, f.err
+}
+
+func (f *fakeCircles) TouchMemberships(context.Context, string) ([]string, error) {
+	f.touched++
+	return f.waiting, f.err
+}
+
+type fakeBucket struct {
+	key      string
+	maxBytes int64
+	deleted  []string
+}
+
+func (f *fakeBucket) UploadTarget(_ context.Context, key string, maxBytes int64) (blobs.UploadTarget, error) {
+	f.key, f.maxBytes = key, maxBytes
+	return blobs.UploadTarget{URL: "https://bucket.example/" + key}, nil
+}
+
+func (f *fakeBucket) Delete(_ context.Context, key string) error {
+	f.deleted = append(f.deleted, key)
+	return nil
 }
 
 // Setting a profile answers with the stored one rather than the request,

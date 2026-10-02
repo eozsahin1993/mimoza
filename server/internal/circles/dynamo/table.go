@@ -98,8 +98,6 @@ const (
 	AttrRole          = "role"
 	AttrNotifyLevel   = "notifyLevel"
 	AttrNeedsRewrap   = "needsRewrap"
-	AttrAvatarID      = "avatarId"
-	AttrAvatarVersion = "avatarKeyVersion"
 	AttrJoinedAt      = "joinedAt"
 	AttrKeys          = "keys"
 	AttrUpdatedAt     = "updatedAt"

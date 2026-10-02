@@ -39,6 +39,31 @@ func (s *Store) SetProfile(ctx context.Context, accountID, name string) error {
 	return err
 }
 
+// SetProfilePicture records which picture this account shows, or clears
+// it when pictureID is empty. The bytes are the caller's to have put in
+// the bucket first; this only says which id is current.
+func (s *Store) SetProfilePicture(ctx context.Context, accountID, pictureID string) error {
+	input := &dynamodb.UpdateItemInput{
+		TableName:           aws.String(s.Name),
+		Key:                 s.Key(dynamo.AccountPK(accountID), dynamo.ProfileSK),
+		ConditionExpression: aws.String("attribute_exists(pk)"),
+	}
+	if pictureID == "" {
+		input.UpdateExpression = aws.String("REMOVE " + dynamo.AttrProfilePictureID + ", " + dynamo.AttrProfilePictureAt)
+	} else {
+		input.UpdateExpression = aws.String("SET " + dynamo.AttrProfilePictureID + " = :id, " + dynamo.AttrProfilePictureAt + " = :now")
+		input.ExpressionAttributeValues = map[string]types.AttributeValue{
+			":id":  dynamoutil.Str(pictureID),
+			":now": dynamoutil.Millis(s.Now()),
+		}
+	}
+	_, err := s.Client.UpdateItem(ctx, input)
+	if dynamoutil.ConditionFailed(err) {
+		return accounts.ErrNotFound
+	}
+	return err
+}
+
 // SetPublicKey replaces the key members seal content keys to. Every copy
 // sealed to the old one is unreadable from here, which is what the
 // rewrap flow exists to repair.

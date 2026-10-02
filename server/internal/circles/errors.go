@@ -22,7 +22,11 @@ var (
 	ErrWouldEmptyAdmins = errors.New("circles: a circle cannot be left without an admin")
 	ErrInviteNotFound   = errors.New("circles: no such invite")
 	ErrRequestNotFound  = errors.New("circles: no such join request")
-	ErrBadCursor        = errors.New("circles: unreadable cursor")
+	// ErrPictureNotFound means the account has no profile picture, or not
+	// the one asked for: a device holding a stale id should hear "gone"
+	// rather than be handed a URL to bytes that are being retired.
+	ErrPictureNotFound = errors.New("circles: no such profile picture")
+	ErrBadCursor       = errors.New("circles: unreadable cursor")
 	// ErrNoPublicKey means the account asking to join has published no
 	// key to seal the circle's content keys to, so admitting it would
 	// admit someone who could not read a word of the circle.

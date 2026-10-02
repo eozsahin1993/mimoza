@@ -147,40 +147,6 @@ func (s *Store) SetRole(ctx context.Context, circleID, accountID, role, actorID,
 
 // SetNotifyLevel is the one membership field its owner changes, and the
 // only one that writes no activity: nobody else needs to know.
-// SetAvatar records which picture this member put in this circle, and
-// the key version it was sealed under. The roster version moves so the
-// member's other devices and everyone else refetch.
-func (s *Store) SetAvatar(ctx context.Context, circleID, accountID, avatarID string, keyVersion int64) error {
-	err := dynamo.WithRetry(func() error {
-		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-			TransactItems: []types.TransactWriteItem{
-				{Update: &types.Update{
-					TableName: aws.String(s.Name),
-					Key:       s.Key(dynamo.CirclePK(circleID), dynamo.MemberKey(accountID)),
-					UpdateExpression: aws.String("SET " + dynamo.AttrAvatarID + " = :avatar, " +
-						dynamo.AttrAvatarVersion + " = :version"),
-					ConditionExpression: aws.String("attribute_exists(sk)"),
-					ExpressionAttributeValues: map[string]types.AttributeValue{
-						":avatar":  dynamoutil.Str(avatarID),
-						":version": dynamoutil.Num(keyVersion),
-					},
-				}},
-				{Update: &types.Update{
-					TableName:                 aws.String(s.Name),
-					Key:                       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
-					UpdateExpression:          aws.String("ADD " + dynamo.AttrRosterVersion + " :one"),
-					ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamoutil.Num(1)},
-				}},
-			},
-		})
-		return err
-	})
-	if dynamoutil.CancelledFor(err, 0) == dynamoutil.ConditionalCheckFailed {
-		return circles.ErrNotMember
-	}
-	return err
-}
-
 func (s *Store) SetNotifyLevel(ctx context.Context, circleID, accountID, level string) error {
 	err := dynamo.WithRetry(func() error {
 		_, err := s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
@@ -539,6 +505,35 @@ func (s *Store) MarkMembershipsNeedRewrap(ctx context.Context, accountID string)
 						ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamoutil.Num(1)},
 					}},
 				},
+			})
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		circleIDs = append(circleIDs, membership.Circle.ID)
+	}
+	return circleIDs, nil
+}
+
+// TouchMemberships moves the roster version of every circle this account
+// is in, and nothing else. It is how a change on the account row — a new
+// picture — reaches devices that only refetch a roster when its version
+// moves. Returns the circles touched, so the caller can wake them.
+func (s *Store) TouchMemberships(ctx context.Context, accountID string) ([]string, error) {
+	memberships, err := s.ListMemberships(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	circleIDs := make([]string, 0, len(memberships))
+	for _, membership := range memberships {
+		err := dynamo.WithRetry(func() error {
+			_, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+				TableName:                 aws.String(s.Name),
+				Key:                       s.Key(dynamo.CirclePK(membership.Circle.ID), dynamo.MetaSK),
+				UpdateExpression:          aws.String("ADD " + dynamo.AttrRosterVersion + " :one"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{":one": dynamoutil.Num(1)},
 			})
 			return err
 		})

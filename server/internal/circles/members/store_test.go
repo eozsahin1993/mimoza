@@ -194,6 +194,61 @@ func TestStore_RewrapDoesNotDropAVersionAddedByAConcurrentKick(t *testing.T) {
 	}
 }
 
+// A changed picture lives on the account row, which no roster read
+// looks at: the roster version of every circle the account is in has to
+// move, and only that, or the other devices never refetch.
+func TestStore_TouchMembershipsBumpsEveryRosterVersion(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	circleStore, memberStore := circle.NewStore(table), members.NewStore(table)
+
+	admin := testsupport.UniqueAccountID(t)
+	first, second := testsupport.UniqueCircleID(t), testsupport.UniqueCircleID(t)
+	for _, circleID := range []string{first, second} {
+		if err := circleStore.CreateCircle(ctx, circles.Circle{
+			ID: circleID, Name: "test", KeyVersion: 1, RosterVersion: 1, CreatedBy: admin, CreatedAt: time.Now(),
+		}, circles.Member{AccountID: admin, Role: circles.RoleAdmin, NotifyLevel: circles.NotifyAll}, []byte("sealed")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	touched, err := memberStore.TouchMemberships(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(touched) != 2 {
+		t.Fatalf("expected both circles touched, got %v", touched)
+	}
+	for _, circleID := range []string{first, second} {
+		circle, err := circleStore.GetCircle(ctx, circleID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if circle.RosterVersion != 2 {
+			t.Errorf("%s: rosterVersion = %d, want 2", circleID, circle.RosterVersion)
+		}
+		if circle.KeyVersion != 1 {
+			t.Errorf("%s: keyVersion moved to %d; a picture is not a rotation", circleID, circle.KeyVersion)
+		}
+	}
+	member, err := memberStore.GetMember(ctx, first, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if member.NeedsRewrap {
+		t.Error("a picture must not flag the membership for a rewrap")
+	}
+
+	// Someone in no circle: nothing to touch, and not an error.
+	none, err := memberStore.TouchMemberships(ctx, admin+"-nobody")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(none) != 0 {
+		t.Errorf("expected nothing touched, got %v", none)
+	}
+}
+
 // The new key must cover every member staying behind — a leave that
 // forgets one would lock them out of everything posted after it.
 func TestStore_LeaveRefusesAnIncompleteKeySet(t *testing.T) {
