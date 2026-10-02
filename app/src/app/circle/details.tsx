@@ -22,7 +22,7 @@ import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { loadCircleDetails, type CircleDetails } from '@/features/circle/usecases/circle-details';
 import { getOrCreateInvite, replaceInvite } from '@/features/invite/usecases/invite-to-circle';
-import { leaveCircle } from '@/features/circle/usecases/leave-circle';
+import { departingSuccessor, leaveCircle } from '@/features/circle/usecases/leave-circle';
 import { removeMember } from '@/features/circle/usecases/remove-member';
 import { renameCircle } from '@/features/circle/usecases/rename-circle';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
@@ -273,23 +273,25 @@ export default function CircleDetailsScreen() {
 
   async function handleLeave() {
     if (!circleId) return;
+    const name = circle?.name;
     // Named rather than left as a surprise: leaving as the last admin
     // hands the circle to someone, and this is where that can be
     // cancelled and overridden with "Make admin" on someone else.
-    const name = circle?.name;
+    const successor = ownPublicKey ? departingSuccessor(members, ownPublicKey) : null;
+
+    const deleteTitle = name ? t('circle.details.deleteTitle', { name }) : t('circle.details.deleteTitleUnnamed');
+    const deleteMessage = name ? t('circle.details.deleteMessage', { name }) : t('circle.details.deleteMessageUnnamed');
+    const leaveTitle = name ? t('circle.details.leaveTitle', { name }) : t('circle.details.leaveTitleUnnamed');
+    let leaveMessage = t('circle.details.leaveMessage');
+    if (successor?.name) {
+      leaveMessage = t('circle.details.leaveMessageSuccessor', { name: successor.name });
+    } else if (successor) {
+      leaveMessage = t('circle.details.leaveMessageSuccessorUnnamed');
+    }
+
     showAlert(
-      lastMember
-        ? name
-          ? t('circle.details.deleteTitle', { name })
-          : t('circle.details.deleteTitleUnnamed')
-        : name
-          ? t('circle.details.leaveTitle', { name })
-          : t('circle.details.leaveTitleUnnamed'),
-      lastMember
-        ? name
-          ? t('circle.details.deleteMessage', { name })
-          : t('circle.details.deleteMessageUnnamed')
-        : t('circle.details.leaveMessage'),
+      lastMember ? deleteTitle : leaveTitle,
+      lastMember ? deleteMessage : leaveMessage,
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
