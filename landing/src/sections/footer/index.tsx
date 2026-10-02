@@ -13,7 +13,7 @@ export function Footer() {
         <a href="/privacy/">Privacy policy</a>
         <a href="mailto:hello@joinmimoza.com">Support</a>
       </span>
-      <span>© 2026 Mimoza</span>
+      <span>© 2026 RareKiwi Software LLC</span>
     </footer>
   );
 }
