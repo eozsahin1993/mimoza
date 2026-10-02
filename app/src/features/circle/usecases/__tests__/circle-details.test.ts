@@ -1,6 +1,6 @@
 jest.mock('@/features/invite/services/invite-relay', () => ({ listInvites: jest.fn() }));
 
-import { applyCircle, applyRoster, initDatabase, saveProfile } from '@/data/db';
+import { applyCircle, applyRoster, initDatabase, saveLocalAccount, storeProfilePicture } from '@/data/db';
 import { loadCircleDetails } from '@/features/circle/usecases/circle-details';
 import { generateUUID } from '@/core/crypto/primitives';
 import { listInvites } from '@/features/invite/services/invite-relay';
@@ -10,7 +10,7 @@ const ACCOUNT_ID = 'account-1';
 
 beforeAll(async () => {
   await initDatabase();
-  await saveProfile({ accountId: ACCOUNT_ID, name: 'Founder', deviceId: 'device-1', createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: ACCOUNT_ID, name: 'Founder', deviceId: 'device-1', createdAt: 1, updatedAt: 1 });
 });
 
 beforeEach(() => {
@@ -77,6 +77,19 @@ test('a failed invite read is swallowed rather than failing the whole screen', a
   const circleId = await makeCircle('admin');
 
   expect((await loadCircleDetails(circleId)).invite).toBeNull();
+});
+
+// A member's picture is resolved through member-pictures.ts, keyed by
+// account id rather than carried on the roster row itself — this is the
+// one place that wiring is exercised end to end against a real circle.
+test("a member's fetched picture resolves into avatarByAccount", async () => {
+  const circleId = await makeCircle('admin');
+  await storeProfilePicture('account-2', 'pic-1', new Uint8Array([1, 2, 3]));
+
+  const details = await loadCircleDetails(circleId);
+
+  expect(details.avatarByAccount.get('account-2')).toMatch(/^file:\/\//);
+  expect(details.avatarByAccount.has(ACCOUNT_ID)).toBe(false);
 });
 
 test('returns an empty shape for a circle this device does not have', async () => {

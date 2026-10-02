@@ -1,4 +1,4 @@
-import { applyRoster, getProfile } from '@/data/db';
+import { applyRoster, getLocalAccount } from '@/data/db';
 import { addCircleKeyVersion } from '@/core/services/keystore/circle-keys';
 import { generateContentKey } from '@/features/circle/crypto';
 import { getRoster, removeMember as removeOnRelay } from '@/features/circle/services/circle-relay';
@@ -13,7 +13,7 @@ import { sealForEach } from '@/features/circle/usecases/key-exchange';
  * makes two admins removing at once safe — the loser refetches.
  */
 export async function removeMember(circleId: string, accountId: string): Promise<void> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
 
   const roster = await getRoster(circleId);
@@ -31,8 +31,7 @@ export async function removeMember(circleId: string, accountId: string): Promise
       circleId,
       accountId: member.accountId,
       name: member.name ?? '',
-      avatarId: member.avatarId ?? null,
-      avatarKeyVersion: member.avatarKeyVersion ?? null,
+      profilePictureId: member.profilePictureId ?? null,
       publicKey: member.publicKey ?? '',
       role: member.role,
       joinedAt: member.joinedAt,

@@ -2,8 +2,8 @@ jest.mock('@/features/push-notifications/services/device-relay');
 jest.mock('@/features/push-notifications/services/tokens');
 jest.mock('@/core/services/settings');
 
-import { initDatabase, saveProfile } from '@/data/db';
-import { forgetProfile } from '@/data/db/profile';
+import { initDatabase, saveLocalAccount } from '@/data/db';
+import { forgetLocalAccount } from '@/data/db/local-account';
 import { registerDevice, unregisterDevice } from '@/features/push-notifications/services/device-relay';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 import { registerThisDevice, unregisterThisDevice } from '@/features/push-notifications/services/register-device';
@@ -19,7 +19,7 @@ beforeAll(async () => {
 // suite has no need for — see data/db/__tests__/profile.test.ts.
 beforeEach(async () => {
   jest.clearAllMocks();
-  await forgetProfile('account-1');
+  await forgetLocalAccount('account-1');
   (getAppSettings as jest.Mock).mockResolvedValue({ language: 'system' });
   (registerDevice as jest.Mock).mockResolvedValue(undefined);
   (unregisterDevice as jest.Mock).mockResolvedValue(undefined);
@@ -35,7 +35,7 @@ test('does nothing without a device id', async () => {
 });
 
 test('does nothing without permission, even with a device id', async () => {
-  await saveProfile({ accountId: 'account-1', deviceId: 'device-1', name: '', picture: null, createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: 'account-1', deviceId: 'device-1', name: '', createdAt: 1, updatedAt: 1 });
   (getDevicePushToken as jest.Mock).mockResolvedValue(null);
 
   await registerThisDevice();
@@ -44,7 +44,7 @@ test('does nothing without permission, even with a device id', async () => {
 });
 
 test('registers under the stored device id, with the platform token and app language', async () => {
-  await saveProfile({ accountId: 'account-1', deviceId: 'device-1', name: '', picture: null, createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: 'account-1', deviceId: 'device-1', name: '', createdAt: 1, updatedAt: 1 });
   (getDevicePushToken as jest.Mock).mockResolvedValue(device);
   (getAppSettings as jest.Mock).mockResolvedValue({ language: 'tr' });
 
@@ -55,7 +55,7 @@ test('registers under the stored device id, with the platform token and app lang
 
 /** Following the device's own language: nothing pinned, so the relay's own default applies. */
 test('omits the locale while following the system language', async () => {
-  await saveProfile({ accountId: 'account-1', deviceId: 'device-1', name: '', picture: null, createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: 'account-1', deviceId: 'device-1', name: '', createdAt: 1, updatedAt: 1 });
   (getDevicePushToken as jest.Mock).mockResolvedValue(device);
   (getAppSettings as jest.Mock).mockResolvedValue({ language: 'system' });
 
@@ -66,7 +66,7 @@ test('omits the locale while following the system language', async () => {
 
 /** A relay failure must never throw into the caller — see register-device.ts. */
 test('a failed registration is swallowed', async () => {
-  await saveProfile({ accountId: 'account-1', deviceId: 'device-1', name: '', picture: null, createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: 'account-1', deviceId: 'device-1', name: '', createdAt: 1, updatedAt: 1 });
   (getDevicePushToken as jest.Mock).mockResolvedValue(device);
   (registerDevice as jest.Mock).mockRejectedValue(new Error('offline'));
 
@@ -74,7 +74,7 @@ test('a failed registration is swallowed', async () => {
 });
 
 test('unregisters under the stored device id', async () => {
-  await saveProfile({ accountId: 'account-1', deviceId: 'device-1', name: '', picture: null, createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: 'account-1', deviceId: 'device-1', name: '', createdAt: 1, updatedAt: 1 });
 
   await unregisterThisDevice();
 

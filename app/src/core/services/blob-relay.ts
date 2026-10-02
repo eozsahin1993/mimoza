@@ -5,9 +5,11 @@ import { authorizedFetch, describeError, reachableFromThisDevice } from '@/core/
 import { BlobAlreadyExistsError, NetworkUnreachableError, RateLimitedError } from '@/core/services/relay-errors';
 
 /**
- * Encrypted bytes: photos, covers and member pictures. Shared by every
- * feature that has some, because one queue and one backoff serve all
- * three.
+ * Photos, covers and profile pictures. Shared by every feature that has
+ * some, because one queue and one backoff serve all three — though not
+ * all are encrypted: a post or a cover is ciphertext the relay cannot
+ * read, but a profile picture is stored as uploaded (see docs/RELAY_DESIGN.md).
+ * This module only ever moves bytes; what they mean is the caller's.
  *
  * Every key is written once and never overwritten — a changed cover or
  * picture is a new id — so the edge caches them indefinitely. The relay
@@ -24,9 +26,8 @@ export type UploadTarget = {
 export const BlobPaths = {
   photo: (postId: string) => postId,
   cover: (coverId: string) => `cover/${coverId}`,
-  /** Uploading an avatar names only the picture; the relay stamps whose it is. */
-  uploadAvatar: (avatarId: string) => `avatar/${avatarId}`,
-  avatar: (accountId: string, avatarId: string) => `avatar/${accountId}/${avatarId}`,
+  /** A member's current profile picture, signed for anyone who shares a circle with them. */
+  picture: (accountId: string, pictureId: string) => `picture/${accountId}/${pictureId}`,
 };
 
 /**
@@ -42,6 +43,42 @@ export async function getUploadTarget(circleId: string, path: string): Promise<U
   return (await response.json()) as UploadTarget;
 }
 
+/** The same thing, for the one blob that is not under a circle: this account's own picture. */
+export async function getProfilePictureUploadTarget(pictureId: string): Promise<UploadTarget> {
+  const response = await authorizedFetch(`/v1/account/picture/${pictureId}/upload-target`, { method: 'POST' });
+  if (response.status === 409) throw new BlobAlreadyExistsError();
+  if (response.status === 429) throw new RateLimitedError();
+  if (!response.ok) throw new Error(await describeError(response, 'getting an upload target'));
+  return (await response.json()) as UploadTarget;
+}
+
+/**
+ * The bytes behind a signed URL — the second half of `getBlob`, broken
+ * out for the two responses that already carry a signed URL inline (an
+ * invite preview, a pending join request) and so never need the first
+ * half, a relay round trip just to ask for one.
+ */
+async function downloadSigned(url: string): Promise<Uint8Array | null> {
+  const bytes = await fetch(reachableFromThisDevice(url)).catch(() => {
+    throw new NetworkUnreachableError();
+  });
+  if (bytes.status === 404) return null;
+  if (!bytes.ok) throw new Error(`Failed to download a blob: ${bytes.status}`);
+  return new Uint8Array(await bytes.arrayBuffer());
+}
+
+/**
+ * The bytes behind an already-signed URL — an invite preview and a
+ * pending request both carry one inline, since whoever fetches either is
+ * going to look at the picture right there; see downloadSigned's doc
+ * comment. Never cache or persist this URL: it is good for an hour, and
+ * is only ever meant to be used immediately after the call that handed
+ * it over, not stored for a later, possibly much later, retry.
+ */
+export async function getBlobFromSignedUrl(url: string): Promise<Uint8Array | null> {
+  return downloadSigned(url);
+}
+
 /**
  * The bytes, through the signed URL the relay hands back. Null when
  * nothing was ever uploaded there, which is ordinary — a circle with no
@@ -54,12 +91,7 @@ export async function getBlob(circleId: string, path: string): Promise<Uint8Arra
   if (!response.ok) throw new Error(await describeError(response, 'reading a blob'));
 
   const { url } = (await response.json()) as { url: string };
-  const bytes = await fetch(reachableFromThisDevice(url)).catch(() => {
-    throw new NetworkUnreachableError();
-  });
-  if (bytes.status === 404) return null;
-  if (!bytes.ok) throw new Error(`Failed to download a blob: ${bytes.status}`);
-  return new Uint8Array(await bytes.arrayBuffer());
+  return downloadSigned(url);
 }
 
 /** Straight to storage through the presigned target, never through the relay. */

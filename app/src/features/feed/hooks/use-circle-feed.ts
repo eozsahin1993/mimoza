@@ -181,6 +181,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     patchPost,
     posts: feed?.posts ?? [],
     profile: meta?.profile ?? null,
+    selfPhotoUri: meta?.selfPhotoUri,
     ownPublicKey: meta?.ownPublicKey ?? null,
     ownIsAdmin: meta?.ownIsAdmin ?? false,
     language,

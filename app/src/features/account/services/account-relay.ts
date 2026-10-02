@@ -2,18 +2,17 @@ import { DeviceLinkAnsweredError, DeviceLinkGoneError } from '@/core/services/re
 import { authorizedFetch, describeError } from '@/core/services/relay';
 
 /**
- * The account itself: the profile every circle shows, and the public key
- * members seal content keys to.
- *
- * A picture is not here. It is circle content, sealed to a circle's key
- * and set on the membership — see circles-relay. Devices are push's, in
- * features/push-notifications.
+ * The account itself: the profile every circle shows, the picture beside
+ * it, and the public key members seal content keys to. Devices are
+ * push's, in features/push-notifications.
  */
 
 export type Profile = {
   accountId: string;
   name: string;
   publicKey?: string;
+  /** This account's current picture id, absent when it has none. */
+  profilePictureId?: string;
   createdAt: number;
 };
 
@@ -30,6 +29,24 @@ export async function setName(name: string): Promise<Profile> {
     body: JSON.stringify({ name }),
   });
   if (!response.ok) throw new Error(await describeError(response, 'saving the profile'));
+  return (await response.json()) as Profile;
+}
+
+/** Says which already-uploaded picture is now this account's. */
+export async function setPicture(pictureId: string): Promise<Profile> {
+  const response = await authorizedFetch('/v1/account/picture', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pictureId }),
+  });
+  if (!response.ok) throw new Error(await describeError(response, 'setting the picture'));
+  return (await response.json()) as Profile;
+}
+
+/** Takes the picture away again. */
+export async function clearPicture(): Promise<Profile> {
+  const response = await authorizedFetch('/v1/account/picture', { method: 'DELETE' });
+  if (!response.ok) throw new Error(await describeError(response, 'removing the picture'));
   return (await response.json()) as Profile;
 }
 

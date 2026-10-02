@@ -11,7 +11,7 @@ import {
   queueComment,
   queuePost,
   queueReactionChange,
-  saveProfile,
+  saveLocalAccount,
 } from '@/data/db';
 import { openContent, sealContent } from '@/core/crypto/content';
 import { decrypt } from '@/core/crypto/primitives';
@@ -70,7 +70,7 @@ function answer(postId: string, overrides: Partial<Entry> = {}): Entry {
 
 beforeAll(async () => {
   await initDatabase();
-  await saveProfile({ accountId: ACCOUNT, name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+  await saveLocalAccount({ accountId: ACCOUNT, name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
 });
 
 beforeEach(() => {

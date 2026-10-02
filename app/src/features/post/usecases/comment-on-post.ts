@@ -1,4 +1,4 @@
-import { getProfile, queueComment, queueCommentDeletion } from '@/data/db';
+import { getLocalAccount, queueComment, queueCommentDeletion } from '@/data/db';
 import { generateUUID } from '@/core/crypto/primitives';
 import { logEvent } from '@/core/services/analytics';
 import { drainOutbox } from '@/core/sync/drain-outbox';
@@ -9,7 +9,7 @@ import { drainOutbox } from '@/core/sync/drain-outbox';
  * until the write lands and replaces both.
  */
 export async function commentOnPost(circleId: string, postId: string, body: string): Promise<string> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
 
   const commentId = generateUUID();

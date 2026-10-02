@@ -1,12 +1,12 @@
 import { initDatabase } from '@/data/db';
-import { applyCircle } from '@/data/db/circles';
+import { applyCircle, markCircleLeft } from '@/data/db/circles';
 import {
   applyRoster,
+  findCircleSharedWith,
   getMember,
   listEveryMemberSeen,
   listMembers,
   rememberDepartedMember,
-  setMemberAvatar,
   setMemberRole,
 } from '@/data/db/members';
 
@@ -105,16 +105,62 @@ test('a departed account can be remembered by name alone', async () => {
   expect(await listMembers(circle)).toHaveLength(0);
 });
 
-// A picture is circle content, so it is recorded per membership.
-test('a picture belongs to a membership', async () => {
+// A profile picture is account-level now, so it rides straight in on the
+// roster row rather than being set through a dedicated call.
+test('a profile picture id arrives with the roster', async () => {
+  const circle = circleId();
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1', { profilePictureId: 'pic-1' })], NOW);
+
+  expect((await getMember(circle, 'acc-1'))?.profilePictureId).toBe('pic-1');
+});
+
+// Absent on the relay's own roster member reads back null, not
+// undefined — callers branch on `!profilePictureId` to skip resolving one.
+test('no profilePictureId on the roster reads back null, not undefined', async () => {
   const circle = circleId();
   await seedCircle(circle);
   await applyRoster(circle, [member('acc-1')], NOW);
-  await setMemberAvatar(circle, 'acc-1', 'hash-1', 2);
 
-  const row = await getMember(circle, 'acc-1');
-  expect(row?.avatarId).toBe('hash-1');
-  expect(row?.avatarKeyVersion).toBe(2);
+  expect((await getMember(circle, 'acc-1'))?.profilePictureId).toBeNull();
+});
+
+// What the picture queue needs to address a download: any live circle
+// this device shares with that account, regardless of which one.
+//
+// The account id is unique per test here, not the file's usual 'acc-1'/
+// 'acc-2' — findCircleSharedWith has no circleId to scope by, so two
+// tests reusing the same account id would see each other's circles.
+test('findCircleSharedWith finds a live circle the account belongs to', async () => {
+  const circle = circleId();
+  const friend = `friend-${circle}`;
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1'), member(friend)], NOW);
+
+  expect(await findCircleSharedWith(friend)).toBe(circle);
+});
+
+test('findCircleSharedWith is null once the account has left every circle', async () => {
+  const circle = circleId();
+  const friend = `friend-${circle}`;
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1'), member(friend)], NOW);
+  await applyRoster(circle, [member('acc-1')], NOW + 100);
+
+  expect(await findCircleSharedWith(friend)).toBeNull();
+});
+
+// This device having left the circle itself is just as disqualifying as
+// the other account having left it — either way there is no route left
+// to address a download through.
+test('findCircleSharedWith is null once this device has left the circle', async () => {
+  const circle = circleId();
+  const friend = `friend-${circle}`;
+  await seedCircle(circle);
+  await applyRoster(circle, [member('acc-1'), member(friend)], NOW);
+  await markCircleLeft(circle, NOW + 100);
+
+  expect(await findCircleSharedWith(friend)).toBeNull();
 });
 
 // applyRoster takes its argument as the whole roster, so promoting

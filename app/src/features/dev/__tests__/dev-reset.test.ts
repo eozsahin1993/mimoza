@@ -1,6 +1,6 @@
 jest.mock('@/data/db', () => ({
   getAllCircleIds: jest.fn(async () => ['c1', 'c2']),
-  getProfile: jest.fn(async () => ({ accountId: 'acc-1', name: 'Ali', deviceId: 'phone', createdAt: 0, updatedAt: 0 })),
+  getLocalAccount: jest.fn(async () => ({ accountId: 'acc-1', name: 'Ali', deviceId: 'phone', createdAt: 0, updatedAt: 0 })),
   resetAllLocalData: jest.fn(async () => undefined),
   resetDatabaseSchema: jest.fn(async () => undefined),
 }));
@@ -10,7 +10,7 @@ jest.mock('@/core/services/keystore/account-keypair', () => ({ forgetAccountKeyp
 jest.mock('@/core/services/keystore/auth-token', () => ({ deleteAuthToken: jest.fn(async () => undefined) }));
 jest.mock('@/core/photo/photo-cache', () => ({ deleteCirclePhotoFiles: jest.fn() }));
 
-import { getAllCircleIds, getProfile, resetAllLocalData } from '@/data/db';
+import { getAllCircleIds, getLocalAccount, resetAllLocalData } from '@/data/db';
 import { forgetAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
@@ -36,7 +36,7 @@ describe('resetLocalDataForTesting', () => {
   });
 
   test('with no local profile yet, there is nothing to forget', async () => {
-    (getProfile as jest.Mock).mockResolvedValue(null);
+    (getLocalAccount as jest.Mock).mockResolvedValue(null);
 
     await resetLocalDataForTesting();
 
@@ -45,11 +45,11 @@ describe('resetLocalDataForTesting', () => {
 
   // The __DEV__ menu's whole reason to exist is recovering a device whose
   // local schema is broken or behind — including the migration-index trap
-  // AGENTS.md describes, where a stale device_profile means the table
+  // AGENTS.md describes, where a stale local_account means the table
   // genuinely does not exist yet. Reading it must not be what stops the
   // one action meant to fix that.
   test('a broken local schema does not stop the reset from completing', async () => {
-    (getProfile as jest.Mock).mockRejectedValue(new Error('no such table: device_profile'));
+    (getLocalAccount as jest.Mock).mockRejectedValue(new Error('no such table: local_account'));
 
     await expect(resetLocalDataForTesting()).resolves.toBeUndefined();
 

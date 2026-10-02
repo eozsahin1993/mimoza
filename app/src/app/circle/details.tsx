@@ -91,15 +91,17 @@ export default function CircleDetailsScreen() {
     setCoverUri(await resolveCircleCoverUri(circleId));
   }, [circleId]);
 
-  // A cover or a member's avatar landing while this screen is open
-  // patches just that piece, rather than waiting for the next focus.
+  // A cover or a member's picture landing while this screen is open
+  // patches just that piece, rather than waiting for the next focus. Not
+  // circle-scoped the way a cover is — one picture, shown wherever that
+  // account appears — so there is no circleId to check against.
   useEffect(() => {
     if (!circleId) return;
     return onPhotoFetched((event) => {
-      if (event.circleId !== circleId) return;
       if (event.kind === 'cover') {
+        if (event.circleId !== circleId) return;
         resolveCircleCoverUri(circleId).then(setCoverUri).catch((err) => console.error('Failed to refresh the cover', err));
-      } else if (event.kind === 'avatar') {
+      } else if (event.kind === 'profilePicture') {
         setDetails((current) =>
           current ? { ...current, avatarByAccount: new Map(current.avatarByAccount).set(event.accountId, event.uri) } : current,
         );

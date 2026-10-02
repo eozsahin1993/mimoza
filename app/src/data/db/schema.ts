@@ -55,12 +55,12 @@ export const circleMembers = sqliteTable(
     accountId: text('account_id').notNull(),
     name: text('name').notNull().default(''),
     /**
-     * This member's picture in this circle, and the content key version
-     * it was sealed under. A picture is circle content, so the same
-     * person has a different one per circle; bytes live in attachments.
+     * The account's current profile picture id, the same wherever this
+     * account is a member — not circle content like the old avatar was.
+     * Bytes live in the profilePictures table, keyed by account, not by
+     * circle.
      */
-    avatarId: text('avatar_id'),
-    avatarKeyVersion: integer('avatar_key_version'),
+    profilePictureId: text('profile_picture_id'),
     /** X25519, what this member's copy of a content key is sealed to. */
     publicKey: text('public_key').notNull().default(''),
     role: text('role').notNull().default('member'),
@@ -154,7 +154,9 @@ export const posts = sqliteTable(
  * has arrived, and what to do if it has not.
  *
  * Keyed the way the relay addresses it, so one queue and one backoff
- * serve post photos, covers and member pictures alike.
+ * serve post photos and covers alike. Profile pictures are not E2EE and
+ * are not circle content, so they live in their own profilePictures
+ * table instead, keyed by account rather than by circle and entry.
  */
 export const attachments = sqliteTable(
   'attachments',
@@ -162,10 +164,7 @@ export const attachments = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    /**
-     * The rest of the relay's key after the circle: a post's id, or
-     * `cover/<coverId>`, or `avatar/<accountId>/<avatarId>`.
-     */
+    /** The rest of the relay's key after the circle: a post's id, or `cover/<coverId>`. */
     entryId: text('entry_id').notNull(),
     kind: text('kind').notNull(),
     bytes: blob('bytes').$type<Uint8Array>(),
@@ -268,19 +267,39 @@ export const outbox = sqliteTable(
   (t) => [index('outbox_circle_status').on(t.circleId, t.status)]
 );
 
-/** This device and the account behind it. One row. */
-export const deviceProfile = sqliteTable('device_profile', {
+/**
+ * This device's own sign-in state: which account, a locally cached name,
+ * and the id this device registers push notifications under. Nothing
+ * about a picture lives here any more — that's profilePictures, looked
+ * up by this same accountId, the same way any other account's is.
+ */
+export const localAccount = sqliteTable('local_account', {
   accountId: text('account_id').primaryKey(),
   name: text('name').notNull().default(''),
-  /**
-   * The original picture, kept locally so it can be sealed again for
-   * each circle. There is no account-level avatar on the relay: a
-   * picture is circle content, sealed to that circle's key.
-   */
-  picture: blob('picture').$type<Uint8Array>(),
   deviceId: text('device_id').notNull().default(''),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
+});
+
+/**
+ * One row per account whose picture this device has ever needed to
+ * show: any circle member, past or present, plus whoever sent an invite
+ * or asked to join one. Keyed by account rather than by circle — unlike
+ * attachments, a profile picture is the same object wherever it is seen,
+ * so one cached copy serves every circle at once.
+ *
+ * A changed pictureId replaces the row's id and clears bytes back to
+ * pending; it is never a second row, since only the current picture is
+ * worth holding onto.
+ */
+export const profilePictures = sqliteTable('profile_pictures', {
+  accountId: text('account_id').primaryKey(),
+  pictureId: text('picture_id').notNull(),
+  bytes: blob('bytes').$type<Uint8Array>(),
+  status: text('status').notNull().default('pending'),
+  fetchAttempts: integer('fetch_attempts').notNull().default(0),
+  nextAttemptAt: integer('next_attempt_at'),
+  createdAt: integer('created_at').notNull(),
 });
 
 /** Asks to join, until the relay answers them. */

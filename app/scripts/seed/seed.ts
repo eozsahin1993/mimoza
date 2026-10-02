@@ -28,7 +28,7 @@ import { encrypt, generateEphemeralKeypair, hashBytes, openSealedBox, sealToPubl
 import { fromWire, openContent, sealContent, toWire } from '@/core/crypto/content';
 import { reactionTag, reactionTagKey } from '@/core/crypto/reaction-tags';
 import { generateContentKey } from '@/features/circle/crypto';
-import { BlobPaths, getUploadTarget } from '@/core/services/blob-relay';
+import { BlobPaths, getProfilePictureUploadTarget, getUploadTarget } from '@/core/services/blob-relay';
 import { asAccount, configureRelay } from '@/core/services/relay';
 import * as accountRelay from '@/features/account/services/account-relay';
 import * as circleRelay from '@/features/circle/services/circle-relay';
@@ -115,18 +115,17 @@ async function bootstrapPerson(id: string, name: string, avatar: string): Promis
   await asAccount(token, async () => {
     await accountRelay.setName(name);
     await accountRelay.publishPublicKey(toWire(keypair.publicKey));
+
+    // One account-level picture, set once here rather than per circle:
+    // there is no content key to seal it under any more, and every
+    // circle this person later joins or founds shows the same one.
+    const photo = await fetchPhoto(avatar);
+    const pictureId = randomUUID();
+    const target = await getProfilePictureUploadTarget(pictureId);
+    await uploadToPresignedTarget(target, photo);
+    await accountRelay.setPicture(pictureId);
   });
   return { id, name, avatar, token, accountId, keypair };
-}
-
-async function setAvatar(circleId: string, person: Seeded, contentKey: Uint8Array): Promise<void> {
-  const photo = await fetchPhoto(person.avatar);
-  const avatarId = randomUUID();
-  await asAccount(person.token, async () => {
-    const target = await getUploadTarget(circleId, BlobPaths.uploadAvatar(avatarId));
-    await uploadToPresignedTarget(target, encrypt(photo, contentKey));
-    await circleRelay.patchMembership(circleId, person.accountId, { avatarId, keyVersion: KEY_VERSION });
-  });
 }
 
 /**
@@ -175,7 +174,6 @@ async function seedCircle(fixture: Fixture['circles'][number], people: Map<strin
     await uploadToPresignedTarget(target, encrypt(cover, contentKey));
     await circleRelay.setCover(circleId, coverId, KEY_VERSION);
   });
-  await setAvatar(circleId, founder, contentKey);
 
   // Minted on real time, not the shifted clock: the invite's expiry is
   // read against the real clock, and this same code is what you join by.
@@ -196,7 +194,6 @@ async function seedCircle(fixture: Fixture['circles'][number], people: Map<strin
         const sealed = { [String(KEY_VERSION)]: toWire(sealToPublicKey(contentKey, fromWire(request.publicKey))) };
         await inviteRelay.approveRequest(circleId, request.requestId, sealed);
       });
-      await setAvatar(circleId, member, contentKey);
     });
   }
 

@@ -17,8 +17,9 @@ test('applies every real migration in one pass', async () => {
       'post_comments',
       'post_reactions',
       'outbox',
-      'device_profile',
+      'local_account',
       'pending_requests',
+      'profile_pictures',
       '__migrations',
     ])
   );
@@ -44,4 +45,18 @@ test('applies every real migration in one pass', async () => {
   expect(circleColumns.map((column) => column.name)).toEqual(
     expect.arrayContaining(['posts_forward_cursor', 'posts_backward_cursor', 'activity_cursor', 'needs_rewrap'])
   );
+
+  // The old per-circle avatar columns are gone; the roster's own copy of
+  // the account-level picture id replaced them.
+  const memberColumns = await db.all<{ name: string }>(sql`PRAGMA table_info(circle_members)`);
+  const memberColumnNames = memberColumns.map((column) => column.name);
+  expect(memberColumnNames).toEqual(expect.arrayContaining(['profile_picture_id']));
+  expect(memberColumnNames).not.toEqual(expect.arrayContaining(['avatar_id', 'avatar_key_version']));
+
+  // local_account (formerly device_profile) is sign-in/device state only
+  // now — nothing picture-shaped is left on it, that's profilePictures'.
+  const localAccountColumns = await db.all<{ name: string }>(sql`PRAGMA table_info(local_account)`);
+  const localAccountColumnNames = localAccountColumns.map((column) => column.name);
+  expect(localAccountColumnNames).toEqual(expect.arrayContaining(['account_id', 'name', 'device_id']));
+  expect(localAccountColumnNames).not.toEqual(expect.arrayContaining(['picture', 'profile_picture_id']));
 });

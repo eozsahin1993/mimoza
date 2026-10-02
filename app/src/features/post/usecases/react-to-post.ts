@@ -1,4 +1,4 @@
-import { getProfile, listReactors, queueReactionChange, summarise, type ReactionSummary } from '@/data/db';
+import { getLocalAccount, listReactors, queueReactionChange, summarise, type ReactionSummary } from '@/data/db';
 import { reactionTag, reactionTagKey } from '@/core/crypto/reaction-tags';
 import { logEvent } from '@/core/services/analytics';
 import { getCircleKeyMap, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
@@ -14,7 +14,7 @@ import { drainOutbox } from '@/core/sync/drain-outbox';
  * anyway, which is what the drain sends.
  */
 export async function toggleReaction(circleId: string, postId: string, emoji: string): Promise<void> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
   const current = await getCurrentContentKey(circleId);
   if (!current) throw new Error('No content key on this device.');
@@ -55,7 +55,7 @@ async function holds(postId: string, accountId: string, emoji: string): Promise<
 
 /** What the card shows: the relay's counts, adjusted by whatever is still queued. */
 export async function getReactions(postId: string): Promise<ReactionSummary> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile) return { counts: {}, total: 0, iReacted: false };
   return summarise(postId, profile.accountId);
 }

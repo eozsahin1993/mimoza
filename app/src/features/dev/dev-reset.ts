@@ -1,4 +1,4 @@
-import { getAllCircleIds, getProfile, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
+import { getAllCircleIds, getLocalAccount, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
 import { clearOwnColorSeedCache } from '@/ui/theme/hooks/use-own-color-seed';
 import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
 import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
@@ -25,10 +25,10 @@ export async function resetLocalDataForTesting(): Promise<void> {
   // needs to happen first, or not at all if this device never got as
   // far as profile setup. Also tolerates the read itself failing: this
   // is the __DEV__ menu's escape hatch for a local schema stuck behind a
-  // migration-index collision (see AGENTS.md), where device_profile can
+  // migration-index collision (see AGENTS.md), where local_account can
   // genuinely not exist yet — the one action meant to recover from that
   // must not be what a broken schema blocks.
-  const profile = await getProfile().catch(() => null);
+  const profile = await getLocalAccount().catch(() => null);
   const circleIds = await getAllCircleIds();
   for (const circleId of circleIds) {
     await deleteCircleKeys(circleId);

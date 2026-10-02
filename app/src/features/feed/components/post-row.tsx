@@ -7,13 +7,12 @@ import { missingPhotoFor } from '@/ui/components/photo-placeholder';
 import { PostCard, type Post, type Reaction } from '@/features/post/components/post-card';
 import { Spacing } from '@/ui/theme/tokens';
 import { showError } from '@/core/services/messages';
-import type { CommentWithAuthor, Profile } from '@/data/db';
+import type { CommentWithAuthor, LocalAccount } from '@/data/db';
 import { getComments } from '@/data/db';
 import type { FeedPostView } from '@/features/feed/usecases/circle-feed';
 import { commentOnPost } from '@/features/post/usecases/comment-on-post';
 import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
-import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative, formatTimestamp } from '@/core/utils/time';
 import { i18n } from '@/core/i18n/i18n';
 import type { LanguageCode } from '@/core/i18n/languages';
@@ -28,8 +27,10 @@ export type PostRowsInput = {
   /** Applies a change to one post, in place, without re-reading the feed. */
   patchPost: (postId: string, change: Partial<FeedPostView>) => void;
   posts: FeedPostView[];
-  /** This device's own profile — the fallback for a post whose author has no roster row yet. */
-  profile: Profile | null;
+  /** This device's own profile — the name fallback for a post whose author has no roster row yet. */
+  profile: LocalAccount | null;
+  /** This device's own current picture, for the composer avatar beside the comment box. */
+  selfPhotoUri?: string;
   /** The reader's own account id, and whether they may re-file any photo — see set-album-visibility.ts. */
   ownPublicKey: string | null;
   ownIsAdmin: boolean;
@@ -58,6 +59,7 @@ export function usePostRows({
   patchPost,
   posts,
   profile,
+  selfPhotoUri,
   ownPublicKey,
   ownIsAdmin,
   language,
@@ -110,16 +112,17 @@ export function usePostRows({
   return useMemo(
     () => ({
       rows: posts.map((view) =>
-        postRow(view, profile, actions, ownIsAdmin || view.post.authorId === ownPublicKey, language),
+        postRow(view, profile, selfPhotoUri, actions, ownIsAdmin || view.post.authorId === ownPublicKey, language),
       ),
     }),
-    [posts, profile, actions, ownPublicKey, ownIsAdmin, language],
+    [posts, profile, selfPhotoUri, actions, ownPublicKey, ownIsAdmin, language],
   );
 }
 
 function postRow(
   view: FeedPostView,
-  profile: Profile | null,
+  profile: LocalAccount | null,
+  selfPhotoUri: string | undefined,
   actions: PostRowActions,
   canEditAlbum: boolean,
   language: LanguageCode,
@@ -134,7 +137,7 @@ function postRow(
     render: () => (
       <PostCard
         post={post}
-        selfPhotoUri={pictureUri(profile?.picture)}
+        selfPhotoUri={selfPhotoUri}
         selfName={profile?.name}
         onToggleReaction={(emoji) => actions.onToggleReaction(post.id, emoji)}
         onAddComment={(body) => actions.onAddComment(post.id, body)}
@@ -147,33 +150,26 @@ function postRow(
   };
 }
 
-/** `bytesToDataUri` is memoized by the bytes' own identity, and a rebuild leaves every untouched post's picture the same array — so this hits on all but the first pass after a reload. */
-function pictureUri(picture: Uint8Array | null | undefined): string | undefined {
-  return picture ? bytesToDataUri(picture) : undefined;
-}
-
 /** The relay's counts, adjusted by what's queued, into the shape PostCard already renders. */
 function toReactions(summary: FeedPostView['reactions']): Reaction[] {
   return Object.entries(summary.counts).map(([emoji, count]) => ({ emoji, count, reactedByMe: summary.iReacted }));
 }
 
 /**
- * Data to view model. Timestamps become strings and bytes become data
- * URIs; nothing else changes shape. Falls back to this device's own
- * profile for a post whose author has no roster row yet.
+ * Data to view model. Timestamps become strings; nothing else changes
+ * shape. Falls back to this device's own name for a post whose author
+ * has no roster row yet — the picture has no equivalent fallback, since
+ * it resolves through profilePictures the same way for every author,
+ * self included.
  */
-function toPostCard(view: FeedPostView, profile: Profile | null, language: LanguageCode): Post {
+function toPostCard(view: FeedPostView, profile: LocalAccount | null, language: LanguageCode): Post {
   const { post } = view;
-
-  // The reader's own post shows their own live picture rather than
-  // waiting on a roster row for themselves — the account's own device
-  // always has it, where the roster copy needs a sync round trip first.
   const isOwn = profile?.accountId === post.authorId;
 
   return {
     id: post.id,
     authorName: view.authorName || (isOwn ? profile.name : '') || i18n.getFixedT(language)('post.unknownMember'),
-    authorPhotoUri: isOwn ? pictureUri(profile?.picture) : view.authorPhotoUri,
+    authorPhotoUri: view.authorPhotoUri,
     authorPublicKey: post.authorId,
     timestamp: formatTimestamp(post.createdAt, language),
     photoUri: view.photoUri,

@@ -15,7 +15,7 @@ import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Colors, Space, Spacing } from '@/ui/theme/tokens';
-import { getProfile } from '@/data/db';
+import { getLocalAccount } from '@/data/db';
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
 import {
   KeypairStatuses,
@@ -49,7 +49,7 @@ export default function WelcomeScreen() {
   // Re-checked on focus, not just mount, so navigating back here post-sign-in still redirects away.
   useFocusEffect(
     useCallback(() => {
-      getProfile().then((profile) => setHasProfile(profile !== null));
+      getLocalAccount().then((profile) => setHasProfile(profile !== null));
       getAuthToken().then((token) => setHasSession(token !== null));
     }, []),
   );

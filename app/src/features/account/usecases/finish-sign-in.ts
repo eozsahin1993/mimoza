@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 
 import { generateUUID } from '@/core/crypto/primitives';
-import { getProfile, saveProfile } from '@/data/db';
+import { getLocalAccount, saveLocalAccount } from '@/data/db';
 import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
 
@@ -28,7 +28,7 @@ export async function finishSignIn({ accountId, name, suggestedName, suggestedPi
 
   // A returning device (local profile already exists — e.g. this was just
   // a re-auth after signing out) has nothing new to fill in.
-  if (await getProfile()) {
+  if (await getLocalAccount()) {
     await goPostAuth(router);
     return;
   }
@@ -38,10 +38,9 @@ export async function finishSignIn({ accountId, name, suggestedName, suggestedPi
   // setup elsewhere.
   if (name) {
     const now = Date.now();
-    await saveProfile({
+    await saveLocalAccount({
       accountId,
       name,
-      picture: null,
       deviceId: generateUUID(),
       createdAt: now,
       updatedAt: now,

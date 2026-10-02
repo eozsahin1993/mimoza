@@ -1,7 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
-import { circleMembers } from '@/data/db/schema';
+import { circleMembers, circles } from '@/data/db/schema';
 
 export type Member = typeof circleMembers.$inferSelect;
 export type NewMember = typeof circleMembers.$inferInsert;
@@ -22,8 +22,7 @@ export async function applyRoster(circleId: string, roster: NewMember[], now: nu
         target: [circleMembers.circleId, circleMembers.accountId],
         set: {
           name: member.name,
-          avatarId: member.avatarId ?? null,
-          avatarKeyVersion: member.avatarKeyVersion ?? null,
+          profilePictureId: member.profilePictureId ?? null,
           publicKey: member.publicKey,
           role: member.role,
           needsRewrap: member.needsRewrap ?? false,
@@ -97,15 +96,18 @@ export async function rememberDepartedMember(
     });
 }
 
-/** This device's own picture for one circle, after it has been uploaded. */
-export async function setMemberAvatar(
-  circleId: string,
-  accountId: string,
-  avatarId: string,
-  keyVersion: number
-): Promise<void> {
-  await db
-    .update(circleMembers)
-    .set({ avatarId, avatarKeyVersion: keyVersion })
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.accountId, accountId)));
+/**
+ * Any one circle this device shares with an account, live on both sides
+ * — what the picture queue needs to address a download: the relay's
+ * route for a member's picture is scoped through a circle the caller is
+ * actually in, not the account alone.
+ */
+export async function findCircleSharedWith(accountId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ circleId: circleMembers.circleId })
+    .from(circleMembers)
+    .innerJoin(circles, eq(circles.id, circleMembers.circleId))
+    .where(and(eq(circleMembers.accountId, accountId), isNull(circleMembers.leftAt), isNull(circles.leftAt)))
+    .limit(1);
+  return row?.circleId ?? null;
 }

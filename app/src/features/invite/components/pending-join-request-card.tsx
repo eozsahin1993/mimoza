@@ -11,6 +11,8 @@ import type { JoinRequest } from '@/features/invite/services/invite-relay';
 
 export type PendingJoinRequestCardProps = {
   request: JoinRequest;
+  /** Resolved from the request's signed `profilePictureUrl`, if it had one — absent falls back to initials. */
+  pictureUri?: string;
   /** Disables both actions while this specific request (or another one in the same list) is being acted on. */
   busy: boolean;
   onApprove: () => void;
@@ -24,7 +26,7 @@ export type PendingJoinRequestCardProps = {
  * relay pages every admin about a new request (see requests/service.go's
  * Create), so any of them can act on it.
  */
-export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: PendingJoinRequestCardProps) {
+export function PendingJoinRequestCard({ request, pictureUri, busy, onApprove, onDeny }: PendingJoinRequestCardProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
@@ -39,7 +41,7 @@ export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: Pen
         onPress={onDeny}>
         <Icon icon={Icons.close} size={20} color={theme.secondary} />
       </Pressable>
-      <Avatar size={44} name={request.name ?? ''} colorSeed={request.accountId} />
+      <Avatar size={44} uri={pictureUri} name={request.name ?? ''} colorSeed={request.accountId} />
       <View style={styles.text}>
         <ThemedText type="titleSmall" numberOfLines={1}>
           {request.name || t('invite.request.someone')}

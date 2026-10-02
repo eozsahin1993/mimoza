@@ -26,13 +26,13 @@ import {
   getPost,
   listComments,
   listReactors,
-  getProfile,
+  getLocalAccount,
   type CommentWithAuthor,
   type Post,
 } from '@/data/db';
 import { commentOnPost } from '@/features/post/usecases/comment-on-post';
 import { deletePost } from '@/features/post/usecases/delete-post';
-import { resolveMemberAvatars } from '@/features/circle/usecases/member-avatars';
+import { resolveMemberPictures } from '@/features/circle/usecases/member-pictures';
 import { openPost } from '@/features/post/usecases/open-post';
 import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
@@ -65,13 +65,10 @@ type ReactionChipView = { emoji: string; count: number; reactedByMe: boolean };
 type CommentView = CommentWithAuthor & { authorPhotoUri?: string };
 
 /** listComments plus resolving every author's current picture in one pass. */
-async function loadComments(circleId: string, postId: string): Promise<CommentView[]> {
+async function loadComments(postId: string): Promise<CommentView[]> {
   const rows = await listComments(postId);
-  const avatarByAccount = await resolveMemberAvatars(
-    circleId,
-    rows.map((comment) => ({ accountId: comment.authorId, avatarId: comment.authorAvatarId })),
-  );
-  return rows.map((comment) => ({ ...comment, authorPhotoUri: avatarByAccount.get(comment.authorId) }));
+  const pictureByAccount = await resolveMemberPictures(rows.map((comment) => comment.authorId));
+  return rows.map((comment) => ({ ...comment, authorPhotoUri: pictureByAccount.get(comment.authorId) }));
 }
 
 export default function PostDetailsScreen() {
@@ -104,10 +101,10 @@ export default function PostDetailsScreen() {
     const [circle, storedPost, profile, summary, everyReactor, postComments] = await Promise.all([
       getCircle(circleId),
       getPost(postId),
-      getProfile(),
+      getLocalAccount(),
       getReactions(postId),
       listReactors(postId),
-      loadComments(circleId, postId),
+      loadComments(postId),
     ]);
 
     setCircleName(circle?.name ?? '');
@@ -167,16 +164,16 @@ export default function PostDetailsScreen() {
     [circleId, postId],
   );
 
-  // Same idea for a commenter's avatar landing after their comment already rendered.
+  // Same idea for a commenter's picture landing after their comment already rendered.
   useEffect(
     () =>
       onPhotoFetched((event) => {
-        if (event.kind !== 'avatar' || event.circleId !== circleId) return;
+        if (event.kind !== 'profilePicture') return;
         setComments((current) =>
           current.map((comment) => (comment.authorId === event.accountId ? { ...comment, authorPhotoUri: event.uri } : comment)),
         );
       }),
-    [circleId],
+    [],
   );
 
   async function handleSelectReaction(emoji: string) {
@@ -245,7 +242,7 @@ export default function PostDetailsScreen() {
     const body = commentText;
     setCommentText('');
     await commentOnPost(circleId, postId, body);
-    setComments(await loadComments(circleId, postId));
+    setComments(await loadComments(postId));
   }
 
   return (

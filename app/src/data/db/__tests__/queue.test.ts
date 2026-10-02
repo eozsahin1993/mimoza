@@ -1,4 +1,4 @@
-import { applyCircle, applyPost, initDatabase, queueReactionChange, queuedFor, saveProfile, summarise } from '@/data/db';
+import { applyCircle, applyPost, initDatabase, queueReactionChange, queuedFor, saveLocalAccount, summarise } from '@/data/db';
 import { generateUUID } from '@/core/crypto/primitives';
 
 const ACCOUNT_ID = 'account-1';
@@ -7,7 +7,7 @@ const EMOJI = '👍';
 
 beforeAll(async () => {
   await initDatabase();
-  await saveProfile({ accountId: ACCOUNT_ID, name: 'Me', deviceId: 'device-1', createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: ACCOUNT_ID, name: 'Me', deviceId: 'device-1', createdAt: 1, updatedAt: 1 });
 });
 
 // summarise() reads a post's own reactionCounts/iReacted as the confirmed

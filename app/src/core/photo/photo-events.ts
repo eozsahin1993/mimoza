@@ -9,7 +9,7 @@
 export type PhotoFetched =
   | { kind: 'post'; circleId: string; postId: string; uri: string }
   | { kind: 'cover'; circleId: string; uri: string }
-  | { kind: 'avatar'; circleId: string; accountId: string; uri: string };
+  | { kind: 'profilePicture'; accountId: string; uri: string };
 
 type Listener = (event: PhotoFetched) => void;
 

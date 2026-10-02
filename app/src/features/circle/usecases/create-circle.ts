@@ -1,4 +1,4 @@
-import { applyCircle, applyRoster, getProfile } from '@/data/db';
+import { applyCircle, applyRoster, getLocalAccount, getProfilePicture } from '@/data/db';
 import { toWire } from '@/core/crypto/content';
 import { sealToPublicKey } from '@/core/crypto/primitives';
 import { generateContentKey } from '@/features/circle/crypto';
@@ -6,7 +6,6 @@ import { getAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { createCircle as createOnRelay } from '@/features/circle/services/circle-relay';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
-import { setMemberAvatar } from '@/features/circle/usecases/set-member-avatar';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 export type CreateCircleInput = {
@@ -22,11 +21,12 @@ export type CreateCircleInput = {
  * they could not read.
  */
 export async function createCircle(input: CreateCircleInput): Promise<{ id: string }> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
   const keypair = await getAccountKeypair(profile.accountId);
   if (!keypair) throw new Error('No account keypair on this device.');
 
+  const ownPicture = await getProfilePicture(profile.accountId);
   const contentKey = generateContentKey();
   const sealed = toWire(sealToPublicKey(contentKey, keypair.publicKey));
 
@@ -54,6 +54,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
         circleId: membership.circleId,
         accountId: profile.accountId,
         name: profile.name,
+        profilePictureId: ownPicture?.pictureId ?? null,
         publicKey: toWire(keypair.publicKey),
         role: membership.role,
         joinedAt: now,
@@ -61,16 +62,6 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     ],
     now
   );
-
-  // This account's first (and only) membership row here starts with no
-  // avatarId, same as the cover below — seed it from whatever's already
-  // on this device's own profile rather than leaving it on initials until
-  // a later edit happens to touch it.
-  if (profile.picture) {
-    await setMemberAvatar(membership.circleId, profile.accountId, profile.picture).catch((err) =>
-      console.error(`Failed to set the avatar in circle ${membership.circleId}`, err)
-    );
-  }
 
   // Needs the circle to exist to upload against, and a circle with no
   // cover is still a circle.

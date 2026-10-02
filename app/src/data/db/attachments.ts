@@ -16,27 +16,15 @@ export const AttachmentStatuses = {
 export const AttachmentKinds = {
   POST_PHOTO: 'post_photo',
   CIRCLE_COVER: 'circle_cover',
-  MEMBER_AVATAR: 'member_avatar',
 } as const;
 
 /**
  * Where a blob lives, as the rest of the relay's key after the circle.
- * Every one is written once and never overwritten, so a changed cover or
- * picture is a new key rather than a replacement.
+ * Every one is written once and never overwritten, so a changed cover is
+ * a new key rather than a replacement.
  */
 export function coverEntryId(coverId: string): string {
   return `cover/${coverId}`;
-}
-
-export function avatarEntryId(accountId: string, avatarId: string): string {
-  return `avatar/${accountId}/${avatarId}`;
-}
-
-/** Reverses avatarEntryId's format, so the queue can recover which account a just-fetched avatar belongs to. */
-export function parseAvatarEntryId(entryId: string): { accountId: string; avatarId: string } | null {
-  const [prefix, accountId, avatarId] = entryId.split('/');
-  if (prefix !== 'avatar' || !accountId || !avatarId) return null;
-  return { accountId, avatarId };
 }
 
 export function normalizeAttachment(attachment: Attachment): Attachment {
@@ -54,15 +42,13 @@ export async function insertAttachment(attachment: NewAttachment): Promise<void>
 }
 
 /**
- * Records an attachment that can legitimately be replaced. Only the
- * circle cover, which always lives at the same fixed `COVER_ENTRY_ID`:
- * setting a new one must overwrite the old row's hash and send it back
- * to the queue, where `insertAttachment`'s no-op would leave the
- * previous image in place forever.
- *
- * Replaying the same entry is still harmless — it writes the same hash
- * and version, and the status reset just re-fetches bytes this device
- * already has.
+ * Records an attachment that can legitimately be overwritten — only a
+ * circle cover calls this. Needed because a sync pass's
+ * `queueAttachmentFetchIfMissing` can race the relay write in
+ * `setCoverPhoto` and insert a pending placeholder for that same
+ * (circleId, entryId) first; `insertAttachment`'s `onConflictDoNothing`
+ * would then leave it pending forever instead of landing the bytes this
+ * device already has in hand.
  */
 export async function upsertAttachment(attachment: NewAttachment): Promise<void> {
   await db
@@ -89,27 +75,24 @@ export async function getAttachment(circleId: string, entryId: string): Promise<
   return rows[0] ? normalizeAttachment(rows[0]) : null;
 }
 
-/** An attachment awaiting download, plus the syncId its blob lives under. */
+/** An attachment awaiting download. */
 export type FetchableAttachment = Attachment;
 
 /**
  * The download queue's only read: attachments that still need bytes and
- * are past any backoff. Circle covers and member avatars are exhausted
- * first — one per circle and one per member, so this tier never grows
- * large enough to meaningfully delay posts — then post photos, each tier
- * newest first across every circle (global rather than per-circle, so a
- * brand-new item in one circle always beats an old backlog in another;
- * see photo-queue.ts, which re-runs this with `limit: 1` on every
- * iteration rather than snapshotting a batch).
- *
- * Resolves each row's `syncId` (the blob's relay address needs it) and
- * skips circles this device has left.
+ * are past any backoff. Circle covers are exhausted first — one per
+ * circle, so this tier never grows large enough to meaningfully delay
+ * posts — then post photos, each tier newest first across every circle
+ * (global rather than per-circle, so a brand-new item in one circle
+ * always beats an old backlog in another; see photo-queue.ts, which
+ * re-runs this with `limit: 1` on every iteration rather than
+ * snapshotting a batch). Profile pictures are a separate table and
+ * queue entirely — see profile-pictures.ts — checked ahead of this one.
  */
 export async function getFetchableAttachments(now: number, limit: number): Promise<FetchableAttachment[]> {
   // Subquery rather than a join, for the same reason as getCirclePosts:
   // this driver maps result columns by name, and `circles`/`attachments`
-  // collide on `circle_id`. The syncIds are then resolved in one extra
-  // read — at most `limit` circles, and `limit` is 1 in the drain loop.
+  // collide on `circle_id`.
   const liveCircles = db.select({ id: circles.id }).from(circles).where(isNull(circles.leftAt));
   const rows = await db
     .select()
@@ -126,8 +109,6 @@ export async function getFetchableAttachments(now: number, limit: number): Promi
       desc(attachments.createdAt)
     )
     .limit(limit);
-  // The circle id is the address now: a blob's key is the circle and
-  // the rest, so nothing has to be looked up to fetch one.
   return rows.map((row) => normalizeAttachment(row));
 }
 

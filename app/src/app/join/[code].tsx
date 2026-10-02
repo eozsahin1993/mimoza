@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 
-import { getProfile } from '@/data/db';
+import { getLocalAccount } from '@/data/db';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { savePendingInviteCode } from '@/features/invite/services/pending-invite';
 
@@ -26,7 +26,7 @@ export default function JoinInviteScreen() {
 
     (async () => {
       await savePendingInviteCode(code);
-      const [token, profile] = await Promise.all([getAuthToken(), getProfile()]);
+      const [token, profile] = await Promise.all([getAuthToken(), getLocalAccount()]);
       router.replace(token && profile ? '/circle' : '/');
     })();
   }, [code]);

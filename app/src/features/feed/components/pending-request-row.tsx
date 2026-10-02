@@ -6,6 +6,8 @@ import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import type { JoinRequest } from '@/features/invite/services/invite-relay';
 import { approveJoinRequest, denyJoinRequest, discoverPendingRequests } from '@/features/invite/usecases/invite-to-circle';
 import { PendingJoinRequestCard } from '@/features/invite/components/pending-join-request-card';
+import { bytesToDataUri } from '@/core/photo/image';
+import { getBlobFromSignedUrl } from '@/core/services/blob-relay';
 import { showError } from '@/core/services/messages';
 import { JoinRequestGoneError } from '@/core/services/relay-errors';
 import { ThemedView } from '@/ui/theme/themed-view';
@@ -43,6 +45,8 @@ export function usePendingRequestRows({ circleId, ownIsAdmin, onRosterChanged }:
   const { t } = useTranslation();
   const [requests, setRequests] = useState<PendingRequestRow[]>([]);
   const [busy, setBusy] = useState(false);
+  /** requestId -> data URI, resolved from each request's own signed profilePictureUrl. */
+  const [pictures, setPictures] = useState<Map<string, string>>(new Map());
 
   const load = useCallback(async () => {
     if (!circleId) return;
@@ -54,7 +58,21 @@ export function usePendingRequestRows({ circleId, ownIsAdmin, onRosterChanged }:
       return;
     }
     try {
-      setRequests(await discoverPendingRequests(circleId));
+      const rows = await discoverPendingRequests(circleId);
+      setRequests(rows);
+
+      // Fetched once right away rather than held onto: the URL is a
+      // one-hour signed link, good for exactly this read, not something
+      // to keep around for a later re-render of this same list.
+      for (const row of rows) {
+        if (!row.profilePictureUrl) continue;
+        getBlobFromSignedUrl(row.profilePictureUrl)
+          .then((bytes) => {
+            if (!bytes) return;
+            setPictures((current) => new Map(current).set(row.requestId, bytesToDataUri(bytes)));
+          })
+          .catch((err) => console.error(`Failed to fetch a join request's picture`, err));
+      }
     } catch (err) {
       console.error('Failed to load pending join requests', err);
     }
@@ -113,12 +131,15 @@ export function usePendingRequestRows({ circleId, ownIsAdmin, onRosterChanged }:
   );
 
   return useMemo(
-    () => ({ rows: requests.map((request) => pendingRequestRow(request, actions)), reload: load }),
-    [requests, actions, load],
+    () => ({
+      rows: requests.map((request) => pendingRequestRow(request, actions, pictures.get(request.requestId))),
+      reload: load,
+    }),
+    [requests, actions, pictures, load],
   );
 }
 
-export function pendingRequestRow(request: PendingRequestRow, actions: RequestRowActions): FeedRow {
+export function pendingRequestRow(request: PendingRequestRow, actions: RequestRowActions, pictureUri?: string): FeedRow {
   return {
     key: `request:${request.requestId}`,
     spacing: Spacing.gapBetweenPosts,
@@ -131,6 +152,7 @@ export function pendingRequestRow(request: PendingRequestRow, actions: RequestRo
       <ThemedView style={styles.row}>
         <PendingJoinRequestCard
           request={request}
+          pictureUri={pictureUri}
           busy={actions.busy}
           onApprove={() => actions.onApprove(request.requestId)}
           onDeny={() => actions.onDeny(request.requestId)}

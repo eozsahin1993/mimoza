@@ -1,11 +1,11 @@
 import {
   AttachmentKinds,
   AttachmentStatuses,
-  avatarEntryId,
   coverEntryId,
-  forgetProfile,
+  forgetLocalAccount,
   getAttachment,
   getCircle,
+  getProfilePicture,
   initDatabase,
   listCircles,
   listEveryMemberSeen,
@@ -13,7 +13,8 @@ import {
   listMembers,
   listRequests,
   markAttachmentFetched,
-  saveProfile,
+  markProfilePictureFetched,
+  saveLocalAccount,
   upsertRequest,
 } from '@/data/db';
 import { syncCircles } from '@/core/sync/sync-circles';
@@ -37,7 +38,6 @@ jest.mock('@/core/services/keystore/circle-keys', () => ({
   getCurrentContentKey: jest.fn(async () => ({ version: 1, key: new Uint8Array(32).fill(1) })),
 }));
 jest.mock('@/core/photo/photo-queue', () => ({ nudgePhotoQueue: jest.fn() }));
-jest.mock('@/features/circle/usecases/set-member-avatar', () => ({ setMemberAvatar: jest.fn(async () => undefined) }));
 jest.mock('@/features/push-notifications/services/channels', () => ({
   ensureCircleNotificationChannel: jest.fn(async () => undefined),
   removeCircleNotificationChannel: jest.fn(async () => undefined),
@@ -56,9 +56,6 @@ const circleKeys = jest.requireMock('@/core/services/keystore/circle-keys') as {
 };
 const posts = jest.requireMock('@/features/post/services/post-relay') as {
   walkEntries: jest.Mock;
-};
-const avatar = jest.requireMock('@/features/circle/usecases/set-member-avatar') as {
-  setMemberAvatar: jest.Mock;
 };
 const channels = jest.requireMock('@/features/push-notifications/services/channels') as {
   ensureCircleNotificationChannel: jest.Mock;
@@ -97,7 +94,7 @@ function roster(overrides: Partial<Roster> = {}): Roster {
 
 beforeAll(async () => {
   await initDatabase();
-  await saveProfile({ accountId: 'me', name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+  await saveLocalAccount({ accountId: 'me', name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
 });
 
 beforeEach(() => {
@@ -111,12 +108,12 @@ describe('a sync pass', () => {
   // can land in that gap. Nothing here knows which account this device
   // is yet, so the pass must do nothing rather than guess.
   test('with no local profile yet, does nothing and calls the relay for nothing', async () => {
-    await forgetProfile('me');
+    await forgetLocalAccount('me');
     try {
       expect(await syncCircles()).toBe(0);
       expect(relay.listCircles).not.toHaveBeenCalled();
     } finally {
-      await saveProfile({ accountId: 'me', name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+      await saveLocalAccount({ accountId: 'me', name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
     }
   });
 
@@ -527,19 +524,28 @@ describe('a sync pass', () => {
     expect(request.circleName).toBe('Family');
   });
 
-  describe('queuing another member\'s avatar to be fetched', () => {
-    test('queues a fetch for a member\'s avatar this device does not have bytes for yet', async () => {
+  // A profile picture is account-level and unencrypted now, so queuing it
+  // is just recording the id, not an attachment with a kind/keyVersion —
+  // see profile-pictures.ts.
+  // profile_pictures is keyed by accountId alone, with no circleId to
+  // scope it — unlike every other table this file exercises, so each
+  // test below uses an account id unique to it (derived from its own
+  // circle id) rather than the file's usual bare 'friend'/'ali'/'ayse'.
+  // Reusing one across tests would read back whatever an earlier test
+  // left rather than a fresh row.
+  describe('queuing another member\'s profile picture to be fetched', () => {
+    test('queues a ref for a member\'s picture this device does not have bytes for yet', async () => {
       const id = circleId();
+      const friend = `friend-${id}`;
       relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
       relay.getRoster.mockResolvedValue(
         roster({
           members: [
             { accountId: 'me', name: 'Me', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW },
             {
-              accountId: 'friend',
+              accountId: friend,
               name: 'Friend',
-              avatarId: 'pic-1',
-              avatarKeyVersion: 1,
+              profilePictureId: 'pic-1',
               publicKey: 'bb',
               role: 'member',
               notifyLevel: 'all',
@@ -551,186 +557,120 @@ describe('a sync pass', () => {
 
       await syncCircles();
 
-      const attachment = await getAttachment(id, avatarEntryId('friend', 'pic-1'));
-      expect(attachment?.status).toBe(AttachmentStatuses.PENDING);
-      expect(attachment?.kind).toBe(AttachmentKinds.MEMBER_AVATAR);
+      const picture = await getProfilePicture(friend);
+      expect(picture?.pictureId).toBe('pic-1');
+      expect(picture?.status).toBe('pending');
+      expect(picture?.bytes).toBeNull();
     });
 
-    test('does not queue a version this device has no key for yet', async () => {
+    test('does not queue a ref for a member with no picture', async () => {
       const id = circleId();
+      const friend = `friend-${id}`;
+      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+      relay.getRoster.mockResolvedValue(
+        roster({
+          members: [{ accountId: friend, name: 'Friend', publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW }],
+        })
+      );
+
+      await syncCircles();
+
+      expect(await getProfilePicture(friend)).toBeNull();
+    });
+
+    test('does not reset an already-fetched picture back to pending on a later sync', async () => {
+      const id = circleId();
+      const friend = `friend-${id}`;
       relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
       relay.getRoster.mockResolvedValue(
         roster({
           members: [
-            {
-              accountId: 'friend',
-              name: 'Friend',
-              avatarId: 'pic-1',
-              avatarKeyVersion: 9,
-              publicKey: 'bb',
-              role: 'member',
-              notifyLevel: 'all',
-              joinedAt: NOW,
-            },
-          ],
-        })
-      );
-
-      await syncCircles();
-
-      expect(await getAttachment(id, avatarEntryId('friend', 'pic-1'))).toBeNull();
-    });
-
-    test('does not reset an already-fetched avatar back to pending on a later sync', async () => {
-      const id = circleId();
-      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
-      relay.getRoster.mockResolvedValue(
-        roster({
-          members: [
-            {
-              accountId: 'friend',
-              name: 'Friend',
-              avatarId: 'pic-1',
-              avatarKeyVersion: 1,
-              publicKey: 'bb',
-              role: 'member',
-              notifyLevel: 'all',
-              joinedAt: NOW,
-            },
+            { accountId: friend, name: 'Friend', profilePictureId: 'pic-1', publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
           ],
         })
       );
       await syncCircles();
-      await markAttachmentFetched(id, avatarEntryId('friend', 'pic-1'), new Uint8Array([1, 2, 3]));
+      await markProfilePictureFetched(friend, 'pic-1', new Uint8Array([1, 2, 3]));
 
       relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
       await syncCircles();
 
-      const attachment = await getAttachment(id, avatarEntryId('friend', 'pic-1'));
-      expect(attachment?.status).toBe(AttachmentStatuses.FETCHED);
-      expect(attachment?.bytes).not.toBeNull();
+      const picture = await getProfilePicture(friend);
+      expect(picture?.status).toBe('fetched');
+      expect(picture?.bytes).not.toBeNull();
     });
 
-    test('queues every member with an avatar in one pass, not just the first', async () => {
+    test('queues every member with a picture in one pass, not just the first', async () => {
       const id = circleId();
+      const ali = `ali-${id}`;
+      const ayse = `ayse-${id}`;
       relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
       relay.getRoster.mockResolvedValue(
         roster({
           members: [
-            { accountId: 'ali', name: 'Ali', avatarId: 'pic-1', avatarKeyVersion: 1, publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW },
-            { accountId: 'ayse', name: 'Ayse', avatarId: 'pic-2', avatarKeyVersion: 1, publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+            { accountId: ali, name: 'Ali', profilePictureId: 'pic-1', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+            { accountId: ayse, name: 'Ayse', profilePictureId: 'pic-2', publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
           ],
         })
       );
 
       await syncCircles();
 
-      expect((await getAttachment(id, avatarEntryId('ali', 'pic-1')))?.status).toBe(AttachmentStatuses.PENDING);
-      expect((await getAttachment(id, avatarEntryId('ayse', 'pic-2')))?.status).toBe(AttachmentStatuses.PENDING);
+      expect((await getProfilePicture(ali))?.pictureId).toBe('pic-1');
+      expect((await getProfilePicture(ayse))?.pictureId).toBe('pic-2');
     });
 
     // circle_members is one row per account, shared by every device that
-    // account has — this device's own avatarId can arrive from the roster
-    // exactly like anyone else's, when another of this account's devices
-    // set it first.
-    test('queues this device\'s own avatar too, when another of this account\'s devices already set one', async () => {
+    // account has — this device's own profilePictureId can arrive from
+    // the roster exactly like anyone else's. 'me' is the one account id
+    // this whole file keeps fixed (it is this device's own, seeded once
+    // in beforeAll), and no earlier test gives it a profilePictureId, so
+    // it carries no collision risk here.
+    test('queues this device\'s own picture too, when it already has one', async () => {
       const id = circleId();
       relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
       relay.getRoster.mockResolvedValue(
         roster({
-          members: [{ accountId: 'me', name: 'Me', avatarId: 'pic-1', avatarKeyVersion: 1, publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW }],
+          members: [{ accountId: 'me', name: 'Me', profilePictureId: 'pic-1', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW }],
         })
       );
 
       await syncCircles();
 
-      expect((await getAttachment(id, avatarEntryId('me', 'pic-1')))?.status).toBe(AttachmentStatuses.PENDING);
+      expect((await getProfilePicture('me'))?.pictureId).toBe('pic-1');
     });
 
-    // avatarId is content-addressed — a changed picture is a new id, not
-    // the old one rewritten — so an already-fetched old avatar must never
-    // block queuing the new one it was replaced by.
-    test('queues a replacement avatarId even though the one it replaced was already fetched', async () => {
+    // profilePictureId is content-addressed — a changed picture is a new
+    // id, not the old one rewritten — so an already-fetched old picture
+    // must never block queuing the new one it was replaced by.
+    test('queues a replacement id even though the one it replaced was already fetched', async () => {
       const id = circleId();
+      const friend = `friend-${id}`;
       relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
       relay.getRoster.mockResolvedValue(
         roster({
           members: [
-            { accountId: 'friend', name: 'Friend', avatarId: 'pic-1', avatarKeyVersion: 1, publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+            { accountId: friend, name: 'Friend', profilePictureId: 'pic-1', publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
           ],
         })
       );
       await syncCircles();
-      await markAttachmentFetched(id, avatarEntryId('friend', 'pic-1'), new Uint8Array([1, 2, 3]));
+      await markProfilePictureFetched(friend, 'pic-1', new Uint8Array([1, 2, 3]));
 
       relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
       relay.getRoster.mockResolvedValue(
         roster({
           members: [
-            { accountId: 'friend', name: 'Friend', avatarId: 'pic-2', avatarKeyVersion: 1, publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
+            { accountId: friend, name: 'Friend', profilePictureId: 'pic-2', publicKey: 'bb', role: 'member', notifyLevel: 'all', joinedAt: NOW },
           ],
         })
       );
       await syncCircles();
 
-      expect((await getAttachment(id, avatarEntryId('friend', 'pic-2')))?.status).toBe(AttachmentStatuses.PENDING);
-    });
-  });
-
-  // A circle's roster is shared across every device this account has, so
-  // avatarId can already be set here without this device having done it —
-  // seeding again would just churn a new id over one another device chose.
-  describe('avatar seeding on a circle this device has not seen before', () => {
-    afterEach(async () => {
-      // saveProfile's onConflictDoUpdate only overwrites a field it was
-      // actually given — omitting picture here would leave the previous
-      // test's behind, not clear it.
-      await saveProfile({ accountId: 'me', name: 'Me', picture: null, deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
-    });
-
-    test('seeds this account\'s picture when it has one and the roster has none yet', async () => {
-      await saveProfile({ accountId: 'me', name: 'Me', picture: new Uint8Array([9]), deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
-      const id = circleId();
-      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
-
-      await syncCircles();
-
-      expect(avatar.setMemberAvatar).toHaveBeenCalledWith(id, 'me', new Uint8Array([9]));
-    });
-
-    test('does not seed when this device has no picture', async () => {
-      const id = circleId();
-      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
-
-      await syncCircles();
-
-      expect(avatar.setMemberAvatar).not.toHaveBeenCalled();
-    });
-
-    test('does not overwrite an avatarId another of this account\'s devices already set', async () => {
-      await saveProfile({ accountId: 'me', name: 'Me', picture: new Uint8Array([9]), deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
-      const id = circleId();
-      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
-      relay.getRoster.mockResolvedValue(
-        roster({ members: [{ accountId: 'me', name: 'Me', avatarId: 'existing', publicKey: 'aa', role: 'member', notifyLevel: 'all', joinedAt: NOW }] })
-      );
-
-      await syncCircles();
-
-      expect(avatar.setMemberAvatar).not.toHaveBeenCalled();
-    });
-
-    test('does not reseed on a later sync of the same circle', async () => {
-      await saveProfile({ accountId: 'me', name: 'Me', picture: new Uint8Array([9]), deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
-      const id = circleId();
-      relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
-      await syncCircles();
-      avatar.setMemberAvatar.mockClear();
-
-      relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { rosterVersion: 2 })], requests: [] });
-      await syncCircles();
-
-      expect(avatar.setMemberAvatar).not.toHaveBeenCalled();
+      const picture = await getProfilePicture(friend);
+      expect(picture?.pictureId).toBe('pic-2');
+      expect(picture?.status).toBe('pending');
+      expect(picture?.bytes).toBeNull();
     });
   });
 });

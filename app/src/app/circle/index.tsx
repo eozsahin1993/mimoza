@@ -21,7 +21,8 @@ import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import {
   countMembers,
-  getProfile,
+  getLocalAccount,
+  getProfilePicture,
   getUnreadCount,
   listCircles,
   listRequests,
@@ -105,8 +106,9 @@ export default function CircleListScreen() {
 
   /** Re-reads the circle list from the local database. No network. */
   const loadFromDatabase = useCallback(async () => {
-    const profile = await getProfile();
-    setAvatarUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
+    const profile = await getLocalAccount();
+    const picture = profile ? await getProfilePicture(profile.accountId) : null;
+    setAvatarUri(picture?.bytes ? bytesToDataUri(picture.bytes) : undefined);
     setProfileName(profile?.name);
     // Empty rather than skipping the load: every current path into this
     // screen saves a local profile first, so this never actually matches

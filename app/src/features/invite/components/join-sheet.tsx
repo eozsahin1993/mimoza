@@ -8,6 +8,8 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { Space, Spacing } from '@/ui/theme/tokens';
 import { findPendingJoinRequestForInvite, previewInvite, requestToJoin } from '@/features/invite/usecases/join-circle';
+import { bytesToDataUri } from '@/core/photo/image';
+import { getBlobFromSignedUrl } from '@/core/services/blob-relay';
 import { showError } from '@/core/services/messages';
 
 /**
@@ -35,6 +37,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
   const [phase, setPhase] = useState<Phase>('checking');
   const [circleName, setCircleName] = useState('');
   const [inviterName, setInviterName] = useState('');
+  const [inviterPictureUri, setInviterPictureUri] = useState<string | undefined>();
 
   useEffect(() => {
     if (!code) return;
@@ -42,6 +45,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('checking');
+    setInviterPictureUri(undefined);
     (async () => {
       try {
         const preview = await previewInvite(code);
@@ -49,11 +53,19 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
         if (stale) return;
 
         setCircleName(preview.name);
-        // A name and nothing else. Someone outside the circle has no
-        // key, so there is no picture to show them — Avatar falls back
-        // to initials.
         setInviterName(preview.invitedBy);
         setPhase(already ? 'waiting' : 'asking');
+
+        // Fetched right away and turned into a self-contained data URI —
+        // the signed URL itself is only good for an hour and is not
+        // something this screen should hold onto past this one use.
+        if (preview.profilePictureUrl) {
+          getBlobFromSignedUrl(preview.profilePictureUrl)
+            .then((bytes) => {
+              if (!stale && bytes) setInviterPictureUri(bytesToDataUri(bytes));
+            })
+            .catch((err) => console.error("Failed to fetch the inviter's picture", err));
+        }
       } catch (err) {
         console.error('Failed to load invite preview', err);
         if (stale) return;
@@ -100,7 +112,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
                 rather than screen-height. The circle's name carries the
                 weight; who sent the key is context, not the headline. */}
             <View style={styles.header}>
-              <Avatar size={48} name={inviterName} />
+              <Avatar size={48} uri={inviterPictureUri} name={inviterName} />
               <View style={styles.headerText}>
                 <ThemedText type="labelSmall" themeColor="muted" numberOfLines={1}>
                   {inviterName ? t('invite.join.invitedBy', { name: inviterName }) : t('invite.join.invited')}

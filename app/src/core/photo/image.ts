@@ -197,7 +197,7 @@ function bytesToBase64(bytes: Uint8Array): string {
  */
 const dataUriCache = new WeakMap<Uint8Array, string>();
 
-/** Turns stored picture bytes (e.g. `device_profile.picture`, an avatar attachment's `bytes`) into a URI `<Image>` can render directly. */
+/** Turns picture bytes (e.g. a profilePictures row's `bytes`, or an inviter's/asker's bytes fetched through a signed URL) into a URI `<Image>` can render directly. */
 export function bytesToDataUri(bytes: Uint8Array, mimeType = 'image/jpeg'): string {
   const cached = dataUriCache.get(bytes);
   if (cached) return cached;

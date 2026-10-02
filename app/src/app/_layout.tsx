@@ -28,11 +28,11 @@ import { applyLanguage } from '@/core/i18n/i18n';
 import { startJankMonitor } from '@/core/utils/timing';
 import { startSyncScheduler } from '@/core/sync/scheduler';
 
-// drizzle-orm's default sqlite blob column (posts.photo, circleMembers.picture,
-// deviceProfile.picture) calls the global `Buffer` directly with no existence
-// check — present in Node/Jest, absent from Hermes on-device, so every blob
-// read/write throws `ReferenceError: Property 'Buffer' doesn't exist` without
-// this polyfill.
+// drizzle-orm's default sqlite blob column (attachments.bytes,
+// profilePictures.bytes) calls the global `Buffer` directly with no
+// existence check — present in Node/Jest, absent from Hermes on-device, so
+// every blob read/write throws `ReferenceError: Property 'Buffer' doesn't
+// exist` without this polyfill.
 global.Buffer = global.Buffer ?? Buffer;
 
 installDebugKeystore();

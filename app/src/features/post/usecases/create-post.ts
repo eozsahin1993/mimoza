@@ -1,4 +1,4 @@
-import { AttachmentKinds, AttachmentStatuses, getProfile, queuePost } from '@/data/db';
+import { AttachmentKinds, AttachmentStatuses, getLocalAccount, queuePost } from '@/data/db';
 import { generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { writePhotoFile } from '@/core/photo/photo-cache';
 import { logEvent } from '@/core/services/analytics';
@@ -27,7 +27,7 @@ export type CreatePostInput = {
  * ties them together.
  */
 export async function createPost(input: CreatePostInput): Promise<string> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
   const current = await getCurrentContentKey(input.circleId);
   if (!current) throw new Error('No content key on this device.');

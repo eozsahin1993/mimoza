@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { getProfile } from '@/data/db';
+import { getLocalAccount } from '@/data/db';
 
 // Module-level, not per-hook-instance: `PostComments` mounts one of these
 // per visible feed row, and every one of them wants the same value. Without
@@ -11,7 +11,7 @@ let inFlight: Promise<string | undefined> | null = null;
 
 function load(): Promise<string | undefined> {
   if (!inFlight) {
-    inFlight = getProfile()
+    inFlight = getLocalAccount()
       .then((profile) => {
         cached = profile?.accountId;
         return cached;

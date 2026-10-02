@@ -1,6 +1,6 @@
-import { getCircle, getMember, getProfile, listMembers, type Circle, type Member } from '@/data/db';
+import { getCircle, getMember, getLocalAccount, listMembers, type Circle, type Member } from '@/data/db';
 import { listInvites, type Invite } from '@/features/invite/services/invite-relay';
-import { resolveMemberAvatars } from '@/features/circle/usecases/member-avatars';
+import { resolveMemberPictures } from '@/features/circle/usecases/member-pictures';
 
 export type CircleDetails = {
   circle: Circle | null;
@@ -22,13 +22,10 @@ export type CircleDetails = {
  * invite, which the relay owns and nothing stores here.
  */
 export async function loadCircleDetails(circleId: string): Promise<CircleDetails> {
-  const [circle, members, profile] = await Promise.all([getCircle(circleId), listMembers(circleId), getProfile()]);
+  const [circle, members, profile] = await Promise.all([getCircle(circleId), listMembers(circleId), getLocalAccount()]);
   const ownMember = profile ? await getMember(circleId, profile.accountId) : null;
   const admin = ownMember?.role === 'admin';
-  const avatarByAccount = await resolveMemberAvatars(
-    circleId,
-    members.map((member) => ({ accountId: member.accountId, avatarId: member.avatarId })),
-  );
+  const avatarByAccount = await resolveMemberPictures(members.map((member) => member.accountId));
 
   // Admins only, and never fatal: the screen is worth showing without a
   // code, and the relay refuses the read to anyone else anyway.

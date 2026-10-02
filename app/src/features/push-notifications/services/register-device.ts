@@ -1,4 +1,4 @@
-import { getProfile } from '@/data/db';
+import { getLocalAccount } from '@/data/db';
 import { getAppSettings } from '@/core/services/settings';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 import { registerDevice as putDevice, unregisterDevice as deleteDevice } from '@/features/push-notifications/services/device-relay';
@@ -14,7 +14,7 @@ import { registerDevice as putDevice, unregisterDevice as deleteDevice } from '@
  * ever surface as an error to whoever just opened the app.
  */
 export async function registerThisDevice(): Promise<void> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile?.deviceId) return;
 
   const device = await getDevicePushToken();
@@ -30,7 +30,7 @@ export async function registerThisDevice(): Promise<void> {
 
 /** Signing out: push stops reaching this phone. Other devices on the account keep theirs. */
 export async function unregisterThisDevice(): Promise<void> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile?.deviceId) return;
 
   try {

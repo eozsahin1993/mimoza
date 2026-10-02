@@ -1,4 +1,4 @@
-import { getProfile } from '@/data/db';
+import { getLocalAccount } from '@/data/db';
 import { reactionTagKey, reactionTagTable } from '@/core/crypto/reaction-tags';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import type { Entry } from '@/features/post/services/post-relay';
@@ -27,7 +27,7 @@ export type EntryHandler = (ctx: EntryContext, entry: Entry) => Promise<void>;
 /** Null when this device holds no keys for the circle, or no profile yet: nothing can be applied. */
 export async function entryContext(circleId: string): Promise<EntryContext | null> {
   const keys = await getCircleKeyMap(circleId);
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!keys || !profile) return null;
   const tagKey = reactionTagKey(circleId, keys);
   return { circleId, accountId: profile.accountId, keys, tagKey, tags: reactionTagTable(tagKey) };

@@ -63,50 +63,19 @@ test('a comment resolves its author from the roster', async () => {
   expect(row.body).toBe('nice');
 });
 
-// The author's current picture comes from the same roster row as their
-// name, so a comment shows whoever they are now, not who they were when
-// they wrote it.
-test("a comment resolves its author's current avatar from the roster", async () => {
-  const { circle, post, n } = ids();
-  await applyCircle(
-    { circleId: circle, name: 'Family', role: 'admin', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
-    NOW
-  );
-  await applyRoster(
-    circle,
-    [
-      {
-        circleId: circle,
-        accountId: 'acc-ali',
-        name: 'Ali',
-        publicKey: 'pk',
-        role: 'member',
-        joinedAt: NOW,
-        avatarId: 'avatar-1',
-        avatarKeyVersion: 2,
-      },
-    ],
-    NOW
-  );
-  await applyPost({ id: post, circleId: circle, authorId: 'acc-ali', caption: 'x', createdAt: NOW, receivedAt: NOW, updatedAt: NOW });
-  await applyComment(comment(circle, post, `comment-1-${n}`));
-
-  const [row] = await listComments(post);
-  expect(row.authorAvatarId).toBe('avatar-1');
-  expect(row.authorAvatarKeyVersion).toBe(2);
-});
-
-// No avatar on the roster row (never set one, or one predating this
-// column) reads back as null, not undefined or a missing key — callers
-// branch on `!avatarId` to skip resolving a picture at all.
-test('a comment with no avatar on the roster reads back null, not undefined', async () => {
+// A comment's picture is resolved separately, by the screen showing it
+// (see resolveMemberPictures) — not joined in here. A profile picture is
+// account-level now, not sealed per circle, so there is nothing on the
+// roster row for this module to carry alongside the name.
+test('a comment carries only the author name, not a picture field', async () => {
   const { circle, post, n } = ids();
   await seed(circle, post);
   await applyComment(comment(circle, post, `comment-1-${n}`));
 
   const [row] = await listComments(post);
-  expect(row.authorAvatarId).toBeNull();
-  expect(row.authorAvatarKeyVersion).toBeNull();
+  expect(row.authorName).toBe('Ali');
+  expect(row).not.toHaveProperty('authorAvatarId');
+  expect(row).not.toHaveProperty('authorAvatarKeyVersion');
 });
 
 // The preview the relay carries on a post row is made of real comments.

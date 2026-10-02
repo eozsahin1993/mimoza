@@ -6,7 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { showAlert } from '@/core/services/alerts';
 import { DeviceLinkAnsweredError, DeviceLinkGoneError } from '@/core/services/relay-errors';
 import { completeDeviceLink, parseDeviceLinkPayload } from '@/features/account/usecases/device-link';
-import { getProfile, listCircles } from '@/data/db';
+import { getLocalAccount, listCircles } from '@/data/db';
 import { LoadingModal } from '@/ui/components/loading-modal';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { QrScanner } from '@/ui/components/qr-scanner';
@@ -32,7 +32,7 @@ export default function DeviceLinkScanScreen() {
   const [rearm, setRearm] = useState(0);
 
   async function send(payload: DeviceLinkPayload) {
-    const profile = await getProfile();
+    const profile = await getLocalAccount();
     if (!profile) return;
     setSending(true);
     try {

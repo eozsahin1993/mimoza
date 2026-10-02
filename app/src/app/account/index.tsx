@@ -19,7 +19,7 @@ import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-gro
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius, Space, Spacing } from '@/ui/theme/tokens';
-import { getProfile, type Profile } from '@/data/db';
+import { getLocalAccount, getProfilePicture, type LocalAccount } from '@/data/db';
 import { deleteAccount } from '@/features/account/usecases/delete-account';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { signOut } from '@/features/account/usecases/sign-in';
@@ -60,7 +60,8 @@ export default function AccountScreen() {
   const deviceLanguage = resolveLanguage('system', useLocales());
   const tints = useTints();
   const ownColorSeed = useOwnColorSeed();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<LocalAccount | null>(null);
+  const [pictureUri, setPictureUri] = useState<string | undefined>(undefined);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [resettingDevData, setResettingDevData] = useState(false);
@@ -71,7 +72,14 @@ export default function AccountScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      getProfile().then(setProfile);
+      getLocalAccount().then((p) => {
+        setProfile(p);
+        if (!p) {
+          setPictureUri(undefined);
+          return;
+        }
+        getProfilePicture(p.accountId).then((picture) => setPictureUri(picture?.bytes ? bytesToDataUri(picture.bytes) : undefined));
+      });
     }, []),
   );
 
@@ -262,7 +270,7 @@ export default function AccountScreen() {
           <View style={styles.profileRow}>
             <Avatar
               size={72}
-              uri={profile?.picture ? bytesToDataUri(profile.picture) : undefined}
+              uri={pictureUri}
               name={profile?.name}
               colorSeed={ownColorSeed}
             />

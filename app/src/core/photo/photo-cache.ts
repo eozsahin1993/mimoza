@@ -21,6 +21,9 @@ const PHOTO_DIRECTORY = 'photos';
 /** Filename segment for a cover, so one can't collide with a post's id. */
 const COVER = 'cover';
 
+/** Filename segment for a profile picture, namespaced by account rather than circle — one picture, wherever it is seen. */
+const PROFILE_PICTURE = 'profile';
+
 function photoFile(circleId: string, entryId: string): File {
   // The relay addresses a blob as (syncId, entryId); locally the same
   // pair is (circleId, entryId), so the name can't collide across circles.
@@ -98,6 +101,56 @@ export function writeCoverFile(circleId: string, bytes: Uint8Array, hash: string
 export function cachedCoverUri(circleId: string, hash: string): string | null {
   const file = coverFile(circleId, hash);
   return file.exists ? file.uri : null;
+}
+
+/**
+ * Suffixed with the picture's own id, the same reasoning as a cover: a
+ * changed picture is a genuinely different path, so neither this cache
+ * nor expo-image's own ever serves stale bytes under a reused name.
+ * Named by account, not by circle — one picture, shown everywhere the
+ * same account appears.
+ */
+function profilePictureFile(accountId: string, pictureId: string): File {
+  return new File(new Directory(Paths.cache, PHOTO_DIRECTORY), `${PROFILE_PICTURE}-${accountId}-${pictureId}.jpg`);
+}
+
+/**
+ * Writes a profile picture under an id-versioned path and drops whatever
+ * was cached under a different id for that account — same reasoning as
+ * writeCoverFile, so a changed picture does not leave its predecessor on
+ * disk forever.
+ */
+export function writeProfilePictureFile(accountId: string, bytes: Uint8Array, pictureId: string): string {
+  const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
+  directory.create({ intermediates: true, idempotent: true });
+
+  const prefix = `${PROFILE_PICTURE}-${accountId}-`;
+  for (const entry of directory.list()) {
+    if (entry instanceof File && entry.name.startsWith(prefix) && entry.name !== `${prefix}${pictureId}.jpg`) {
+      entry.delete();
+    }
+  }
+
+  const file = profilePictureFile(accountId, pictureId);
+  file.create({ overwrite: true });
+  file.write(bytes);
+  return file.uri;
+}
+
+/** The profile picture's cached path for this exact id, or null if it isn't cached under it yet. */
+export function cachedProfilePictureUri(accountId: string, pictureId: string): string | null {
+  const file = profilePictureFile(accountId, pictureId);
+  return file.exists ? file.uri : null;
+}
+
+/** Drops every cached file for one account's picture, under whatever id it was last written — removing a picture outright, not replacing it with a new one. */
+export function deleteProfilePictureFiles(accountId: string): void {
+  const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
+  if (!directory.exists) return;
+  const prefix = `${PROFILE_PICTURE}-${accountId}-`;
+  for (const entry of directory.list()) {
+    if (entry instanceof File && entry.name.startsWith(prefix)) entry.delete();
+  }
 }
 
 /**

@@ -1,24 +1,32 @@
 import {
   AttachmentKinds,
   clearAttachmentBackoff,
+  findCircleSharedWith,
   getFetchableAttachments,
+  getFetchableProfilePictures,
   markAttachmentFailed,
   markAttachmentFetched,
-  parseAvatarEntryId,
+  markProfilePictureFailed,
+  markProfilePictureFetched,
   type FetchableAttachment,
+  type ProfilePicture,
 } from '@/data/db';
 import { decrypt, hashBytes } from '@/core/crypto/primitives';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
-import { bytesToDataUri } from '@/core/photo/image';
-import { writeCoverFile, writePhotoFile } from '@/core/photo/photo-cache';
+import { writeCoverFile, writePhotoFile, writeProfilePictureFile } from '@/core/photo/photo-cache';
 import { notifyPhotoFetched } from '@/core/photo/photo-events';
-import { getBlob } from '@/core/services/blob-relay';
+import { BlobPaths, getBlob } from '@/core/services/blob-relay';
 import { timed, timedSync } from '@/core/utils/timing';
 
 /** First retry waits this long; each further failure doubles it, up to `MAX_BACKOFF_MS`. */
 const BASE_BACKOFF_MS = 30_000;
 const MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How many pending profile pictures to fetch in one parallel batch.
+ */
+const PICTURE_BATCH_LIMIT = 20;
 
 export type DrainBudget = {
   /** Stop after this many photos. */
@@ -66,16 +74,6 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
       // is already content-addressed — a new cover is a new key.
       const uri = writeCoverFile(circleId, bytes, entryId.split('/').pop() ?? entryId);
       notifyPhotoFetched({ kind: 'cover', circleId, uri });
-    } else if (attachment.kind === AttachmentKinds.MEMBER_AVATAR) {
-      // Bytes only: a picture is small and its screens read it straight
-      // out of SQLite rather than through the file cache — but a screen
-      // already showing this member's picture still needs telling.
-      const parsed = parseAvatarEntryId(entryId);
-      if (parsed) {
-        notifyPhotoFetched({ kind: 'avatar', circleId, accountId: parsed.accountId, uri: bytesToDataUri(bytes) });
-      } else {
-        console.error(`Fetched avatar attachment with an unparseable entryId: ${entryId}`);
-      }
     } else {
       // Whatever screen is showing this post's placeholder patches just
       // this row rather than reloading — a backlog of many photos landing
@@ -90,8 +88,62 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
   }
 }
 
+/**
+ * A profile picture is never encrypted and is not addressed by circle +
+ * entryId the way a post or cover is — it rides on the account, reached
+ * through whichever circle this device happens to share with that
+ * account. No decrypt, no hash: the relay already serves plain bytes.
+ */
+async function fetchProfilePicture(picture: ProfilePicture): Promise<void> {
+  const { accountId, pictureId, fetchAttempts } = picture;
+  try {
+    const circleId = await findCircleSharedWith(accountId);
+    if (!circleId) throw new Error(`no shared circle with ${accountId}`);
+
+    const bytes = await timed(`photo.fetch(picture:${accountId.slice(0, 8)})`, () =>
+      getBlob(circleId, BlobPaths.picture(accountId, pictureId))
+    );
+    if (!bytes) throw new Error('blob not found');
+
+    await markProfilePictureFetched(accountId, pictureId, bytes);
+    const uri = writeProfilePictureFile(accountId, bytes, pictureId);
+    notifyPhotoFetched({ kind: 'profilePicture', accountId, uri });
+  } catch (err) {
+    const attempts = fetchAttempts + 1;
+    console.error(`Failed to fetch profile picture for ${accountId} (attempt ${attempts})`, err);
+    await markProfilePictureFailed(accountId, pictureId, attempts, Date.now() + backoffFor(attempts));
+  }
+}
+
+/**
+ * Exhausts every pending profile picture before `drain` below ever looks
+ * at an attachment. Unlike a post or cover, these are small, undecrypted,
+ * and independent of one another, so they go out in parallel batches
+ * rather than one at a time through `maxPhotos` — the common "just
+ * joined a circle full of strangers" case gets every face at once
+ * instead of one round trip per member.
+ *
+ * Still checks the deadline per batch: if `deadlineMs` ever backs a real
+ * background task's window, a backlog spread across several stale
+ * circles shouldn't be able to run past it just because it isn't
+ * counted against `maxPhotos`.
+ */
+async function drainProfilePictures(startedAt: number, deadlineMs: number | undefined): Promise<void> {
+  for (;;) {
+    if (deadlineMs !== undefined && Date.now() - startedAt >= deadlineMs) return;
+    if (!(await getAuthToken())) return;
+
+    const pictures = await getFetchableProfilePictures(Date.now(), PICTURE_BATCH_LIMIT);
+    if (pictures.length === 0) return;
+
+    await Promise.all(pictures.map((picture) => fetchProfilePicture(picture)));
+  }
+}
+
 async function drain(budget: DrainBudget): Promise<void> {
   const startedAt = Date.now();
+  await drainProfilePictures(startedAt, budget.deadlineMs);
+
   const maxPhotos = budget.maxPhotos ?? Infinity;
 
   for (let fetched = 0; fetched < maxPhotos; fetched += 1) {
@@ -100,12 +152,6 @@ async function drain(budget: DrainBudget): Promise<void> {
     // Carrying on would fail every fetch and back each photo off for up to a day.
     if (!(await getAuthToken())) return;
 
-    // Re-queried every iteration rather than taking a batch up front, so
-    // the next photo is always the newest one eligible *right now* — a
-    // post landing mid-drain jumps ahead of an older backlog instead of
-    // queueing behind a stale snapshot. The backoff filter is also what
-    // stops this looping forever on a photo that keeps failing: once
-    // marked, it drops out of the query until its retry time.
     const [next] = await getFetchableAttachments(Date.now(), 1);
     if (!next) return;
 

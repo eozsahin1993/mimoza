@@ -1,4 +1,4 @@
-import { getProfile, markCircleLeft } from '@/data/db';
+import { getLocalAccount, markCircleLeft } from '@/data/db';
 import { generateContentKey } from '@/features/circle/crypto';
 import { getRoster, leaveCircle as leaveOnRelay } from '@/features/circle/services/circle-relay';
 import { sealForEach } from '@/features/circle/usecases/key-exchange';
@@ -14,7 +14,7 @@ import { removeCircleNotificationChannel } from '@/features/push-notifications/s
  * first.
  */
 export async function leaveCircle(circleId: string): Promise<void> {
-  const profile = await getProfile();
+  const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
 
   const roster = await getRoster(circleId);

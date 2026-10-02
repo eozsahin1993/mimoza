@@ -1,4 +1,11 @@
-jest.mock('@/core/services/blob-relay');
+// A factory, not the bare automock: BlobPaths is plain path-building data
+// that fetchProfilePicture itself calls at runtime, not something this
+// file stubs — automocking the whole module would turn every BlobPaths.*
+// call inside photo-queue.ts into a function returning undefined too.
+jest.mock('@/core/services/blob-relay', () => ({
+  ...jest.requireActual('@/core/services/blob-relay'),
+  getBlob: jest.fn(),
+}));
 jest.mock('@/core/services/keystore/circle-keys', () => ({
   getCircleKeyMap: jest.fn(async () => ({ 1: new Uint8Array(32).fill(1) })),
 }));
@@ -8,17 +15,19 @@ import {
   AttachmentStatuses,
   applyCircle,
   applyPost,
-  avatarEntryId,
+  applyRoster,
   clearAttachmentBackoff,
   coverEntryId,
   getAttachment,
   getFetchableAttachments,
+  getProfilePicture,
   initDatabase,
   insertAttachment,
+  upsertProfilePictureRef,
 } from '@/data/db';
 import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
-import { getBlob } from '@/core/services/blob-relay';
+import { BlobPaths, getBlob } from '@/core/services/blob-relay';
 import { drainPhotoQueue, retryAttachment } from '@/core/photo/photo-queue';
 import { onPhotoFetched, type PhotoFetched } from '@/core/photo/photo-events';
 
@@ -82,28 +91,23 @@ async function makePendingCover(circleId: string, photo: Uint8Array, createdAt: 
   return entryId;
 }
 
-/** A pending member avatar, same shape as makePendingPost but for the cover tier. */
-async function makePendingAvatar(
+/**
+ * A pending profile picture: a roster row so findCircleSharedWith has
+ * somewhere to address the download through, plus the ref itself —
+ * what queueProfilePictureRefs in sync-circles.ts does on a real sync.
+ */
+async function makePendingProfilePicture(
   circleId: string,
-  photo: Uint8Array,
-  createdAt: number,
-  accountId = 'sarah',
-  avatarId = 'avatar-1'
-): Promise<string> {
-  const entryId = avatarEntryId(accountId, avatarId);
-  await insertAttachment({
+  accountId: string,
+  pictureId: string,
+  createdAt: number
+): Promise<void> {
+  await applyRoster(
     circleId,
-    entryId,
-    kind: AttachmentKinds.MEMBER_AVATAR,
-    bytes: null,
-    hash: hashBytes(photo),
-    keyVersion: 1,
-    status: AttachmentStatuses.PENDING,
-    fetchAttempts: 0,
-    nextAttemptAt: null,
-    createdAt,
-  });
-  return entryId;
+    [{ circleId, accountId, name: accountId, publicKey: 'pk', role: 'member', joinedAt: createdAt }],
+    createdAt
+  );
+  await upsertProfilePictureRef(accountId, pictureId, createdAt);
 }
 
 test('downloads, decrypts, and stores a pending photo', async () => {
@@ -140,18 +144,139 @@ test('notifies with kind "cover" when a circle cover finishes downloading', asyn
   expect(events).toEqual([{ kind: 'cover', circleId, uri: expect.any(String) }]);
 });
 
-test('notifies with kind "avatar" when a member avatar finishes downloading', async () => {
+// Not an attachment at all any more: no circle/entryId address, no
+// decrypt, no hash — the relay already serves plain bytes.
+//
+// Account ids here are unique per test, not the shared 'sarah' the post
+// and cover helpers above use — profile_pictures is keyed by accountId
+// alone, with no circleId to scope it, so two tests reusing the same one
+// would read back whatever the earlier test left, not a fresh row.
+test('fetches a pending profile picture: plain bytes, no decrypt, notifies kind "profilePicture"', async () => {
   const circleId = await makeCircle();
+  const accountId = `account-${circleId}`;
   const photo = new Uint8Array([1, 2, 3]);
-  await makePendingAvatar(circleId, photo, 1000, 'sarah');
-  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
+  await makePendingProfilePicture(circleId, accountId, 'pic-1', 1000);
+  (getBlob as jest.Mock).mockResolvedValue(photo);
 
   const events: PhotoFetched[] = [];
   const unsubscribe = onPhotoFetched((event) => events.push(event));
   await drainPhotoQueue();
   unsubscribe();
 
-  expect(events).toEqual([{ kind: 'avatar', circleId, accountId: 'sarah', uri: expect.any(String) }]);
+  expect(getBlob).toHaveBeenCalledWith(circleId, BlobPaths.picture(accountId, 'pic-1'));
+  const picture = await getProfilePicture(accountId);
+  expect(picture?.bytes).toEqual(photo);
+  expect(picture?.status).toBe('fetched');
+  expect(picture?.fetchAttempts).toBe(0);
+  expect(events).toEqual([{ kind: 'profilePicture', accountId, uri: expect.any(String) }]);
+});
+
+// Faces before posts: every pending picture is drained to exhaustion
+// before the attachment loop ever runs, regardless of recency — not
+// counted against maxPhotos at all, so this has to be observed by call
+// order rather than by catching the drain mid-way with a small budget.
+test('a profile picture is drained before a post, regardless of recency', async () => {
+  const circleId = await makeCircle();
+  const accountId = `account-${circleId}`;
+  const photo = new Uint8Array([1]);
+  const postId = await makePendingPost(circleId, photo, 9000); // newer than the picture below
+  await makePendingProfilePicture(circleId, accountId, 'pic-1', 1000);
+  (getBlob as jest.Mock).mockImplementation(async (_circleId: string, path: string) =>
+    path === BlobPaths.picture(accountId, 'pic-1') ? photo : encrypt(photo, KEY)
+  );
+
+  await drainPhotoQueue();
+
+  const calledPaths = (getBlob as jest.Mock).mock.calls.map((call) => call[1]);
+  expect(calledPaths.indexOf(BlobPaths.picture(accountId, 'pic-1'))).toBeLessThan(calledPaths.indexOf(postId));
+});
+
+// Compact and independent of one another, unlike a post or cover — so
+// they go out together rather than one at a time. Proven by a gate that
+// only opens once both fetches have actually started: a sequential
+// implementation would await the first call forever, since nothing
+// would ever start the second one to open the gate.
+test('fetches multiple pending profile pictures in parallel, not one at a time', async () => {
+  // Two circles, not one: applyRoster replaces a circle's whole roster,
+  // so calling makePendingProfilePicture twice against the *same*
+  // circleId would mark the first account as having left when the
+  // second roster (of just the second account) landed.
+  const circleA = await makeCircle();
+  const circleB = await makeCircle();
+  const accountA = `account-a-${circleA}`;
+  const accountB = `account-b-${circleB}`;
+  await makePendingProfilePicture(circleA, accountA, 'pic-a', 1000);
+  await makePendingProfilePicture(circleB, accountB, 'pic-b', 1000);
+
+  let started = 0;
+  let releaseBoth: () => void = () => {};
+  const bothStarted = new Promise<void>((resolve) => {
+    releaseBoth = resolve;
+  });
+  (getBlob as jest.Mock).mockImplementation(async () => {
+    started += 1;
+    if (started === 2) releaseBoth();
+    await bothStarted;
+    return new Uint8Array([1]);
+  });
+
+  await drainPhotoQueue();
+
+  expect(started).toBe(2);
+  expect((await getProfilePicture(accountA))?.status).toBe('fetched');
+  expect((await getProfilePicture(accountB))?.status).toBe('fetched');
+});
+
+// deadlineMs has no real caller yet (see DrainBudget's own doc comment),
+// but it's being kept for an eventual background-fetch task, so the
+// picture-draining loop has to actually honor it now, not just the
+// attachment loop — a backlog spread across many stale circles
+// shouldn't be able to run past a real deadline uncounted.
+test('stops draining profile pictures once the deadline has passed', async () => {
+  const circleId = await makeCircle();
+  const accountId = `account-${circleId}`;
+  await makePendingProfilePicture(circleId, accountId, 'pic-1', 1000);
+  (getBlob as jest.Mock).mockResolvedValue(new Uint8Array([1]));
+
+  await drainPhotoQueue({ deadlineMs: -1 });
+
+  expect(getBlob).not.toHaveBeenCalled();
+  expect((await getProfilePicture(accountId))?.status).toBe('pending');
+});
+
+// A blob that was never uploaded (or was already retired) is an ordinary
+// miss, not corruption — same as a post or a cover.
+test('a missing profile picture backs off rather than retrying forever', async () => {
+  const circleId = await makeCircle();
+  const accountId = `account-${circleId}`;
+  await makePendingProfilePicture(circleId, accountId, 'pic-1', 1000);
+  (getBlob as jest.Mock).mockResolvedValue(null);
+
+  await drainPhotoQueue();
+
+  const picture = await getProfilePicture(accountId);
+  expect(picture?.status).toBe('failed');
+  expect(picture?.bytes).toBeNull();
+  expect(picture?.fetchAttempts).toBe(1);
+  expect(picture?.nextAttemptAt).toBeGreaterThan(Date.now());
+});
+
+// getFetchableProfilePictures' own gate only checks that the account has
+// some row in a circle this device hasn't left; it says nothing about
+// whether that one account has since left that particular circle, so
+// findCircleSharedWith's own, stricter check is what actually catches
+// this case — backing it off rather than throwing out of the drain loop.
+test('a profile picture backs off once the account has left every circle this device shares', async () => {
+  const circleId = await makeCircle();
+  const accountId = `account-${circleId}`;
+  await applyRoster(circleId, [{ circleId, accountId, name: 'Sarah', publicKey: 'pk', role: 'member', joinedAt: 1000 }], 1000);
+  await applyRoster(circleId, [], 1100); // this account leaves; the circle itself stays
+  await upsertProfilePictureRef(accountId, 'pic-1', 1100);
+
+  await drainPhotoQueue();
+
+  expect(getBlob).not.toHaveBeenCalled();
+  expect((await getProfilePicture(accountId))?.status).toBe('failed');
 });
 
 test('stops without a session, rather than backing every photo off', async () => {
@@ -184,7 +309,7 @@ test('fetches newest first, across circles rather than finishing one circle at a
   expect(first.entryId).toBe(newest);
 });
 
-test('drains every cover/avatar before any post, regardless of recency', async () => {
+test('drains every cover before any post, regardless of recency', async () => {
   const circleId = await makeCircle();
   const photo = new Uint8Array([1]);
   await makePendingPost(circleId, photo, 9000); // newer than the cover below
@@ -196,16 +321,16 @@ test('drains every cover/avatar before any post, regardless of recency', async (
   expect(first.entryId).toBe(coverEntry);
 });
 
-test('within the cover/avatar tier, newest still wins', async () => {
+test('within the cover tier, newest still wins', async () => {
   const circleId = await makeCircle();
   const photo = new Uint8Array([1]);
   await makePendingPost(circleId, photo, 9000); // must still lose to both, despite being newest overall
-  await makePendingAvatar(circleId, photo, 1000, 'sarah');
-  const newerAvatar = await makePendingAvatar(circleId, photo, 2000, 'emre');
+  await makePendingCover(circleId, photo, 1000, 'cover-1');
+  const newerCover = await makePendingCover(circleId, photo, 2000, 'cover-2');
 
   const [first] = await getFetchableAttachments(Date.now(), 1);
 
-  expect(first.entryId).toBe(newerAvatar);
+  expect(first.entryId).toBe(newerCover);
 });
 
 test('records a failure with backoff and leaves the photo pending', async () => {

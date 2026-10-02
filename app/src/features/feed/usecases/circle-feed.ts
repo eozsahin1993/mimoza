@@ -7,15 +7,15 @@ import {
   getMember,
   listActivitySince,
   listEveryMemberSeen,
-  getProfile,
+  getLocalAccount,
   summarise,
   type CommentWithAuthor,
   type Post,
-  type Profile,
+  type LocalAccount,
   type ReactionSummary,
 } from '@/data/db';
 import { toMemberEvents, isMembershipEvent, type MemberEvent } from '@/features/feed/usecases/group-member-events';
-import { resolveMemberAvatars } from '@/features/circle/usecases/member-avatars';
+import { resolveMemberPictures } from '@/features/circle/usecases/member-pictures';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 
 /** One comment, with its author's current picture resolved alongside their name. */
@@ -49,7 +49,9 @@ export type FeedPostView = {
 export type CircleFeedMeta = {
   circleName: string;
   memberCount: number;
-  profile: Profile | null;
+  profile: LocalAccount | null;
+  /** This device's own current picture — resolved the same way any other member's is, through profilePictures. */
+  selfPhotoUri?: string;
   /**
    * The reader's own account id. Named ownPublicKey for the row kinds
    * that already compare against it (roster changes, posts) — it is an
@@ -77,13 +79,15 @@ export const FEED_PAGE_SIZE = 10;
  * same as loadCircleFeedPage.
  */
 export async function loadCircleFeedMeta(circleId: string): Promise<CircleFeedMeta> {
-  const [circle, memberCount, profile] = await Promise.all([getCircle(circleId), countMembers(circleId), getProfile()]);
+  const [circle, memberCount, profile] = await Promise.all([getCircle(circleId), countMembers(circleId), getLocalAccount()]);
   const ownMember = profile ? await getMember(circleId, profile.accountId) : null;
+  const selfPhotoUri = profile ? (await resolveMemberPictures([profile.accountId])).get(profile.accountId) : undefined;
 
   return {
     circleName: circle?.name ?? '',
     memberCount,
     profile,
+    selfPhotoUri,
     ownPublicKey: profile?.accountId ?? null,
     ownIsAdmin: ownMember?.role === 'admin',
     circleCreatedAt: circle?.createdAt ?? 0,
@@ -136,11 +140,7 @@ export async function loadCircleFeedPage(
   // Only who this page actually needs a picture for — a post's author or
   // a previewed comment's — not every member the circle has ever had.
   const avatarsNeeded = new Set([...page.map((post) => post.authorId), ...previewComments.map((comment) => comment.authorId)]);
-  const membersByAccount = new Map(everyMember.map((member) => [member.accountId, member]));
-  const avatarByAccount = await resolveMemberAvatars(
-    circleId,
-    [...avatarsNeeded].map((accountId) => ({ accountId, avatarId: membersByAccount.get(accountId)?.avatarId ?? null })),
-  );
+  const avatarByAccount = await resolveMemberPictures([...avatarsNeeded]);
 
   const commentsByPost = commentSummaries(page, previewComments, avatarByAccount);
   // No batched read for reactions yet (summarise is per post, unlike

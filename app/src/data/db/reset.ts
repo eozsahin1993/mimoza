@@ -7,12 +7,13 @@ import {
   attachments,
   circleMembers,
   circles,
-  deviceProfile,
+  localAccount,
   outbox,
   pendingRequests,
   postComments,
   postReactions,
   posts,
+  profilePictures,
 } from '@/data/db/schema';
 
 /** Every circle id ever stored locally, including ones this device has left — unlike getAllCircles, nothing is filtered out, since resetAllLocalData's caller needs to clean up keystore material for all of them, not just active ones. */
@@ -61,5 +62,6 @@ export async function resetAllLocalData(): Promise<void> {
   await db.delete(pendingRequests);
   await db.delete(circleMembers);
   await db.delete(circles);
-  await db.delete(deviceProfile);
+  await db.delete(profilePictures);
+  await db.delete(localAccount);
 }

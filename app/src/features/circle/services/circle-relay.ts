@@ -39,8 +39,8 @@ export type PendingRequest = {
 export type RosterMember = {
   accountId: string;
   name?: string;
-  avatarId?: string;
-  avatarKeyVersion?: number;
+  /** The account's current profile picture id — resolve through member-pictures.ts, never a URL here. */
+  profilePictureId?: string;
   publicKey?: string;
   role: string;
   notifyLevel: string;
@@ -111,13 +111,13 @@ export async function setCover(circleId: string, coverId: string, coverKeyVersio
 }
 
 /**
- * Field-level rules, enforced by the relay: notifyLevel and avatarId only
- * on your own row, role only by an admin and never on your own.
+ * Field-level rules, enforced by the relay: notifyLevel only on your own
+ * row, role only by an admin and never on your own.
  */
 export async function patchMembership(
   circleId: string,
   accountId: string,
-  change: { role?: string; notifyLevel?: string; avatarId?: string; keyVersion?: number }
+  change: { role?: string; notifyLevel?: string }
 ): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${circleId}/members/${accountId}`, {
     method: 'PATCH',

@@ -11,10 +11,10 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Fonts, Radius, Space, Spacing } from '@/ui/theme/tokens';
-import { getProfile } from '@/data/db';
+import { getLocalAccount, getProfilePicture } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 import { completeProfileSetup } from '@/features/account/usecases/onboarding';
-import { getProfile as getRelayProfile } from '@/features/account/services/account-relay';
+import { getProfile } from '@/features/account/services/account-relay';
 import { primeOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
@@ -49,7 +49,7 @@ export default function ProfileSetupScreen() {
   // immediately instead of hashing the name as it's typed, letter by
   // letter.
   useEffect(() => {
-    getRelayProfile()
+    getProfile()
       .then((profile) => setColorSeed(primeOwnColorSeed(profile.accountId)))
       .catch((err) => console.error('Failed to read the account profile', err));
   }, []);
@@ -58,11 +58,12 @@ export default function ProfileSetupScreen() {
   // load whatever's already saved so this doesn't look like a blank form
   // for someone who's already told us who they are.
   useEffect(() => {
-    getProfile().then((profile) => {
+    getLocalAccount().then(async (profile) => {
       if (!profile) return;
       setName(profile.name);
-      if (profile.picture) {
-        setPicture({ uri: bytesToDataUri(profile.picture), bytes: profile.picture });
+      const picture = await getProfilePicture(profile.accountId);
+      if (picture?.bytes) {
+        setPicture({ uri: bytesToDataUri(picture.bytes), bytes: picture.bytes });
       }
     });
   }, []);

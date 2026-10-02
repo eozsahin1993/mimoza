@@ -24,7 +24,14 @@ import Constants from 'expo-constants';
 
 import { BlobAlreadyExistsError, RateLimitedError, SessionExpiredError } from '@/core/services/relay-errors';
 import { setSessionExpiredListener } from '@/core/services/session';
-import { BlobPaths, getBlob, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import {
+  BlobPaths,
+  getBlob,
+  getBlobFromSignedUrl,
+  getProfilePictureUploadTarget,
+  getUploadTarget,
+  uploadBlob,
+} from '@/core/services/blob-relay';
 import { listCircles } from '@/features/circle/services/circle-relay';
 import { walkEntries } from '@/features/post/services/post-relay';
 
@@ -144,8 +151,7 @@ describe('blob addressing', () => {
   test.each([
     [BlobPaths.photo('post-1'), 'post-1'],
     [BlobPaths.cover('cover-9'), 'cover/cover-9'],
-    [BlobPaths.uploadAvatar('avatar-3'), 'avatar/avatar-3'],
-    [BlobPaths.avatar('acct-2', 'avatar-3'), 'avatar/acct-2/avatar-3'],
+    [BlobPaths.picture('acct-2', 'pic-3'), 'picture/acct-2/pic-3'],
   ])('%s', (path, expected) => {
     expect(path).toBe(expected);
   });
@@ -164,15 +170,13 @@ describe('getUploadTarget', () => {
     expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
   });
 
-  test('a cover and a picture go to their own paths', async () => {
+  test('a cover goes to its own path, under the circle', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3', fields: {} }));
 
     await getUploadTarget('c1', BlobPaths.cover('cover-9'));
-    await getUploadTarget('c1', BlobPaths.uploadAvatar('avatar-3'));
 
     expect((global.fetch as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
       `${RELAY_URL}/v1/circles/c1/blobs/cover/cover-9/upload-target`,
-      `${RELAY_URL}/v1/circles/c1/blobs/avatar/avatar-3/upload-target`,
     ]);
   });
 
@@ -195,6 +199,33 @@ describe('getUploadTarget', () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
 
     await expect(getUploadTarget('c1', 'post-1')).rejects.toBeInstanceOf(RateLimitedError);
+  });
+});
+
+// The one blob not under a circle: this account's own picture, so the
+// path has no circleId segment at all.
+describe('getProfilePictureUploadTarget', () => {
+  test('asks the relay for a presigned target against the account, not a circle', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3/bucket', fields: { key: 'account/a1/picture/p1' } }));
+
+    const result = await getProfilePictureUploadTarget('p1');
+
+    expect(result).toEqual({ url: 'https://s3/bucket', fields: { key: 'account/a1/picture/p1' } });
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(`${RELAY_URL}/v1/account/picture/p1/upload-target`);
+    expect(init.method).toBe('POST');
+  });
+
+  test('throws BlobAlreadyExistsError specifically on a 409', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 409));
+
+    await expect(getProfilePictureUploadTarget('p1')).rejects.toBeInstanceOf(BlobAlreadyExistsError);
+  });
+
+  test('throws RateLimitedError specifically on a 429', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
+
+    await expect(getProfilePictureUploadTarget('p1')).rejects.toBeInstanceOf(RateLimitedError);
   });
 });
 
@@ -222,6 +253,26 @@ describe('getBlob', () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
 
     await expect(getBlob('c1', 'post-1')).rejects.toBeInstanceOf(RateLimitedError);
+  });
+});
+
+// The other half of a response that already carries a signed URL inline
+// (an invite preview, a pending request) — no relay round trip first.
+describe('getBlobFromSignedUrl', () => {
+  test('downloads straight from the URL, no relay call first', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200, arrayBuffer: async () => new Uint8Array([4, 5, 6]).buffer });
+
+    const bytes = await getBlobFromSignedUrl('https://cdn/already-signed');
+
+    expect(bytes).toEqual(new Uint8Array([4, 5, 6]));
+    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(1);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('https://cdn/already-signed');
+  });
+
+  test('a 404 is null, not an error — the account simply has no picture', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 404 });
+
+    expect(await getBlobFromSignedUrl('https://cdn/already-signed')).toBeNull();
   });
 });
 

@@ -7,7 +7,7 @@ import {
   initDatabase,
   listComments,
   listReactors,
-  saveProfile,
+  saveLocalAccount,
 } from '@/data/db';
 import { reactionTag, reactionTagKey } from '@/core/crypto/reaction-tags';
 import { commentOnPost, deleteComment } from '@/features/post/usecases/comment-on-post';
@@ -53,7 +53,7 @@ async function makePost(circleId: string): Promise<string> {
 
 beforeAll(async () => {
   await initDatabase();
-  await saveProfile({ accountId: ACCOUNT, name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
+  await saveLocalAccount({ accountId: ACCOUNT, name: 'Me', deviceId: 'phone', createdAt: NOW, updatedAt: NOW });
 });
 
 beforeEach(() => {

@@ -7,8 +7,6 @@ export type Comment = typeof postComments.$inferSelect;
 export type NewComment = typeof postComments.$inferInsert;
 export type CommentWithAuthor = Comment & {
   authorName: string;
-  authorAvatarId: string | null;
-  authorAvatarKeyVersion: number | null;
 };
 
 /**
@@ -41,23 +39,13 @@ export async function applyChildren(postId: string, comments: NewComment[]): Pro
   for (const comment of comments) await applyComment(comment);
 }
 
-function withAuthor(row: { comment: Comment; name: string | null; avatarId: string | null; avatarKeyVersion: number | null }): CommentWithAuthor {
-  return {
-    ...row.comment,
-    authorName: row.name ?? '',
-    authorAvatarId: row.avatarId ?? null,
-    authorAvatarKeyVersion: row.avatarKeyVersion ?? null,
-  };
+function withAuthor(row: { comment: Comment; name: string | null }): CommentWithAuthor {
+  return { ...row.comment, authorName: row.name ?? '' };
 }
 
 export async function listComments(postId: string): Promise<CommentWithAuthor[]> {
   const rows = await db
-    .select({
-      comment: postComments,
-      name: circleMembers.name,
-      avatarId: circleMembers.avatarId,
-      avatarKeyVersion: circleMembers.avatarKeyVersion,
-    })
+    .select({ comment: postComments, name: circleMembers.name })
     .from(postComments)
     .leftJoin(
       circleMembers,
@@ -76,12 +64,7 @@ export async function listComments(postId: string): Promise<CommentWithAuthor[]>
 export async function getComments(commentIds: string[]): Promise<CommentWithAuthor[]> {
   if (commentIds.length === 0) return [];
   const rows = await db
-    .select({
-      comment: postComments,
-      name: circleMembers.name,
-      avatarId: circleMembers.avatarId,
-      avatarKeyVersion: circleMembers.avatarKeyVersion,
-    })
+    .select({ comment: postComments, name: circleMembers.name })
     .from(postComments)
     .leftJoin(
       circleMembers,

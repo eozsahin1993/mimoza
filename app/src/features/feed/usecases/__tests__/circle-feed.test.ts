@@ -1,4 +1,4 @@
-import { applyCircle, applyPost, applyRoster, initDatabase, insertActivity, saveProfile } from '@/data/db';
+import { applyCircle, applyPost, applyRoster, initDatabase, insertActivity, saveLocalAccount } from '@/data/db';
 import { FEED_PAGE_SIZE, loadCircleFeedMeta, loadCircleFeedPage } from '@/features/feed/usecases/circle-feed';
 import { generateUUID } from '@/core/crypto/primitives';
 
@@ -6,7 +6,7 @@ const ACCOUNT_ID = 'account-1';
 
 beforeAll(async () => {
   await initDatabase();
-  await saveProfile({ accountId: ACCOUNT_ID, name: 'Founder', deviceId: 'device-1', createdAt: 1, updatedAt: 1 });
+  await saveLocalAccount({ accountId: ACCOUNT_ID, name: 'Founder', deviceId: 'device-1', createdAt: 1, updatedAt: 1 });
 });
 
 async function makeCircle(): Promise<string> {

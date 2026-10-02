@@ -23,6 +23,14 @@ export type InvitePreview = {
   name: string;
   memberCount: number;
   invitedBy: string;
+  /**
+   * The inviter's picture, already a signed URL — fetch it with
+   * getBlobFromSignedUrl right away rather than holding onto this
+   * preview to use later; the URL is good for an hour, and nothing here
+   * should ever be cached across a re-render of this screen, let alone
+   * persisted. Absent when they have none.
+   */
+  profilePictureUrl?: string;
 };
 
 export type JoinRequest = {
@@ -30,6 +38,8 @@ export type JoinRequest = {
   circleId: string;
   accountId: string;
   name?: string;
+  /** Same one-hour, use-it-now signed URL as InvitePreview.profilePictureUrl. Absent when they have none. */
+  profilePictureUrl?: string;
   /**
    * What an approver seals every content key version to. The requester
    * is not on the roster yet, so this ask is the only place their key
