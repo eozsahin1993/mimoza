@@ -63,7 +63,7 @@ every member of a circle.
 | `<prefix>-accounts` | One partition per account: profile, devices, linked providers, device-link sessions, and the Apple refresh token deletion revokes with. |
 | `<prefix>-sessions` | Bearer tokens this relay issued. TTL on `expiresAt`. |
 | `<prefix>-rate-limit` | Per-account request budgets. |
-| `<prefix>-blobs` (S3) | Photo, cover and avatar ciphertext. Glacier IR after 90 days. |
+| `<prefix>-blobs` (S3) | Photo and cover ciphertext, plus plain profile picture bytes under `account/`. Glacier IR after 90 days. |
 | SSM `/<prefix>/*` | Settings, and the four SecureString credentials. |
 | Firebase, one project per env | Outside AWS: push (FCM), crash reports and usage analytics from the app. Route patterns and three parameterless events — no ids, no content; see `RELAY_DESIGN.md`, *Telemetry*. |
 
@@ -87,11 +87,13 @@ a SecureString change needs only a cold start. Nothing is stored in the
 repo, in CI, or on a developer's machine except `<env>.env`, which is
 gitignored.
 
-**Everything the relay serves is ciphertext it cannot read.** That is the
-constraint the rest of this document keeps running into: it is why blobs
-can be cached and shared, why logs carry no identifiers, why a backup
-restores something only the user's device can open, and why the relay
-cannot select a circle's rows to fix them.
+**Almost everything the relay serves is ciphertext it cannot read.** That
+is the constraint the rest of this document keeps running into: it is
+why most blobs can be cached and shared, why logs carry no identifiers,
+why a backup restores something only the user's device can open, and why
+the relay cannot select a circle's rows to fix them. The one disclosed
+exception is a profile picture, stored as uploaded rather than sealed —
+see `RELAY_DESIGN.md`'s trust model for exactly who that is shown to.
 
 **Auth and rate limiting are both the relay's own, not AWS's.** Sign-in
 verifies a Google or Apple ID token against that provider's JWKS over
@@ -206,16 +208,22 @@ reader onward should be served from the edge.
   the origin sees them.
 - **Every key is immutable** — `<circleId>/<postId>` for a photo,
   `<circleId>/cover/<coverId>` for a cover,
-  `<circleId>/avatar/<accountId>/<avatarId>` for a member's picture. A
-  changed cover or picture is a new id, never an overwrite, so all three
-  take a long TTL and none needs an uncached path.
+  `account/<accountId>/picture/<pictureId>` for a profile picture (the
+  one key not under a circle prefix at all). A changed cover or picture
+  is a new id, never an overwrite, so all three take a long TTL and none
+  needs an uncached path.
 - **Invalidate on delete only.** Nothing else ever changes. One path per
   photo; one wildcard (`/<circleId>/*`) per circle for bulk deletion,
-  which counts as a single path. First 1,000 paths/month free,
+  which counts as a single path; account deletion invalidates
+  `/account/<accountId>/*` the same way. First 1,000 paths/month free,
   account-wide. Best-effort: the bytes are already destroyed by then, so
   a failed invalidation is logged rather than failing the delete.
-- Invite previews carry no blob — a name and a member count, nothing
-  more. No pre-membership blob access.
+- Invite previews and pending join requests carry no post or cover
+  blob — a name and a member count, nothing more there. A profile
+  picture is the deliberate exception: each inlines a signed URL to it
+  directly on that same response, so an invite's recipient or an admin
+  reviewing an ask sees a face before they are a member — see
+  `RELAY_DESIGN.md`'s *A profile picture*.
 
 Provider portability comes from the domain plus the relay handing out
 URLs at request time; clients never see S3. Signing is CloudFront-specific

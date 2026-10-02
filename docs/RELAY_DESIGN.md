@@ -22,7 +22,8 @@ relay (Lambda)
  ├─ circles table      circle#<id>: meta, members, sealed keys,
  │                     invites, requests, posts, activity, children
  ├─ sessions, rate-limit tables
- ├─ S3 (via CloudFront) encrypted photo, cover and avatar bytes
+ ├─ S3 (via CloudFront) encrypted photo and cover bytes, plain profile
+ │                       picture bytes
  └─ APNs / FCM         push, text composed from names + action
 ```
 
@@ -35,6 +36,11 @@ or a reaction's emoji. This is the same trade WhatsApp asks for, stated
 plainly rather than implied. (An earlier design hid membership too; it
 cost most of the codebase, and the property never held in flight — ids
 were on every request.)
+
+A profile picture is the one piece of content this does not cover: like
+WhatsApp's, it is stored as uploaded, not sealed under a circle key, so
+the relay can see it too — see *What is encrypted* and the picture
+section below for exactly who else can.
 
 What that buys: the relay can count, order, route and explain. Reaction
 counts are server-side, so a card renders from one row. Notification
@@ -68,9 +74,10 @@ for the reasons under *New device*.
 | | who can read it |
 |---|---|
 | account name, circle name | relay and members |
+| profile picture | relay, plus circle members, an admin reviewing a join request, and anyone who opens an invite the account created — see *A profile picture* below |
 | membership, roles, who invited whom, activity events | relay and members |
 | entry kind, author, timestamps, counts | relay and members |
-| post caption, photo, comment text, reaction payload, cover photo, member picture | members only |
+| post caption, photo, comment text, reaction payload, cover photo | members only |
 | content keys | members only; the relay stores copies sealed to each member |
 
 ## Keys
@@ -90,7 +97,7 @@ reaction tag      HMAC-SHA256(HKDF(K_v, "reaction-tag"), emoji), hex
 
 | pk | sk | attributes |
 |---|---|---|
-| `account#<id>` | `profile` | name, pubkey, pubkeyUpdatedAt, createdAt |
+| `account#<id>` | `profile` | name, pubkey, pubkeyUpdatedAt, profilePictureId, profilePictureSetAt, createdAt |
 | `account#<id>` | `device#<deviceId>` | pushToken, platform, locale, updatedAt |
 | `account#<id>` | `provider#<provider>:<sub>` | linkedAt, refreshToken (Apple only, for revoking on deletion) |
 | `account#<id>` | `devicelink#<sessionId>` | publicKey (the throwaway one), sealedKeypair once answered, createdAt, expiresAt |
@@ -107,7 +114,7 @@ token of the relay's own that every other route requires;
 | pk | sk | attributes |
 |---|---|---|
 | `circle#<id>` | `meta` | name, coverId, keyVersion, rosterVersion, memberCount, lastEntryAt, createdBy, createdAt |
-| `circle#<id>` | `member#<accountId>` | accountId, role `admin\|member`, notifyLevel, needsRewrap, avatarId, avatarKeyVersion, joinedAt |
+| `circle#<id>` | `member#<accountId>` | accountId, role `admin\|member`, notifyLevel, needsRewrap, joinedAt |
 | `circle#<id>` | `key#<accountId>` | keys `{ "<v>": sealedKey }`, updatedAt |
 | `circle#<id>` | `invite#<code>` | createdBy, createdAt, expiresAt |
 | `circle#<id>` | `request#<requestId>` | accountId, publicKey, status `pending\|approved\|denied`, createdAt, expiresAt. Indexed by account like a membership, since the asker has no membership to read: the query that answers "which circles am I in" filters on the `member#` prefix, so an ask can never be mistaken for one |
@@ -141,27 +148,39 @@ token of the relay's own that every other route requires;
 | `by-type-updated` | `pk` | `typeUpdatedKey = post#<updatedAt:013d>#<postId>` | posts forward, including changed ones |
 | `by-account` | `accountId` | `sk` | every circle an account is in |
 
-Blobs live in S3 at `<circleId>/<postId>`, `<circleId>/cover/<coverId>`
-and `<circleId>/avatar/<accountId>/<avatarId>`, delivered as CloudFront
-URLs signed for an hour. The bytes never pass through the relay in either direction:
-an upload is a presigned form the device posts straight to the bucket,
-and a download is a signed URL it fetches from the edge.
+Blobs live in S3 at `<circleId>/<postId>` and `<circleId>/cover/<coverId>`,
+delivered as CloudFront URLs signed for an hour. The bytes never pass
+through the relay in either direction: an upload is a presigned form the
+device posts straight to the bucket, and a download is a signed URL it
+fetches from the edge.
 
-Every key is written once. A cover id and an avatar id are content
-hashes the client computes, so changing either is a new key rather than
-an overwrite: a cached copy can never be stale, the edge holds objects
-indefinitely, and re-uploading something unchanged is refused because
-those exact bytes are already there. Ids that become keys are checked
-for shape before they get near one (`internal/util/ids`).
+Every key is written once. A cover id is a fresh id the client mints per
+upload rather than a content hash, so changing it is a new key rather
+than an overwrite: a cached copy can never be stale, the edge holds
+objects indefinitely, and re-uploading under an id already there is
+refused. Ids that become keys are checked for shape before they get near
+one (`internal/util/ids`).
 
-A member's picture is circle content like everything else: sealed under
-the circle's content key, stored under that circle's prefix, and recorded
-on the membership row as an id and the key version that opens it. The
-same face is therefore stored once per circle rather than once per
-account, put there by its owner after they are admitted and deleted when
-they leave. A pending join request carries a name and no picture: the
-asker holds no key yet, so there is nothing they could have sealed one
-to.
+**A profile picture** is account-level, not circle content: one per
+account rather than one per circle, stored as uploaded under
+`account/<accountId>/picture/<pictureId>` — the one blob that is not
+under a circle at all — and recorded on the `profile` row as
+`profilePictureId`, the same fresh-id-per-change scheme as a cover. It
+is not public; reaching the bytes still requires a relationship:
+
+- a circle member reads it through `GET /circles/{id}/blobs/picture/{accountId}/{pictureId}`,
+  gated on both caller and subject being in that circle;
+- an admin reviewing a pending join request, and anyone who opens an
+  invite, get a signed URL inlined directly on that same read
+  (`GET /circles/{id}/requests`, `GET /invites/{code}`) instead of a
+  second route — both are already fetched and rendered immediately, so
+  there is nothing to gain by making the client ask twice.
+
+Changing it retires the old key (best-effort) and bumps every circle's
+`rosterVersion` the same way a role or notification-level change does —
+the wake-up signal that gets a member's devices to refetch the roster
+rather than stay on a stale id. Deleting the account sweeps the whole
+`account/<id>/` prefix.
 
 A blob is uploaded before the entry that references it, so a crash in
 between leaves an orphaned object rather than a post pointing at bytes
@@ -195,6 +214,7 @@ outlives it.
 | role change, rename, cover | row update with an admin check, `rosterVersion + 1` where membership changes, matching activity. A request that sets both a name and a cover records both |
 | notification level | the member's own row (`PATCH /circles/{id}/members/{accountId}`, `all \| comments \| photos \| none`), no activity — nobody else needs to know — but `rosterVersion + 1`, so that account's other devices refetch |
 | publish a public key | `PUT /account/pubkey`; with `reset`, every membership is flagged `needsRewrap` and each circle's members get a silent push |
+| set / clear profile picture | `PUT /account/picture` (body `{pictureId}`) or `DELETE /account/picture`; both retire the old blob (best-effort) and touch every membership, `rosterVersion + 1` each, so members refetch the roster the same way a rename reaches them |
 | device link | `POST /account/device-link` opens a session holding a throwaway public key; `POST …/{sessionId}` stores the sealed keypair once, first answer wins; `GET …/{sessionId}` is the poll. See *New device* |
 | visibility, delete post, delete comment | see Reads: each stamps `updatedAt` and the forward index key, so the change reaches every device through the walk |
 | delete circle | every row in the partition, in batches, plus the lookup row each invite code owns |
@@ -236,8 +256,8 @@ GET /account
     what says whose it is, and it is the only one they may read
 
 GET /circles/{id}/roster
-  → rosterVersion, members [accountId, name, avatarId, avatarKeyVersion,
-    pubkey, role, joinedAt, needsRewrap], the caller's sealed keys
+  → rosterVersion, members [accountId, name, profilePictureId, pubkey,
+    role, joinedAt, needsRewrap], the caller's sealed keys
 
 GET /circles/{id}/entries?type=post|activity&cursor=<opaque>&limit=200
   → entries, next, prev, more
@@ -246,21 +266,36 @@ GET /circles/{id}/entries/{postId}/children
   → comments, reactions
 
 GET /circles/{id}/invites        → this circle's live codes, any admin
-GET /circles/{id}/requests       → pending asks, each with the joiner's public key
+GET /circles/{id}/requests       → every ask this circle has ever gotten
+                                   (pending, approved or denied — see
+                                   below), each with the joiner's public
+                                   key and, if they have one, a signed
+                                   profilePictureUrl inlined directly
 GET /invites/{code}              → the preview a joiner sees: name, member
-                                   count, who shared it. No blob, no roster
+                                   count, who shared it, and that
+                                   inviter's signed profilePictureUrl if
+                                   they have one. No roster
 
 POST /circles/{id}/blobs/{postId}/upload-target
 POST /circles/{id}/blobs/cover/{coverId}/upload-target
-POST /circles/{id}/blobs/avatar/{avatarId}/upload-target
-  → a presigned form, refused where bytes already sit at that key
+POST /account/picture/{pictureId}/upload-target
+  → a presigned form, refused where bytes already sit at that key. The
+    picture one is account-, not circle-, scoped — no {id} in its path
 
 GET /circles/{id}/blobs/{postId}
 GET /circles/{id}/blobs/cover/{coverId}
-GET /circles/{id}/blobs/avatar/{accountId}/{avatarId}
+GET /circles/{id}/blobs/picture/{accountId}/{pictureId}
   → a URL signed for an hour, refused for a post that is deleted or
-    never had a photo
+    never had a photo. The picture route is gated on both caller and
+    subject being a member of {id}, independent of the roster's own
+    rosterVersion — see *A profile picture*
 ```
+
+`GET /circles/{id}/requests` returning every status rather than only
+`pending` is deliberate: an admin's device needs to tell "already
+denied" apart from "never asked" when a repeat attempt comes in, and the
+asker's own `GET /circles` needs the answer to still be there once it
+lands. Filtering the list down to pending ones is the client's job.
 
 A post entry in a page carries its counts, `recentComments`, and what the
 caller themselves did — `iReacted` and `iCommented`, projected from the two

@@ -4,7 +4,7 @@ import { Footer } from "../../sections/footer";
 import "./style.css";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
-const LAST_UPDATED = "30 September 2026";
+const LAST_UPDATED = "2 October 2026";
 
 const SECTIONS = [
   ["can't-see", "What we can't see"],
@@ -44,9 +44,13 @@ export function PrivacyPolicy() {
 
         <div className="policy-lede">
           <p>
-            Mimoza is end-to-end encrypted. Your photos, captions, comments, reactions, cover photos and profile
-            pictures are encrypted on your device with keys that only the members of your circle hold. Our servers
-            store and deliver them, but can't read them.
+            Mimoza is end-to-end encrypted. Your photos, captions, comments, reactions and cover photos are
+            encrypted on your device with keys that only the members of your circle hold. Our servers store and
+            deliver them, but can't read them.
+          </p>
+          <p>
+            Your name and profile picture are the two things about you we store as uploaded, so we can show them
+            to the people you share circles with.
           </p>
           <p>
             This page says what we can see, why we need it, who else touches it, and how to delete it. We never sell
@@ -76,7 +80,6 @@ export function PrivacyPolicy() {
           <li>Comments</li>
           <li>Reactions, including which emoji you chose</li>
           <li>Circle cover photos</li>
-          <li>Profile pictures</li>
         </ul>
         <p>
           We can count reactions and comments on a post, and we can tell that you reacted, but not with what. There
@@ -121,6 +124,15 @@ export function PrivacyPolicy() {
               </td>
             </tr>
             <tr>
+              <td>Profile picture</td>
+              <td>
+                The picture you choose in the app, if you add one. It is stored as uploaded, not end-to-end
+                encrypted, and is shown only to the members of your circles, to the admins of a circle you've asked
+                to join, and to anyone who opens an invite you created. It's never shown anywhere else, and you can
+                replace or remove it at any time.
+              </td>
+            </tr>
+            <tr>
               <td>Public key</td>
               <td>
                 The public half of the encryption keypair your device generates. Other members use it to share circle
@@ -145,8 +157,8 @@ export function PrivacyPolicy() {
             <tr>
               <td>Encrypted content</td>
               <td>
-                The encrypted bytes of photos, captions, comments, reactions, covers and profile pictures, stored so
-                they can be delivered to the other members. We can't decrypt them.
+                The encrypted bytes of photos, captions, comments, reactions and covers, stored so they can be
+                delivered to the other members. We can't decrypt them.
               </td>
             </tr>
             <tr>
@@ -306,9 +318,9 @@ export function PrivacyPolicy() {
           <li>Deleting a photo or comment removes it for everyone in the circle. The encrypted file is deleted from
             storage and cleared from the content network. Download links already issued expire within an hour.
           </li>
-          <li>Leaving a circle removes your membership and your profile picture from that circle, and the circle's
-            key is rotated so you can't read anything posted afterwards. Photos and comments you posted stay with
-            the circle, like a print you handed someone. Delete them first if you don't want that.
+          <li>Leaving a circle removes your membership from that circle, and the circle's key is rotated so you
+            can't read anything posted afterwards. Photos and comments you posted stay with the circle, like a
+            print you handed someone. Delete them first if you don't want that.
           </li>
           <li>Invite codes and join requests expire on their own.</li>
           <li>Session tokens expire after 90 days, or immediately when you sign out.</li>
@@ -325,11 +337,11 @@ export function PrivacyPolicy() {
         </p>
         <ul>
           <li>Deletes every photo, caption, comment and reaction you posted, in every circle you are in.</li>
-          <li>Removes you from every circle, along with your profile picture and any pending join requests.</li>
+          <li>Removes you from every circle, along with any pending join requests.</li>
           <li>
             Deletes any circle in which you were the last remaining member, together with everything in it.
           </li>
-          <li>Deletes your name, public key, devices, notification tokens and sessions.</li>
+          <li>Deletes your name, profile picture, public key, devices, notification tokens and sessions.</li>
           <li>Revokes the Sign in with Apple connection, if you used it.</li>
         </ul>
         <p>
