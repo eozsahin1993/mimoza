@@ -1,6 +1,7 @@
 import { applyCircle, applyRoster, getLocalAccount, getProfilePicture } from '@/data/db';
 import { toWire } from '@/core/crypto/content';
 import { sealToPublicKey } from '@/core/crypto/primitives';
+import { logEvent } from '@/core/services/analytics';
 import { generateContentKey } from '@/features/circle/crypto';
 import { getAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
@@ -71,5 +72,6 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     );
   }
 
+  void logEvent('circle_created');
   return { id: membership.circleId };
 }
