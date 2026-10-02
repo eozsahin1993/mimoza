@@ -494,6 +494,22 @@ describe('a sync pass', () => {
     expect(await listRequests()).toEqual([]);
   });
 
+  // The relay keeps an approved request listed until it expires, so the
+  // asking device can see the answer even if it missed the moment — but
+  // once the circle it names is in the same response, the ask is done.
+  test('an approved request is dropped the moment its circle arrives, not left for the circle list screen to notice', async () => {
+    const id = circleId();
+    await upsertRequest({ circleId: id, inviteCode: 'CODE', circleName: 'Family', submittedAt: NOW, status: 'pending' });
+    relay.listCircles.mockResolvedValue({
+      circles: [circleOf(id)],
+      requests: [{ circleId: id, circleName: 'Family', status: 'approved', createdAt: NOW }],
+    });
+
+    await syncCircles();
+
+    expect(await listRequests()).toEqual([]);
+  });
+
   // The invite code is this device's own and is never echoed back, so a
   // status update must not wipe it.
   test('an updated request keeps the invite code it was made with', async () => {
