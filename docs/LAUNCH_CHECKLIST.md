@@ -60,8 +60,14 @@ Prod is 852138521113, staging 223057859233. See
 
 - [x] `aps-environment` production-only for `APP_ENV=production` — commit
       a356a70.
-- [x] `ITSAppUsesNonExemptEncryption: true` — the app carries its own
-      ciphers, so the HTTPS exemption doesn't apply.
+- [x] Non-exempt encryption declared at upload, not in Info.plist — the
+      app carries its own ciphers, so the HTTPS exemption doesn't apply,
+      but a static `ITSAppUsesNonExemptEncryption: true` asserts a
+      compliance code is already on file and gets every CI upload
+      rejected (90592) until one exists, which nothing can generate while
+      uploads keep failing. Fixed 2026-10-02: the key is gone from
+      `app.json`, and `upload_to_testflight`'s `uses_non_exempt_encryption:
+      true` (Fastfile) answers it per upload instead.
 - [x] `ios.buildNumber` and `android.versionCode` set, both `1` —
       2026-09-28. Still open: whether CI bumps them or you do. Each store
       rejects a repeat upload of the same number.

@@ -16,8 +16,7 @@
           "remote-notification"
         ],
         "CFBundleAllowMixedLocalizations": true,
-        "NSPhotoLibraryUsageDescription": "Mimoza accesses your photos so you can pick the ones to share in your circles.",
-        "ITSAppUsesNonExemptEncryption": true
+        "NSPhotoLibraryUsageDescription": "Mimoza accesses your photos so you can pick the ones to share in your circles."
       },
       "entitlements": {
         "aps-environment": "development"

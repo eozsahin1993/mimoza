@@ -160,6 +160,12 @@ def ship(name)
     app_identifier: config[:app_identifier],
     distribute_external: false,
     skip_waiting_for_build_processing: true,
+    # Answered here instead of a static ITSAppUsesNonExemptEncryption in
+    # Info.plist: `true` there asserts a compliance code is already on
+    # file, and rejects the upload outright when one isn't — which is
+    # permanent until a build lands to generate one. This option is
+    # pilot's own answer path, used only when the plist is silent on it.
+    uses_non_exempt_encryption: true,
   )
 end
 
