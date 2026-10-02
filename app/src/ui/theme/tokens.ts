@@ -7,7 +7,6 @@ import { Platform } from 'react-native';
 
 import Album from 'lucide-react-native/icons/album';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
-import ArrowUp from 'lucide-react-native/icons/arrow-up';
 import ArrowUpRight from 'lucide-react-native/icons/arrow-up-right';
 import Bookmark from 'lucide-react-native/icons/bookmark';
 import Camera from 'lucide-react-native/icons/camera';
@@ -27,6 +26,7 @@ import MessageCircle from 'lucide-react-native/icons/message-circle';
 import Plus from 'lucide-react-native/icons/plus';
 import QrCode from 'lucide-react-native/icons/qr-code';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
+import SendHorizontal from 'lucide-react-native/icons/send-horizontal';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import ShieldOff from 'lucide-react-native/icons/shield-off';
 import SquarePen from 'lucide-react-native/icons/square-pen';
@@ -263,7 +263,7 @@ export const Icons = {
   /** Opens the emoji picker on a post nobody has reacted to yet — outline, since it's an invitation rather than a reaction you left. */
   react: Heart,
   comment: MessageCircle,
-  send: ArrowUp,
+  send: SendHorizontal,
   locked: Lock,
   promote: ShieldCheck,
   demote: ShieldOff,

@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type ViewToken } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FabButton } from '@/ui/components/buttons/fab-button';
@@ -21,6 +22,9 @@ import { useTheme } from '@/ui/theme/hooks/use-theme';
 /** Scroll clearance above the FAB. The safe-area inset itself is separate — see `ListFooterComponent`. */
 const LIST_BOTTOM_PADDING = 100;
 
+/** Gap between the keyboard and a focused composer's caret — `Space.s300` read as touching the keyboard on iOS. */
+const KEYBOARD_BOTTOM_OFFSET = 20;
+
 /**
  * One circle's feed. `useCircleFeed` owns the data and the actions on it,
  * `buildFeedRows` decides what rows exist and in what order, and this
@@ -35,10 +39,18 @@ export default function FeedScreen() {
     [circleId],
   );
   const theme = useTheme();
-  const { rows, circleName, memberCount, loaded, refreshing, hasMore, loadingMore, loadMore, reload, refresh } = useCircleFeed(
-    circleId,
-    { justJoined: justJoined === '1' },
-  );
+  const {
+    rows,
+    circleName,
+    memberCount,
+    loaded,
+    refreshing,
+    hasMore,
+    loadingMore,
+    loadMore,
+    reload,
+    refresh,
+  } = useCircleFeed(circleId, { justJoined: justJoined === '1' });
   useFocusEffect(
     useCallback(() => {
       reload().catch((err) => console.error('Failed to load the feed', err));
@@ -96,6 +108,10 @@ export default function FeedScreen() {
         <FlatList
           data={rows}
           showsVerticalScrollIndicator={false}
+          // Scrolls whichever row's focused TextInput above the keyboard
+          // itself.
+          renderScrollComponent={(props) => <KeyboardAwareScrollView {...props} bottomOffset={KEYBOARD_BOTTOM_OFFSET} />}
+          keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

@@ -122,6 +122,14 @@ export function PostCard({
     });
   }
 
+  // Closes after sending: a feed comment is a quick "nice!" in passing,
+  // not a sitting conversation, so the composer collapses back to the
+  // chip+summary rather than sitting open waiting for another one.
+  function handleAddComment(body: string) {
+    onAddComment?.(body);
+    setComposerOpen(false);
+  }
+
   return (
     <ThemedView style={styles.card}>
       <View style={styles.header}>
@@ -218,9 +226,9 @@ export function PostCard({
         <PostComments
           latest={post.latestComment}
           total={post.commentCount}
-          onSubmit={(body) => onAddComment?.(body)}
-          composerOpen={composerOpen}
           onPressShowAll={handleShowAll}
+          composerOpen={composerOpen}
+          onSubmit={handleAddComment}
           selfPhotoUri={selfPhotoUri}
           selfName={selfName}
         />

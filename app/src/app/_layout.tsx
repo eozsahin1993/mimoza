@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AndroidNotificationPriority, setNotificationHandler } from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { Dialog } from '@/ui/components/dialog';
 import { EnvBadge } from '@/ui/components/env-badge';
@@ -193,8 +194,10 @@ export default function RootLayout() {
   }
 
   return (
-    <AppSettingsProvider initialSettings={settings}>
-      <AppShell />
-    </AppSettingsProvider>
+    <KeyboardProvider>
+      <AppSettingsProvider initialSettings={settings}>
+        <AppShell />
+      </AppSettingsProvider>
+    </KeyboardProvider>
   );
 }

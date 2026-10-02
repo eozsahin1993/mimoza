@@ -16,6 +16,9 @@ import { createPost } from '@/features/post/usecases/create-post';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 
+/** Scroll clearance above the footer button, same idea as the feed's FAB. */
+const FOOTER_CLEARANCE = 110;
+
 export default function NewPostScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -71,6 +74,7 @@ export default function NewPostScreen() {
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView
+            style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
@@ -105,20 +109,25 @@ export default function NewPostScreen() {
               />
             </View>
           </ScrollView>
-
-          {error ? (
-            <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
-              {error}
-            </ThemedText>
-          ) : null}
-
-          <PrimaryButton
-            label={t('post.create.postTo', { circle: circleName })}
-            disabled={!picture || posting}
-            onPress={handlePost}
-            style={styles.postButton}
-          />
         </KeyboardAvoider>
+      </ThemedSafeAreaView>
+
+      {/* Outside KeyboardAvoider and absolutely positioned, same as the
+          feed's FAB: pinned to the screen itself rather than riding up
+          with the keyboard the way a sibling inside KeyboardAvoider
+          would. The caption is still reachable above the keyboard; this
+          button isn't needed until it's dismissed. */}
+      <ThemedSafeAreaView edges={['bottom']} style={styles.footer}>
+        {error ? (
+          <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
+            {error}
+          </ThemedText>
+        ) : null}
+        <PrimaryButton
+          label={t('post.create.postTo', { circle: circleName })}
+          disabled={!picture || posting}
+          onPress={handlePost}
+        />
       </ThemedSafeAreaView>
     </ThemedView>
   );
@@ -142,9 +151,13 @@ const styles = StyleSheet.create({
   form: {
     flex: 1,
   },
+  scroll: {
+    flex: 1,
+  },
   scrollContent: {
     gap: Spacing.cardListGap,
-    paddingBottom: Spacing.cardListGap,
+    // Clears the absolutely-positioned footer button below — see `footer`.
+    paddingBottom: FOOTER_CLEARANCE,
   },
   captionInput: {
     minHeight: 60,
@@ -167,8 +180,14 @@ const styles = StyleSheet.create({
   },
   error: {
     textAlign: 'center',
+    marginBottom: Space.s300,
   },
-  postButton: {
-    marginTop: Spacing.cardListGap,
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: Spacing.screenPadding,
+    paddingTop: Space.s300,
   },
 });

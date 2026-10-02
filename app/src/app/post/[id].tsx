@@ -1,15 +1,15 @@
 import type { TFunction } from 'i18next';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ActionSheet } from '@/ui/components/action-sheet';
 import { CommentRow } from '@/features/post/components/comment-row';
 import { Icon } from '@/ui/components/icon';
-import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
 import { FabButton } from '@/ui/components/buttons/fab-button';
 import { HeaderIconButton } from '@/ui/components/navbar/header-icon-button';
 import { missingPhotoFor, PhotoPlaceholder } from '@/ui/components/photo-placeholder';
@@ -47,6 +47,9 @@ import { useLanguage } from '@/core/i18n/use-language';
 
 /** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
 const PREVIEW_NAMES = 3;
+
+/** Gap between the keyboard and a focused composer's caret — `Space.s300` read as touching the keyboard on iOS. */
+const KEYBOARD_BOTTOM_OFFSET = 20;
 
 /** "Aunt Ro, Dad, Emre & 5 others reacted." — or every name, once expanded. */
 function describeReactors(names: string[], expanded: boolean, t: TFunction): string {
@@ -152,6 +155,28 @@ export default function PostDetailsScreen() {
       load().catch((err) => console.error('Failed to load post details', err));
     }, [load]),
   );
+
+  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
+  // Once per visit, not every reload: a refocus mid-visit (the photo
+  // landing, a reaction syncing in) shouldn't snap someone who scrolled
+  // back up to the photo down to the comments again.
+  const scrolledToLatestRef = useRef(false);
+  useEffect(() => {
+    scrolledToLatestRef.current = false;
+  }, [postId]);
+  useEffect(() => {
+    if (comments.length === 0 || scrolledToLatestRef.current) return;
+    scrolledToLatestRef.current = true;
+    scrollRef.current?.scrollToEnd({ animated: false });
+  }, [comments]);
+  // Tapping Send (as opposed to a return key) never blurs the input, so
+  // it stays focused — but a new comment growing the content below it
+  // isn't a focus or keyboard event, which is all KeyboardAwareScrollView
+  // reacts to on its own. Without this, the composer (and the keyboard
+  // still up) ends up below the fold after sending.
+  useEffect(() => {
+    scrollRef.current?.assureFocusedInputVisible();
+  }, [comments]);
 
   // The photo landing while its placeholder is on screen sets it directly
   // rather than reloading everything else this screen shows.
@@ -276,12 +301,14 @@ export default function PostDetailsScreen() {
           />
         </View>
 
-        <KeyboardAvoider style={styles.body}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
-            {photoUri ? (
+        <KeyboardAwareScrollView
+          ref={scrollRef}
+          style={styles.body}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bottomOffset={KEYBOARD_BOTTOM_OFFSET}>
+          {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />
             ) : (
               <PhotoPlaceholder
@@ -380,27 +407,27 @@ export default function PostDetailsScreen() {
                 />
               ))}
             </View>
-          </ScrollView>
 
           <View style={styles.composer}>
             <TextInput
               value={commentText}
               onChangeText={setCommentText}
-              onSubmitEditing={handleSubmitComment}
               placeholder={t('post.details.commentPlaceholder')}
               placeholderTextColor={theme.faint}
-              returnKeyType="send"
+              multiline
+              // Return inserts a newline — the send button is the only
+              // way to submit, same as the feed's own composer.
               style={[styles.composerInput, { color: theme.text, borderColor: theme.faint }]}
             />
             <FabButton
               icon={Icons.send}
-              size={44}
+              size={56}
               disabled={!commentText.trim()}
               onPress={handleSubmitComment}
               style={!commentText.trim() ? styles.composerSendDisabled : undefined}
             />
           </View>
-        </KeyboardAvoider>
+        </KeyboardAwareScrollView>
       </ThemedSafeAreaView>
 
       {/* Says which photo it's about, since it covers the one behind it,
@@ -497,8 +524,11 @@ const styles = StyleSheet.create({
   },
   composerInput: {
     flex: 1,
-    height: 44,
+    minHeight: 44,
+    maxHeight: 44 * 3,
     paddingHorizontal: Space.s400,
+    paddingTop: Space.s300,
+    paddingBottom: Space.s300,
     borderRadius: 999,
     borderWidth: 1,
     fontFamily: Fonts.sans,

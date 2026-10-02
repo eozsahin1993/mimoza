@@ -10,6 +10,7 @@ import { showError } from '@/core/services/messages';
 import type { CommentWithAuthor, LocalAccount } from '@/data/db';
 import { getComments } from '@/data/db';
 import type { FeedPostView } from '@/features/feed/usecases/circle-feed';
+import { resolveMemberPictures } from '@/features/circle/usecases/member-pictures';
 import { commentOnPost } from '@/features/post/usecases/comment-on-post';
 import { getReactions, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
@@ -78,8 +79,16 @@ export function usePostRows({
       onAddComment: async (postId, body) => {
         const commentId = await commentOnPost(circleId, postId, body);
         const [comment] = await getComments([commentId]);
+        // getComments only joins the author's name — their picture is a
+        // separate resolution, same as loadComments does for post/[id].
+        const authorPhotoUri = comment ? (await resolveMemberPictures([comment.authorId])).get(comment.authorId) : undefined;
         const current = posts.find((view) => view.post.id === postId);
-        patchPost(postId, { comments: { latest: comment ?? null, total: (current?.comments.total ?? 0) + 1 } });
+        patchPost(postId, {
+          comments: {
+            latest: comment ? { ...comment, authorPhotoUri } : null,
+            total: (current?.comments.total ?? 0) + 1,
+          },
+        });
       },
       /**
        * Optimistic, like the post's own screen: the write is local-first

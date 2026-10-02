@@ -19,6 +19,9 @@ import { primeOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
 
+/** Scroll clearance above the footer button, same idea as the feed's FAB. */
+const FOOTER_CLEARANCE = 110;
+
 export default function ProfileSetupScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -106,6 +109,7 @@ export default function ProfileSetupScreen() {
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView
+            style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
@@ -135,20 +139,25 @@ export default function ProfileSetupScreen() {
               style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
             />
           </ScrollView>
-
-          {error ? (
-            <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
-              {error}
-            </ThemedText>
-          ) : null}
-
-          <PrimaryButton
-            label={name.trim() ? t('onboarding.profile.continue') : t('onboarding.profile.addNameToContinue')}
-            disabled={!name.trim() || saving}
-            onPress={handleContinue}
-            style={styles.continueButton}
-          />
         </KeyboardAvoider>
+      </ThemedSafeAreaView>
+
+      {/* Outside KeyboardAvoider and absolutely positioned, same as the
+          feed's FAB: pinned to the screen itself rather than riding up
+          with the keyboard the way a sibling inside KeyboardAvoider
+          would. The name field is still reachable above the keyboard;
+          this button isn't needed until it's dismissed. */}
+      <ThemedSafeAreaView edges={['bottom']} style={styles.footer}>
+        {error ? (
+          <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
+            {error}
+          </ThemedText>
+        ) : null}
+        <PrimaryButton
+          label={name.trim() ? t('onboarding.profile.continue') : t('onboarding.profile.addNameToContinue')}
+          disabled={!name.trim() || saving}
+          onPress={handleContinue}
+        />
       </ThemedSafeAreaView>
     </ThemedView>
   );
@@ -171,9 +180,13 @@ const styles = StyleSheet.create({
   form: {
     flex: 1,
   },
+  scroll: {
+    flex: 1,
+  },
   scrollContent: {
     gap: Spacing.cardListGap,
-    paddingBottom: Spacing.cardListGap,
+    // Clears the absolutely-positioned footer button below — see `footer`.
+    paddingBottom: FOOTER_CLEARANCE,
   },
   body: {
     marginTop: -4,
@@ -199,10 +212,16 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sans,
     fontSize: 18,
   },
-  continueButton: {
-    marginTop: Spacing.cardListGap,
-  },
   error: {
     textAlign: 'center',
+    marginBottom: Space.s300,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: Spacing.screenPadding,
+    paddingTop: Space.s300,
   },
 });
