@@ -153,11 +153,22 @@ func TestProfilePictures_AreSeenAcrossAnInvite(t *testing.T) {
 	asker.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated).Decode(&request)
 	var pending struct {
 		Requests []struct {
+			AccountID         string `json:"accountId"`
 			ProfilePictureURL string `json:"profilePictureUrl"`
 		} `json:"requests"`
 	}
+	// The list is the circle's whole ask history, not pending-only (see
+	// TestInvites_DenyingMarksTheAskAndCannotBeRepeated), and member's
+	// already-approved ask from joinCircle above is still in it — so the
+	// asker's row has to be found by id, not assumed to be first.
 	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
-	harness.AssertEqual(t, string(fetch(t, pending.Requests[0].ProfilePictureURL)), "asker face", "the ask's url fetches the asker's picture")
+	askerURL := ""
+	for _, row := range pending.Requests {
+		if row.AccountID == asker.AccountID() {
+			askerURL = row.ProfilePictureURL
+		}
+	}
+	harness.AssertEqual(t, string(fetch(t, askerURL)), "asker face", "the ask's url fetches the asker's picture")
 	member.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusForbidden)
 
 	// Revoked, the code opens nothing — preview included.
