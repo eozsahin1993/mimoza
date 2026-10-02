@@ -9,7 +9,7 @@ jest.mock('@/features/account/services/account-relay', () => ({
 
 import { initDatabase } from '@/data/db';
 import { deleteProfilePicture, getProfilePicture } from '@/data/db/profile-pictures';
-import { uploadBlob } from '@/core/services/blob-relay';
+import { getProfilePictureUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import { clearPicture, setPicture } from '@/features/account/services/account-relay';
 import { BlobAlreadyExistsError } from '@/core/services/relay-errors';
 import { publishProfilePicture, removeProfilePicture } from '@/features/account/usecases/set-profile-picture';
@@ -22,6 +22,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   (setPicture as jest.Mock).mockResolvedValue({ accountId: ACCOUNT_ID, name: 'Ali', createdAt: 0 });
   (clearPicture as jest.Mock).mockResolvedValue({ accountId: ACCOUNT_ID, name: 'Ali', createdAt: 0 });
+  (getProfilePictureUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3/target', fields: {} });
   (uploadBlob as jest.Mock).mockResolvedValue(undefined);
   await deleteProfilePicture(ACCOUNT_ID);
 });
@@ -51,12 +52,14 @@ describe('publishProfilePicture', () => {
   });
 
   // The first attempt actually landed; a retry just needs the relay told,
-  // not a second upload of bytes already sitting at that key.
-  test('a 409 on the upload is treated as already landed, not a failure', async () => {
-    (uploadBlob as jest.Mock).mockRejectedValue(new BlobAlreadyExistsError());
+  // not a second upload of bytes already sitting at that key. Minting
+  // the upload target again is the call a repeat gets the 409 from.
+  test('a 409 minting the upload target is treated as already landed, not a failure', async () => {
+    (getProfilePictureUploadTarget as jest.Mock).mockRejectedValue(new BlobAlreadyExistsError());
 
     const pictureId = await publishProfilePicture(ACCOUNT_ID, new Uint8Array([1]));
 
+    expect(uploadBlob).not.toHaveBeenCalled();
     expect(setPicture).toHaveBeenCalledWith(pictureId);
   });
 

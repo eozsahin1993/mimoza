@@ -18,10 +18,14 @@ import { clearPicture, setPicture } from '@/features/account/services/account-re
 export async function publishProfilePicture(accountId: string, photo: Uint8Array): Promise<string> {
   const pictureId = generateUUID();
 
-  await uploadBlob(await getProfilePictureUploadTarget(pictureId), photo).catch((err) => {
-    // The first attempt actually landed; a retry just needs the relay told.
-    if (!(err instanceof BlobAlreadyExistsError)) throw err;
+  // The first attempt actually landed; a retry just needs the relay told,
+  // not a second upload — minting the target again is the call a repeat
+  // gets the 409 from, not the upload itself.
+  const target = await getProfilePictureUploadTarget(pictureId).catch((err) => {
+    if (err instanceof BlobAlreadyExistsError) return null;
+    throw err;
   });
+  if (target) await uploadBlob(target, photo);
   await setPicture(pictureId);
 
   await storeProfilePicture(accountId, pictureId, photo);
