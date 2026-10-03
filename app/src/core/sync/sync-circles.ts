@@ -161,6 +161,12 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string, forc
     try {
       const roster = await timed('sync.roster', () => getRoster(circle.circleId));
       await storeSealedKeys(circle.circleId, roster.keys, myAccountId);
+
+      const keys = await getCircleKeyMap(circle.circleId);
+      if (!keys?.[circle.keyVersion]) {
+        throw new Error(`Still missing content key version ${circle.keyVersion} for circle ${circle.circleId}.`);
+      }
+
       await applyRoster(
         circle.circleId,
         roster.members.map((member) => ({

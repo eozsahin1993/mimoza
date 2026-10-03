@@ -424,6 +424,10 @@ describe('a sync pass', () => {
       circles: [circleOf(id, { coverId: 'cover-1', coverKeyVersion: 3 })],
       requests: [],
     });
+    // Two real reads now happen in this one pass — this check's own, and
+    // queueAttachmentFetchIfMissing's further down — and in storage both
+    // would see the same thing, so both need the override.
+    circleKeys.getCircleKeyMap.mockResolvedValueOnce({ 1: new Uint8Array(32).fill(1) });
     circleKeys.getCircleKeyMap.mockResolvedValueOnce({ 1: new Uint8Array(32).fill(1) });
 
     expect(await syncCircles()).toBe(0);
@@ -431,6 +435,26 @@ describe('a sync pass', () => {
 
     expect(await syncCircles()).toBe(0);
     expect(await getAttachment(id, coverEntryId('cover-1'))).not.toBeNull();
+  });
+
+  // The same swallow, but for the circle's own current version rather
+  // than a cover's. This is the one that matters for posting: once
+  // keyVersion looks caught up, getCurrentContentKey never gets another
+  // chance to pick up the version it actually needs, and every post from
+  // this device would be rejected as stale forever instead of just until
+  // the next pass.
+  test('a roster sync that leaves this device without its own new key does not advance keyVersion', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id, { keyVersion: 2 })], requests: [] });
+    relay.getRoster.mockResolvedValue(roster({ keyVersion: 2, keys: { 1: 'sealed', 2: 'sealed' } }));
+    circleKeys.getCircleKeyMap.mockResolvedValueOnce({ 1: new Uint8Array(32).fill(1) });
+
+    expect(await syncCircles()).toBe(1);
+    expect((await getCircle(id))?.keyVersion).toBe(0);
+
+    circleKeys.getCircleKeyMap.mockResolvedValueOnce({ 1: new Uint8Array(32).fill(1), 2: new Uint8Array(32).fill(1) });
+    expect(await syncCircles()).toBe(0);
+    expect((await getCircle(id))?.keyVersion).toBe(2);
   });
 
   // The channel-ensure call has to survive a roster fetch that throws
