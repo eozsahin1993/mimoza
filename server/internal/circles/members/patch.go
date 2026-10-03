@@ -38,8 +38,7 @@ func (h *PatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := h.Service.SetRole(r.Context(), circleID, subjectID, body.Role, accountID); err != nil {
-			status, message := circles.Status(err)
-			httputil.WriteError(w, status, message)
+			circles.WriteError(r.Context(), w, err)
 			return
 		}
 	case body.NotifyLevel != "":
@@ -48,8 +47,7 @@ func (h *PatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := h.Service.SetNotifyLevel(r.Context(), circleID, subjectID, body.NotifyLevel, accountID); err != nil {
-			status, message := circles.Status(err)
-			httputil.WriteError(w, status, message)
+			circles.WriteError(r.Context(), w, err)
 			return
 		}
 	default:

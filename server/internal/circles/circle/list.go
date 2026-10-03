@@ -50,8 +50,7 @@ type ListHandler struct {
 func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	memberships, err := h.Service.List(r.Context(), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -61,8 +60,7 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	waiting, err := h.Service.Waiting(r.Context(), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	for _, ask := range waiting {

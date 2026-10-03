@@ -38,8 +38,7 @@ type RosterHandler struct {
 func (h *RosterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	circle, roster, keys, err := h.Service.Roster(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 

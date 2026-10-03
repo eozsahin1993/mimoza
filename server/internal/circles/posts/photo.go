@@ -36,8 +36,7 @@ func (h *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	target, err := h.Service.UploadTarget(r.Context(), r.PathValue("circleId"), postID, auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, uploadResponse{URL: target.URL, Fields: target.Fields})
@@ -49,8 +48,7 @@ func (h *PhotoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	url, err := h.Service.PhotoURL(r.Context(), r.PathValue("circleId"),
 		r.PathValue("postId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, photoResponse{URL: url})

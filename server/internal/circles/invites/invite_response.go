@@ -18,8 +18,7 @@ type inviteResponse struct {
 func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	invite, err := h.Service.Create(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusCreated, asResponse(invite))
@@ -28,8 +27,7 @@ func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	invites, err := h.Service.List(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -43,8 +41,7 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *RevokeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.Revoke(r.Context(), r.PathValue("circleId"), r.PathValue("code"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -53,8 +50,7 @@ func (h *RevokeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *PreviewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	preview, err := h.Service.Preview(r.Context(), r.PathValue("code"))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, previewResponse{

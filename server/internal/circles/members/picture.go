@@ -21,8 +21,7 @@ func (h *PictureHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	url, err := h.Service.ProfilePictureURL(r.Context(), r.PathValue("circleId"),
 		r.PathValue("accountId"), r.PathValue("pictureId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, pictureResponse{URL: url})

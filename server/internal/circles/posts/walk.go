@@ -50,8 +50,7 @@ func (h *WalkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("count") != "" {
 		total, err := h.Service.Count(r.Context(), circleID, accountID, entryType)
 		if err != nil {
-			status, message := circles.Status(err)
-			httputil.WriteError(w, status, message)
+			circles.WriteError(r.Context(), w, err)
 			return
 		}
 		httputil.WriteJSON(w, http.StatusOK, countResponse{Count: total})
@@ -76,8 +75,7 @@ func (h *WalkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	page, err := h.Service.Walk(r.Context(), circleID, accountID, cursor, limit)
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 

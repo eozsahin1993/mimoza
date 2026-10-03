@@ -22,8 +22,7 @@ func (h *RemoveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.Remove(r.Context(), r.PathValue("circleId"), r.PathValue("accountId"),
 		auth.AccountID(r.Context()), expectedVersion, sealed)
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

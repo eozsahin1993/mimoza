@@ -38,8 +38,7 @@ func (h *RewrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err = h.Service.Rewrap(r.Context(), r.PathValue("circleId"), body.AccountID, auth.AccountID(r.Context()), sealed)
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

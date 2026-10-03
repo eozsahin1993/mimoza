@@ -33,8 +33,7 @@ type requestResponse struct {
 func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	request, err := h.Service.Create(r.Context(), r.PathValue("code"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusCreated, asResponse(request))
@@ -43,8 +42,7 @@ func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	requests, err := h.Service.List(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -84,8 +82,7 @@ func (h *ApproveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.Approve(r.Context(), r.PathValue("circleId"), r.PathValue("requestId"),
 		auth.AccountID(r.Context()), sealed)
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -95,8 +92,7 @@ func (h *DenyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.Deny(r.Context(), r.PathValue("circleId"), r.PathValue("requestId"),
 		auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -106,8 +102,7 @@ func (h *CancelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.Cancel(r.Context(), r.PathValue("circleId"), r.PathValue("requestId"),
 		auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

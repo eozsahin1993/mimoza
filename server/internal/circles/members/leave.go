@@ -21,8 +21,7 @@ func (h *LeaveHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := h.Service.Leave(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()), expectedVersion, sealed)
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

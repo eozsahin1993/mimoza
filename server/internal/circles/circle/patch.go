@@ -45,8 +45,7 @@ func (h *PatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	circle, err := h.Service.Patch(r.Context(), r.PathValue("circleId"), auth.AccountID(r.Context()), body.Name, body.CoverID, body.CoverKeyVersion)
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, circleResponse{

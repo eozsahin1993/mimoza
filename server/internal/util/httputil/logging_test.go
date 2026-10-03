@@ -61,3 +61,33 @@ func passthrough(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(r.Context()))
 	})
 }
+
+func TestLogRequestsReason(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		SetReason(r.Context(), "encrypted under an old key version")
+		w.WriteHeader(http.StatusConflict)
+	})
+
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
+	LogRequests(handler).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("POST", "/x", nil))
+
+	var logged struct {
+		Status int    `json:"status"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &logged); err != nil {
+		t.Fatalf("log line is not JSON: %v (%q)", err, buf.String())
+	}
+	if logged.Status != http.StatusConflict || logged.Reason != "encrypted under an old key version" {
+		t.Errorf("logged = %+v", logged)
+	}
+
+	// A request that set no reason logs no reason field at all.
+	buf.Reset()
+	LogRequests(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).
+		ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/y", nil))
+	if bytes.Contains(buf.Bytes(), []byte(`"reason"`)) {
+		t.Errorf("reason logged without being set: %s", buf.String())
+	}
+}

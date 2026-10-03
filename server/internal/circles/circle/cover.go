@@ -36,8 +36,7 @@ func (h *CoverUploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	target, err := h.Service.CoverUploadTarget(r.Context(), r.PathValue("circleId"), coverID, auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, uploadResponse{URL: target.URL, Fields: target.Fields})
@@ -49,8 +48,7 @@ func (h *CoverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	url, err := h.Service.CoverURL(r.Context(), r.PathValue("circleId"),
 		r.PathValue("coverId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	httputil.WriteJSON(w, http.StatusOK, coverResponse{URL: url})

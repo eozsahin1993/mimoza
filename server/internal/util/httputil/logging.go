@@ -24,12 +24,26 @@ func LogRequests(next http.Handler) http.Handler {
 
 		next.ServeHTTP(recorder, r)
 
-		slog.InfoContext(r.Context(), "request", LogAttrs(r.Context(),
+		attrs := []any{
 			"method", r.Method,
 			"route", route(r, matched),
 			"status", recorder.status,
-			"ms", time.Since(started).Milliseconds())...)
+			"ms", time.Since(started).Milliseconds(),
+		}
+		if matched.reason != "" {
+			attrs = append(attrs, "reason", matched.reason)
+		}
+		slog.InfoContext(r.Context(), "request", LogAttrs(r.Context(), attrs...)...)
 	})
+}
+
+// SetReason puts a short, non-identifying explanation of a failure on the
+// request's log line. The body a client gets says the same thing, but a
+// body is not logged — the status alone cannot tell one 409 from another.
+func SetReason(ctx context.Context, reason string) {
+	if matched, ok := ctx.Value(routeKey{}).(*matchedRoute); ok {
+		matched.reason = reason
+	}
 }
 
 // LogRoutes makes LogRequests name the endpoint a nested mux matched,
@@ -55,7 +69,10 @@ func LogRoutes(mux *http.ServeMux) http.Handler {
 
 type routeKey struct{}
 
-type matchedRoute struct{ pattern string }
+type matchedRoute struct {
+	pattern string
+	reason  string
+}
 
 // A request nothing matched has no pattern anywhere, which is worth seeing
 // as itself: a client calling a route that doesn't exist.

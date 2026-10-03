@@ -40,8 +40,7 @@ func (h *CreateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	circle, founder, err := h.Service.Create(r.Context(), auth.AccountID(r.Context()), body.Name, sealed)
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 	// The same shape the circle list returns, so the device that made it

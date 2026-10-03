@@ -8,10 +8,12 @@ package circles
 // the one handler that parses it.
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"log/slog"
 	"mimoza-relay/internal/blobs"
+	"mimoza-relay/internal/util/httputil"
 	"net/http"
 	"time"
 )
@@ -147,4 +149,49 @@ func Status(err error) (int, string) {
 		slog.Error("unmapped circles error", "reason", "unmapped_error", "error", err)
 		return http.StatusInternalServerError, "something went wrong"
 	}
+}
+
+// codes are the wire names of the errors a client acts on by kind. One
+// that is not here still gets a status and message, just no code.
+var codes = map[error]string{
+	ErrCircleNotFound:   "circle_not_found",
+	ErrEntryNotFound:    "entry_not_found",
+	ErrInviteNotFound:   "invite_not_found",
+	ErrRequestNotFound:  "request_not_found",
+	ErrPictureNotFound:  "picture_not_found",
+	ErrNotMember:        "not_member",
+	ErrNotAdmin:         "not_admin",
+	ErrNotTheAuthor:     "not_author",
+	ErrAlreadyExists:    "already_exists",
+	ErrCircleFull:       "circle_full",
+	ErrStaleKeyVersion:  "stale_key_version",
+	ErrVersionMoved:     "version_moved",
+	ErrWouldEmptyAdmins: "would_empty_admins",
+	ErrPublicKeyChanged: "public_key_changed",
+	ErrBadCursor:        "bad_cursor",
+	ErrIncompleteKeys:   "incomplete_keys",
+	ErrNoPublicKey:      "no_public_key",
+}
+
+// Code is the wire name for err, or "" if it has none.
+func Code(err error) string {
+	for sentinel, code := range codes {
+		if errors.Is(err, sentinel) {
+			return code
+		}
+	}
+	return ""
+}
+
+// WriteError answers a failed circles request: status and message from
+// Status, the code beside them, and the message on the request's log
+// line so a 4xx in CloudWatch says which one it was.
+func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
+	status, message := Status(err)
+	httputil.SetReason(ctx, message)
+	if code := Code(err); code != "" {
+		httputil.WriteCodedError(w, status, code, message)
+		return
+	}
+	httputil.WriteError(w, status, message)
 }

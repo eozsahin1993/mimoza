@@ -19,6 +19,12 @@ func WriteError(w http.ResponseWriter, status int, message string) {
 	WriteJSON(w, status, map[string]string{"error": message})
 }
 
+// WriteCodedError is WriteError with a stable machine-readable code
+// beside the message, for a client that has to act on which error it was.
+func WriteCodedError(w http.ResponseWriter, status int, code, message string) {
+	WriteJSON(w, status, map[string]string{"error": message, "code": code})
+}
+
 // BearerToken extracts the token from an "Authorization: Bearer <token>" header.
 func BearerToken(r *http.Request) (string, bool) {
 	const prefix = "Bearer "

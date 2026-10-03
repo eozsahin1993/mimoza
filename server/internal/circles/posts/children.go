@@ -21,8 +21,7 @@ func (h *ChildrenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	comments, reactions, err := h.Service.Children(r.Context(), r.PathValue("circleId"),
 		r.PathValue("postId"), auth.AccountID(r.Context()))
 	if err != nil {
-		status, message := circles.Status(err)
-		httputil.WriteError(w, status, message)
+		circles.WriteError(r.Context(), w, err)
 		return
 	}
 
