@@ -1,4 +1,4 @@
-import { ed25519, x25519 } from '@noble/curves/ed25519.js';
+import { x25519 } from '@noble/curves/ed25519.js';
 import { bytesToHex, concatBytes, randomBytes } from '@noble/curves/utils.js';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
@@ -54,16 +54,6 @@ export function generateInviteCode(): string {
 }
 
 /**
- * Generates a fresh Ed25519 identity keypair. Call this once per circle —
- * never reuse the same keypair across circles, or your public key becomes
- * a stable pseudonym that links your membership across otherwise-unrelated
- * groups (see the cross-circle correlation discussion).
- */
-export function generateIdentity(): Keypair {
-  return ed25519.keygen();
-}
-
-/**
  * Encrypts `plaintext` under the circle's shared secret using
  * XChaCha20-Poly1305 (AEAD — tampering makes decrypt fail, it doesn't
  * silently return corrupted data). A fresh random nonce is generated per
@@ -106,24 +96,6 @@ export function decrypt(ciphertext: Uint8Array, secret: Uint8Array): Uint8Array 
  */
 export function hashBytes(bytes: Uint8Array): string {
   return bytesToHex(sha256(bytes));
-}
-
-/**
- * Signs `message` with `secretKey`, producing a 64-byte Ed25519 signature
- * that anyone holding the matching public key can verify — without ever
- * needing the secret key themselves.
- */
-export function sign(message: Uint8Array, secretKey: Uint8Array): Uint8Array {
-  return ed25519.sign(message, secretKey);
-}
-
-/**
- * Verifies that `signature` over `message` was produced by whoever holds
- * the secret key matching `publicKey`. Returns false on any mismatch or
- * tampering — never throws for an invalid signature.
- */
-export function verify(signature: Uint8Array, message: Uint8Array, publicKey: Uint8Array): boolean {
-  return ed25519.verify(signature, message, publicKey);
 }
 
 const SEALED_BOX_KEY_DOMAIN = new TextEncoder().encode('join-approval-box');
