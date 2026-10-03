@@ -316,6 +316,7 @@ func TestCircles_TheSyncListCarriesWhatYouAreWaitingOn(t *testing.T) {
 	harness.AssertEqual(t, waiting.Requests[0].CircleID, circleID, "on the circle they asked about")
 	harness.AssertEqual(t, waiting.Requests[0].CircleName, "Family", "named, though they cannot read it yet")
 	harness.AssertEqual(t, waiting.Requests[0].Status, "pending", "and unanswered")
+	harness.AssertEqual(t, waiting.Requests[0].RequestID, request.RequestID, "named by the id withdrawing it takes")
 
 	// The answer reaches the asker through the same list.
 	admin.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/deny"), nil).Expect(http.StatusNoContent)
@@ -333,6 +334,7 @@ func TestCircles_TheSyncListCarriesWhatYouAreWaitingOn(t *testing.T) {
 func syncList(t *testing.T, device *harness.Device) struct {
 	Circles  []circleRow `json:"circles"`
 	Requests []struct {
+		RequestID  string `json:"requestId"`
 		CircleID   string `json:"circleId"`
 		CircleName string `json:"circleName"`
 		Status     string `json:"status"`
@@ -342,6 +344,7 @@ func syncList(t *testing.T, device *harness.Device) struct {
 	var body struct {
 		Circles  []circleRow `json:"circles"`
 		Requests []struct {
+			RequestID  string `json:"requestId"`
 			CircleID   string `json:"circleId"`
 			CircleName string `json:"circleName"`
 			Status     string `json:"status"`

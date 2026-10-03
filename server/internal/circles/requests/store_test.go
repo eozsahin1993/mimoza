@@ -196,6 +196,185 @@ func TestApproveRequest_RefusesAStaleKeyVersion(t *testing.T) {
 	}
 }
 
+// Taking an ask back removes it from both places it is read: the
+// admin's list of what is waiting, and the asker's own list of what they
+// are waiting on.
+func TestDeleteRequest_RemovesAnOpenAsk(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	store := requests.NewStore(table)
+
+	asker := testsupport.UniqueAccountID(t)
+	circleID := seedCircle(t, table)
+	ask(t, store, circleID, asker)
+
+	if err := store.DeleteRequest(ctx, circleID, "request-"+asker); err != nil {
+		t.Fatal(err)
+	}
+
+	forAdmin, err := store.ListRequests(ctx, circleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(forAdmin) != 0 {
+		t.Errorf("an admin must no longer see the ask, got %+v", forAdmin)
+	}
+	forAsker, err := store.ListRequestsForAccount(ctx, asker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(forAsker) != 0 {
+		t.Errorf("the asker must no longer be waiting, got %+v", forAsker)
+	}
+}
+
+// An ask's id comes from the account alone, so the same account asking
+// two circles holds the same id in both. Withdrawing from one must not
+// reach into the other.
+func TestDeleteRequest_OnlyTouchesTheCircleItWasMadeIn(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	store := requests.NewStore(table)
+
+	asker := testsupport.UniqueAccountID(t)
+	first := seedCircle(t, table)
+	second := seedCircle(t, table)
+	ask(t, store, first, asker)
+	ask(t, store, second, asker)
+
+	if err := store.DeleteRequest(ctx, first, "request-"+asker); err != nil {
+		t.Fatal(err)
+	}
+
+	waiting, err := store.ListRequestsForAccount(ctx, asker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(waiting) != 1 || waiting[0].CircleID != second {
+		t.Fatalf("expected the ask in the other circle to stand, got %+v", waiting)
+	}
+}
+
+// A denial is the answer its asker is still reading, so withdrawing does
+// not erase it.
+func TestDeleteRequest_LeavesADeniedAskForItsAskerToRead(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	store := requests.NewStore(table)
+
+	asker := testsupport.UniqueAccountID(t)
+	circleID := seedCircle(t, table)
+	ask(t, store, circleID, asker)
+	if err := store.DenyRequest(ctx, circleID, "request-"+asker); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.DeleteRequest(ctx, circleID, "request-"+asker); !errors.Is(err, circles.ErrRequestNotFound) {
+		t.Fatalf("expected ErrRequestNotFound, got %v", err)
+	}
+
+	waiting, err := store.ListRequestsForAccount(ctx, asker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(waiting) != 1 || waiting[0].Status != circles.RequestDenied {
+		t.Fatalf("expected the denial to still be there, got %+v", waiting)
+	}
+}
+
+// An approved ask belongs to a membership that now exists. Withdrawing
+// it afterwards must neither fake success nor disturb the membership.
+func TestDeleteRequest_CannotUndoAnApproval(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	circleStore, store := circle.NewStore(table), requests.NewStore(table)
+
+	joiner := testsupport.UniqueAccountID(t)
+	circleID := seedCircle(t, table)
+	ask(t, store, circleID, joiner)
+	member := circles.Member{AccountID: joiner, Role: circles.RoleMember, NotifyLevel: circles.NotifyAll}
+	if err := store.ApproveRequest(ctx, circleID, "request-"+joiner, "admin", member,
+		circles.SealedKeys{1: []byte("sealed-for-joiner")}, "Joiner", 1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.DeleteRequest(ctx, circleID, "request-"+joiner); !errors.Is(err, circles.ErrRequestNotFound) {
+		t.Fatalf("expected ErrRequestNotFound, got %v", err)
+	}
+
+	memberships, err := circleStore.ListMemberships(ctx, joiner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(memberships) != 1 {
+		t.Fatalf("the membership must be untouched, got %+v", memberships)
+	}
+}
+
+func TestDeleteRequest_AnAskThatIsNotThere(t *testing.T) {
+	table := testsupport.NewCircleTable(t)
+	store := requests.NewStore(table)
+
+	err := store.DeleteRequest(context.Background(), seedCircle(t, table), "request-nobody")
+	if !errors.Is(err, circles.ErrRequestNotFound) {
+		t.Fatalf("expected ErrRequestNotFound, got %v", err)
+	}
+}
+
+// An admin who loaded the list just before the asker withdrew can still
+// tap Approve. That must find nothing, not admit someone who took the
+// ask back.
+func TestDeleteRequest_ApprovingAWithdrawnAskFindsNothing(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	circleStore, store := circle.NewStore(table), requests.NewStore(table)
+
+	asker := testsupport.UniqueAccountID(t)
+	circleID := seedCircle(t, table)
+	ask(t, store, circleID, asker)
+	if err := store.DeleteRequest(ctx, circleID, "request-"+asker); err != nil {
+		t.Fatal(err)
+	}
+
+	member := circles.Member{AccountID: asker, Role: circles.RoleMember, NotifyLevel: circles.NotifyAll}
+	err := store.ApproveRequest(ctx, circleID, "request-"+asker, "admin", member,
+		circles.SealedKeys{1: []byte("sealed-for-asker")}, "Asker", 1)
+	if !errors.Is(err, circles.ErrRequestNotFound) {
+		t.Fatalf("expected ErrRequestNotFound, got %v", err)
+	}
+	memberships, err := circleStore.ListMemberships(ctx, asker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(memberships) != 0 {
+		t.Fatalf("a withdrawn ask must not admit anyone, got %+v", memberships)
+	}
+}
+
+// Withdrawing does not burn the code: the same account can ask again and
+// is waiting again.
+func TestDeleteRequest_AskingAgainAfterwardsWorks(t *testing.T) {
+	ctx := context.Background()
+	table := testsupport.NewCircleTable(t)
+	store := requests.NewStore(table)
+
+	asker := testsupport.UniqueAccountID(t)
+	circleID := seedCircle(t, table)
+	ask(t, store, circleID, asker)
+	if err := store.DeleteRequest(ctx, circleID, "request-"+asker); err != nil {
+		t.Fatal(err)
+	}
+	ask(t, store, circleID, asker)
+
+	waiting, err := store.ListRequestsForAccount(ctx, asker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(waiting) != 1 || waiting[0].Status != circles.RequestPending {
+		t.Fatalf("expected one pending ask again, got %+v", waiting)
+	}
+}
+
 func seedCircle(t *testing.T, table *dynamo.Table) string {
 	t.Helper()
 	circleID := testsupport.UniqueCircleID(t)

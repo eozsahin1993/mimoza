@@ -102,6 +102,17 @@ func (h *DenyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *CancelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.Service.Cancel(r.Context(), r.PathValue("circleId"), r.PathValue("requestId"),
+		auth.AccountID(r.Context()))
+	if err != nil {
+		status, message := circles.Status(err)
+		httputil.WriteError(w, status, message)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func asResponse(request circles.Request) requestResponse {
 	return requestResponse{
 		RequestID: request.ID,

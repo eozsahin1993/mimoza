@@ -18,6 +18,7 @@ type store interface {
 	ListRequests(ctx context.Context, circleID string) ([]circles.Request, error)
 	ApproveRequest(ctx context.Context, circleID, requestID, actorID string, member circles.Member, sealed circles.SealedKeys, name string, expectedVersion int64) error
 	DenyRequest(ctx context.Context, circleID, requestID string) error
+	DeleteRequest(ctx context.Context, circleID, requestID string) error
 }
 
 // profiles is who the account ids on these requests are. An admin
@@ -235,6 +236,16 @@ func (s *Service) Deny(ctx context.Context, circleID, requestID, accountID strin
 		return err
 	}
 	return s.Store.DenyRequest(ctx, circleID, requestID)
+}
+
+// Cancel is the asker taking their own ask back. Asks are named by a
+// hash of the account that made them, so whether an ask is the caller's
+// is decided by the id alone.
+func (s *Service) Cancel(ctx context.Context, circleID, requestID, accountID string) error {
+	if requestID != circles.RequestID(accountID) {
+		return circles.ErrRequestNotFound
+	}
+	return s.Store.DeleteRequest(ctx, circleID, requestID)
 }
 
 func (s *Service) requireAdmin(ctx context.Context, circleID, accountID string) error {

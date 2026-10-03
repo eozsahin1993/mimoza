@@ -26,8 +26,10 @@ type membershipResponse struct {
 
 // pendingResponse is an ask this account is waiting on. It carries a
 // status rather than only existing, so a device can tell "not answered
-// yet" from "turned down".
+// yet" from "turned down", and its id, which is what withdrawing it
+// names.
 type pendingResponse struct {
+	RequestID  string `json:"requestId"`
 	CircleID   string `json:"circleId"`
 	CircleName string `json:"circleName,omitempty"`
 	Status     string `json:"status"`
@@ -65,6 +67,7 @@ func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, ask := range waiting {
 		body.Requests = append(body.Requests, pendingResponse{
+			RequestID:  ask.ID,
 			CircleID:   ask.CircleID,
 			CircleName: ask.CircleName,
 			Status:     ask.Status,

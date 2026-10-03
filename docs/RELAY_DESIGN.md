@@ -208,6 +208,7 @@ outlives it.
 | delete post | strip ciphertext, set `deletedAt` and `updatedAt`, delete the blob |
 | approve join | one transaction: `member#`, the joiner's `key#` with every version, `rosterVersion + 1`, request approved, `activity{joined}` |
 | deny join | the request marked denied; nothing else moves, and the asker sees the answer on their next `GET /circles` |
+| withdraw ask | `DELETE /circles/{id}/requests/{rid}`: a conditional delete of the asker's own ask while it is still pending. A denied or approved ask is left alone, and answers 404 |
 | rewrap | `POST /circles/{id}/keys`: a member writes every version sealed to a `needsRewrap` member's new key; stored on that `key#`, flag cleared |
 | kick | one transaction: delete `member#` and the leaver's `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read, `activity{removed}` |
 | leave | same shape as kick, self-directed: delete own `member#` and `key#`, add v+1 to each remaining `key#`, `meta{keyVersion + 1, rosterVersion + 1, memberCount − 1}` conditioned on the version read and, for an admin, on another admin remaining, `activity{left}` |
@@ -247,7 +248,8 @@ replace its local copy at once.
 GET /circles
   → per circle: name, role, keyVersion, rosterVersion, lastEntryAt,
     notifyLevel, needsRewrap; and this account's own join requests with
-    the circle each names. An answered ask stays here until it expires,
+    the circle each names, and the id withdrawing one takes. An answered
+    ask stays here until it expires,
     so the device that made it sees the answer rather than watching the
     ask disappear
 
@@ -364,6 +366,12 @@ admin                     relay                    joiner
 
 A code belongs to the circle, not to whoever made it, so any admin sees
 and can revoke the same one. Codes expire; nothing else does.
+
+A joiner can take an open ask back. Only their own, since the id is a hash
+of the account, and only while it is pending: a denial stays readable and
+an approval is not undone. Dropping it on the device alone would not
+hold, because the relay keeps listing the ask and an admin could still
+approve it.
 
 The ask carries no body: the key an approver seals to is the one the
 joiner's account published at sign-in. It is also the only place that

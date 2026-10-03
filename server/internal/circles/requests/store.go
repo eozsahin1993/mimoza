@@ -316,6 +316,25 @@ func (s *Store) DenyRequest(ctx context.Context, circleID, requestID string) err
 	return err
 }
 
+// DeleteRequest is an asker taking their own ask back. Only an open one:
+// a denied ask is the answer its asker is still reading, and an approved
+// one belongs to a membership that now exists.
+func (s *Store) DeleteRequest(ctx context.Context, circleID, requestID string) error {
+	_, err := s.Client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName:                aws.String(s.Name),
+		Key:                      s.Key(dynamo.CirclePK(circleID), dynamo.RequestKey(requestID)),
+		ConditionExpression:      aws.String("attribute_exists(sk) AND #status = :pending"),
+		ExpressionAttributeNames: map[string]string{"#status": dynamo.AttrStatus},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pending": dynamoutil.Str(circles.RequestPending),
+		},
+	})
+	if dynamoutil.ConditionFailed(err) {
+		return circles.ErrRequestNotFound
+	}
+	return err
+}
+
 // requestFrom reads one ask back. The circle is taken from the row's own
 // partition rather than passed in, so a read that gathered rows from
 // several circles at once still names each one correctly.

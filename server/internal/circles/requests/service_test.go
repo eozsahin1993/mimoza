@@ -16,7 +16,11 @@ type fakeStore struct {
 	created  circles.Request
 	requests []circles.Request
 	denied   string
-	approved struct {
+	deleted  struct{ circleID, requestID string }
+	// deleteErr is what a withdrawal answers with, for the ask that is
+	// no longer open.
+	deleteErr error
+	approved  struct {
 		requestID       string
 		member          circles.Member
 		name            string
@@ -68,6 +72,12 @@ func (f *fakeStore) ApproveRequest(_ context.Context, _, requestID, _ string, me
 func (f *fakeStore) DenyRequest(_ context.Context, _, requestID string) error {
 	f.denied = requestID
 	return nil
+}
+
+func (f *fakeStore) DeleteRequest(_ context.Context, circleID, requestID string) error {
+	f.deleted.circleID = circleID
+	f.deleted.requestID = requestID
+	return f.deleteErr
 }
 
 type fakeNotifier struct{ sent []circles.Notification }
@@ -339,5 +349,74 @@ func TestDeny_AnAdminTurnsTheRequestAway(t *testing.T) {
 	}
 	if store.denied != "request-1" {
 		t.Errorf("denied %q, want request-1", store.denied)
+	}
+}
+
+// Asks are named by a hash of the account that made them, so the id in
+// the path is checked against who is calling: an asker withdraws their
+// own ask and nobody else's.
+func TestCancel_WithdrawsTheCallersOwnAsk(t *testing.T) {
+	store := &fakeStore{}
+	service := &Service{Store: store}
+	own := circles.RequestID("asker-1")
+
+	if err := service.Cancel(context.Background(), "circle-1", own, "asker-1"); err != nil {
+		t.Fatal(err)
+	}
+	if store.deleted.circleID != "circle-1" || store.deleted.requestID != own {
+		t.Errorf("withdrew %+v, want %q in circle-1", store.deleted, own)
+	}
+}
+
+// Somebody else's ask reads as not there rather than as forbidden, which
+// would confirm that an ask under that id exists.
+func TestCancel_SomeoneElsesAskIsNotYoursToWithdraw(t *testing.T) {
+	store := &fakeStore{}
+	service := &Service{Store: store}
+
+	err := service.Cancel(context.Background(), "circle-1", circles.RequestID("asker-1"), "mallory")
+	if !errors.Is(err, circles.ErrRequestNotFound) {
+		t.Fatalf("expected ErrRequestNotFound, got %v", err)
+	}
+	if store.deleted.requestID != "" {
+		t.Errorf("nothing should have been deleted, got %+v", store.deleted)
+	}
+}
+
+// An admin answers an ask with Deny. Withdrawing is the asker's, so even
+// an admin of that very circle cannot take someone's ask back.
+func TestCancel_AnAdminCannotWithdrawAnAskThatIsNotTheirs(t *testing.T) {
+	store := &fakeStore{members: map[string]circles.Member{"admin-1": {AccountID: "admin-1", Role: circles.RoleAdmin}}}
+	service := &Service{Store: store}
+
+	err := service.Cancel(context.Background(), "circle-1", circles.RequestID("asker-1"), "admin-1")
+	if !errors.Is(err, circles.ErrRequestNotFound) {
+		t.Fatalf("expected ErrRequestNotFound, got %v", err)
+	}
+	if store.deleted.requestID != "" {
+		t.Errorf("nothing should have been deleted, got %+v", store.deleted)
+	}
+}
+
+// Whoever asked is not on the roster yet, so there is no membership to
+// check: unlike Approve and Deny, nothing here reads one.
+func TestCancel_NeedsNoMembership(t *testing.T) {
+	store := &fakeStore{members: map[string]circles.Member{}}
+	service := &Service{Store: store}
+
+	if err := service.Cancel(context.Background(), "circle-1", circles.RequestID("asker-1"), "asker-1"); err != nil {
+		t.Fatalf("an asker who is no member must still be able to withdraw: %v", err)
+	}
+}
+
+// An ask already answered, or already gone, is not one to withdraw; the
+// caller is told so rather than being left to think it worked.
+func TestCancel_SaysSoWhenTheAskIsNoLongerOpen(t *testing.T) {
+	store := &fakeStore{deleteErr: circles.ErrRequestNotFound}
+	service := &Service{Store: store}
+
+	err := service.Cancel(context.Background(), "circle-1", circles.RequestID("asker-1"), "asker-1")
+	if !errors.Is(err, circles.ErrRequestNotFound) {
+		t.Fatalf("expected ErrRequestNotFound, got %v", err)
 	}
 }

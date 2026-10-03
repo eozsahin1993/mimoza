@@ -169,3 +169,129 @@ func TestInvites_OnlyAnAdminMayDeny(t *testing.T) {
 
 	member.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/deny"), nil).Expect(http.StatusForbidden)
 }
+
+// An asker can take their own ask back, and it is gone everywhere it was
+// read: the admin's list, the asker's own sync list, and any approval an
+// admin still had in hand. Asking again afterwards works as normal.
+func TestInvites_AnAskerCanTakeTheirAskBack(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	asker := relay.SignIn()
+	circleID := createCircle(t, admin, "Family")
+
+	var invite struct {
+		Code string `json:"code"`
+	}
+	admin.Post(api("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
+	var request struct {
+		RequestID string `json:"requestId"`
+	}
+	asker.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated).Decode(&request)
+	harness.AssertEqual(t, len(syncList(t, asker).Requests), 1, "waiting before withdrawing")
+
+	asker.Delete(api("/circles/" + circleID + "/requests/" + request.RequestID)).Expect(http.StatusNoContent)
+
+	var pending struct {
+		Requests []struct {
+			RequestID string `json:"requestId"`
+		} `json:"requests"`
+	}
+	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
+	harness.AssertEqual(t, len(pending.Requests), 0, "the admin no longer sees it")
+	harness.AssertEqual(t, len(syncList(t, asker).Requests), 0, "and the asker is no longer waiting")
+
+	// An admin who loaded the list a moment earlier cannot admit someone
+	// who took the ask back, and the asker is not a member as a result.
+	admin.Post(api("/circles/"+circleID+"/requests/"+request.RequestID+"/approve"), harness.Body{
+		"sealed": map[string]string{"1": base64.StdEncoding.EncodeToString([]byte("sealed-v1"))},
+	}).Expect(http.StatusNotFound)
+	harness.AssertEqual(t, len(syncList(t, asker).Circles), 0, "withdrawn means not admitted")
+
+	// Doing it twice says so, so a retry after a lost response is
+	// recognisable rather than mistaken for success.
+	asker.Delete(api("/circles/" + circleID + "/requests/" + request.RequestID)).Expect(http.StatusNotFound)
+
+	var again struct {
+		RequestID string `json:"requestId"`
+	}
+	asker.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated).Decode(&again)
+	harness.AssertEqual(t, again.RequestID, request.RequestID, "the same account's ask has the same id")
+	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
+	harness.AssertEqual(t, len(pending.Requests), 1, "asking again puts it back in front of the admin")
+}
+
+// Withdrawing is the asker's alone. Someone else holding an ask's id,
+// even an admin of that circle, gets the same answer as for an ask that
+// does not exist, and the ask stands.
+func TestInvites_OnlyTheAskerMayWithdrawAnAsk(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	asker := relay.SignIn()
+	other := relay.SignIn()
+	circleID := createCircle(t, admin, "Family")
+
+	var invite struct {
+		Code string `json:"code"`
+	}
+	admin.Post(api("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
+	var request struct {
+		RequestID string `json:"requestId"`
+	}
+	asker.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated).Decode(&request)
+	other.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated)
+
+	path := api("/circles/" + circleID + "/requests/" + request.RequestID)
+	other.Delete(path).Expect(http.StatusNotFound)
+	admin.Delete(path).Expect(http.StatusNotFound)
+	relay.Anon().Delete(path).Expect(http.StatusUnauthorized)
+
+	var pending struct {
+		Requests []struct {
+			RequestID string `json:"requestId"`
+			Status    string `json:"status"`
+		} `json:"requests"`
+	}
+	admin.Get(api("/circles/" + circleID + "/requests")).Expect(http.StatusOK).Decode(&pending)
+	harness.AssertEqual(t, len(pending.Requests), 2, "both asks are still waiting")
+	for _, entry := range pending.Requests {
+		harness.AssertEqual(t, entry.Status, "pending", "nobody's ask was touched")
+	}
+
+	// Someone with no ask at all has nothing to withdraw.
+	stranger := relay.SignIn()
+	stranger.Delete(path).Expect(http.StatusNotFound)
+}
+
+// An answer is not something to withdraw: a denial is what its asker is
+// still reading, and an approval made them a member. Both read as not
+// there, and neither is disturbed.
+func TestInvites_WithdrawingDoesNotUndoAnAnswer(t *testing.T) {
+	relay := harness.Start(t)
+	admin := relay.SignIn()
+	denied := relay.SignIn()
+	admitted := relay.SignIn()
+	circleID := createCircle(t, admin, "Family")
+
+	var invite struct {
+		Code string `json:"code"`
+	}
+	admin.Post(api("/circles/"+circleID+"/invites"), nil).Expect(http.StatusCreated).Decode(&invite)
+	var turnedAway, letIn struct {
+		RequestID string `json:"requestId"`
+	}
+	denied.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated).Decode(&turnedAway)
+	admitted.Post(api("/invites/"+invite.Code+"/requests"), nil).Expect(http.StatusCreated).Decode(&letIn)
+
+	admin.Post(api("/circles/"+circleID+"/requests/"+turnedAway.RequestID+"/deny"), nil).Expect(http.StatusNoContent)
+	admin.Post(api("/circles/"+circleID+"/requests/"+letIn.RequestID+"/approve"), harness.Body{
+		"sealed": map[string]string{"1": base64.StdEncoding.EncodeToString([]byte("sealed-v1"))},
+	}).Expect(http.StatusNoContent)
+
+	denied.Delete(api("/circles/" + circleID + "/requests/" + turnedAway.RequestID)).Expect(http.StatusNotFound)
+	waiting := syncList(t, denied)
+	harness.AssertEqual(t, len(waiting.Requests), 1, "the denial is still theirs to read")
+	harness.AssertEqual(t, waiting.Requests[0].Status, "denied", "as it was")
+
+	admitted.Delete(api("/circles/" + circleID + "/requests/" + letIn.RequestID)).Expect(http.StatusNotFound)
+	harness.AssertEqual(t, len(syncList(t, admitted).Circles), 1, "still a member")
+}

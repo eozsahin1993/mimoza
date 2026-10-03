@@ -15,6 +15,7 @@ func Register(mux *http.ServeMux, service *Service, read, write func(http.Handle
 		{"GET /circles/{circleId}/requests", &ListHandler{Service: service}, read},
 		{"POST /circles/{circleId}/requests/{requestId}/approve", &ApproveHandler{Service: service}, write},
 		{"POST /circles/{circleId}/requests/{requestId}/deny", &DenyHandler{Service: service}, write},
+		{"DELETE /circles/{circleId}/requests/{requestId}", &CancelHandler{Service: service}, write},
 	}
 	for _, route := range routes {
 		handler := route.handler
