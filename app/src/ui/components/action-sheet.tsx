@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Dimensions, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -86,15 +86,35 @@ export function ActionSheet({
     });
   }, [visible, progress]);
 
-  if (!mounted) return null;
+  // An option's action runs only once this modal is gone, not on the tap.
+  // Several options open another modal (the remove confirmation), and iOS
+  // presenting one while this one is still dismissing leaves an invisible
+  // modal that swallows every touch until the app is killed.
+  const pendingSelection = useRef<(() => void) | null>(null);
+
+  function flushSelection() {
+    const run = pendingSelection.current;
+    pendingSelection.current = null;
+    run?.();
+  }
+
+  useEffect(() => {
+    // Android has no onDismiss; there the React unmount is the signal.
+    if (!mounted && Platform.OS !== 'ios') flushSelection();
+  }, [mounted]);
 
   function select(onPress: () => void) {
+    pendingSelection.current = onPress;
     onClose();
-    onPress();
   }
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={mounted}
+      animationType="none"
+      onRequestClose={onClose}
+      onDismiss={Platform.OS === 'ios' ? flushSelection : undefined}>
       <AnimatedPressable style={[styles.backdrop, { opacity: progress }]} onPress={onClose} />
 
       <Animated.View
