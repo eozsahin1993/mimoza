@@ -83,8 +83,8 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
     setPhase('submitting');
     try {
       await requestToJoin(code, { circleName, invitedByName: inviterName });
-      setPhase('waiting');
       onRequested();
+      onClose();
     } catch (err) {
       console.error('Failed to request to join', err);
       // Back to 'asking', not 'error': the invite is fine, the send wasn't.
