@@ -11,7 +11,7 @@ export function Footer() {
       </a>
       <span className="footer-links">
         <a href="/privacy/">Privacy policy</a>
-        <a href="mailto:hello@joinmimoza.com">Support</a>
+        <a href="/support/">Support</a>
       </span>
       <span>© 2026 RareKiwi Software LLC</span>
     </footer>

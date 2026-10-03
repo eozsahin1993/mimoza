@@ -1,7 +1,7 @@
 import { Icon } from "../../components/Icon";
 import { Wordmark } from "../../components/wordmark";
 import { Footer } from "../../sections/footer";
-import "./style.css";
+import "../../styles/staticPage.css";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
 const LAST_UPDATED = "2 October 2026";
@@ -31,7 +31,7 @@ export function PrivacyPolicy() {
           <Wordmark />
         </a>
         <a className="back" href="/">
-          <Icon name="arrow" size={17} /> joinmimoza.com
+          <Icon name="arrow" size={17} /> Home
         </a>
       </nav>
 

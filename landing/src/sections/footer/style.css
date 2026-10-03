@@ -1,10 +1,10 @@
-footer { background: var(--brown); color: #776b62; border-top: 1px solid rgba(255,255,255,.09); padding: 28px max(36px, calc((100vw - 1180px)/2)); display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; font-size: 11px; }
+footer { background: var(--brown); color: #a89c90; border-top: 1px solid rgba(255,255,255,.09); padding: 32px max(36px, calc((100vw - 1180px)/2)); display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; font-size: 14px; }
 .footer-brand { display: inline-flex; align-items: center; gap: 10px; }
 .footer-icon { width: 30px; height: 30px; }
 footer .wordmark { color: var(--paper); font-size: 21px; } footer span:nth-child(2) { text-align: center; } footer span:last-child { text-align: right; }
-footer .footer-links { display: flex; gap: 18px; justify-content: center; }
-footer a { color: inherit; text-decoration: none; }
-footer a:hover { color: var(--paper); }
+footer .footer-links { display: flex; gap: 20px; justify-content: center; }
+footer a { color: #c7c2bc; text-decoration: none; font-weight: 500; }
+footer a:hover { color: var(--ochre); }
 
 /* The policy link has to stay reachable on a phone, where the tagline column used to be dropped. */
 @media (max-width: 600px) {

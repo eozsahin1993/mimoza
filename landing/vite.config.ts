@@ -6,12 +6,13 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      // A second page rather than a client-side route: the stores fetch
-      // /privacy as a plain document, and a static host serves it without
-      // an SPA fallback.
+      // Separate pages rather than client-side routes: the stores fetch
+      // /privacy and /support as plain documents, and a static host serves
+      // them without an SPA fallback.
       input: {
         main: "index.html",
         privacy: "privacy/index.html",
+        support: "support/index.html",
       },
     },
   },

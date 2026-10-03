@@ -1,0 +1,9 @@
+.contact { display: flex; flex-direction: column; gap: 10px; max-width: 480px; }
+.contact-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.contact-form input, .contact-form textarea { padding: 14px 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); font-family: inherit; font-size: 15px; color: var(--ink); resize: vertical; }
+.contact-form input::placeholder, .contact-form textarea::placeholder { color: var(--muted); }
+.contact-form button { height: 50px; padding: 0 22px; border-radius: 10px; border: 0; background: var(--brown); color: var(--paper); font-family: inherit; font-weight: 600; font-size: 14px; align-self: flex-start; cursor: pointer; transition: transform .2s ease, background .2s ease; }
+.contact-form button:hover:not(:disabled) { transform: translateY(-2px); background: #2b231d; }
+.contact-form button:disabled { opacity: .6; cursor: default; }
+.contact-error { color: var(--rust-dark); font-size: 13px; }
+.contact-done { font-size: 17px; font-weight: 500; max-width: 480px; }
