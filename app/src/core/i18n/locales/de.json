@@ -235,7 +235,9 @@
       "createCircle": "Kreis erstellen",
       "locked": "Gesperrt",
       "lockedStatus": "Öffnet sich, sobald ein Mitglied online ist",
-      "pendingStatus": "Ausstehend"
+      "pendingStatus": "Ausstehend",
+      "archivedSection": "Nicht mehr dabei",
+      "archivedBadge": "Archiviert"
     },
     "feed": {
       "subtitle_one": "{{count}} Person. Tippen für Details",
@@ -288,9 +290,9 @@
       "leaveTitleUnnamed": "Diesen Kreis verlassen?",
       "deleteMessage": "Außer dir ist niemand mehr hier. Dadurch werden {{name}} und alle Fotos darin endgültig gelöscht, und niemand könnte dich wieder einladen.",
       "deleteMessageUnnamed": "Außer dir ist niemand mehr hier. Dadurch werden dieser Kreis und alle Fotos darin endgültig gelöscht, und niemand könnte dich wieder einladen.",
-      "leaveMessageSuccessor": "Der Kreis verschwindet von diesem Handy, und {{name}} wird Admin.",
-      "leaveMessageSuccessorUnnamed": "Der Kreis verschwindet von diesem Handy, und das dienstälteste Mitglied wird Admin.",
-      "leaveMessage": "Der Kreis verschwindet von diesem Handy, und du brauchst einen neuen Schlüssel, um zurückzukommen.",
+      "leaveMessageSuccessor": "Der Kreis wird auf diesem Handy archiviert, und {{name}} wird Admin.",
+      "leaveMessageSuccessorUnnamed": "Der Kreis wird auf diesem Handy archiviert, und das dienstälteste Mitglied wird Admin.",
+      "leaveMessage": "Der Kreis wird auf diesem Handy archiviert, und du brauchst eine neue Einladung, um zurückzukommen.",
       "delete": "Löschen",
       "leave": "Verlassen",
       "deleteFailed": "Der Kreis konnte nicht gelöscht werden",
@@ -330,7 +332,7 @@
       "deleteRowDescription": "Außer dir ist niemand hier. Der Kreis und alle Fotos darin werden endgültig gelöscht.",
       "leaveRow": "{{name}} verlassen",
       "leaveRowUnnamed": "Diesen Kreis verlassen",
-      "leaveRowDescription": "Der Kreis verschwindet von diesem Handy. Du brauchst einen neuen Schlüssel, um zurückzukommen.",
+      "leaveRowDescription": "Der Kreis bleibt auf diesem Handy archiviert, bis du ihn löschst. Um zurückzukommen, brauchst du eine neue Einladung.",
       "members": "Mitglieder",
       "inTheCircle_one": "{{count}} im Kreis",
       "inTheCircle_other": "{{count}} im Kreis",
@@ -339,6 +341,16 @@
       "admin": "Admin",
       "joined": "Dabei seit {{month}}",
       "thisMember": "Dieses Mitglied"
+    },
+    "archived": {
+      "title": "Du bist nicht mehr in diesem Kreis.",
+      "body": "Was hier geteilt wurde, bleibt auf diesem Handy, aber Neues kommt nicht mehr dazu.",
+      "removeRow": "Von diesem Handy entfernen",
+      "removeRowDescription": "Die Fotos und Unterhaltungen werden von diesem Handy gelöscht. Um zurückzukommen, brauchst du eine neue Einladung.",
+      "removeTitle": "Diesen Kreis von diesem Handy entfernen?",
+      "removeMessage": "Die Fotos und Unterhaltungen werden von diesem Handy gelöscht. Ohne neue Einladung gibt es keinen Weg zurück.",
+      "removeConfirm": "Entfernen",
+      "removeFailed": "Der Kreis konnte nicht entfernt werden"
     }
   },
   "post": {

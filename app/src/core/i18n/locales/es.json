@@ -235,7 +235,9 @@
       "createCircle": "Crear círculo",
       "locked": "Bloqueado",
       "lockedStatus": "Se abre cuando un miembro se conecta",
-      "pendingStatus": "Pendiente"
+      "pendingStatus": "Pendiente",
+      "archivedSection": "Ya no formas parte",
+      "archivedBadge": "Archivado"
     },
     "feed": {
       "subtitle_one": "{{count}} persona. Toca para ver los detalles",
@@ -288,9 +290,9 @@
       "leaveTitleUnnamed": "¿Salir de este círculo?",
       "deleteMessage": "Eres la única persona que queda en el círculo. Esto elimina {{name}} y todas sus fotos para siempre, y no queda nadie que pueda volver a invitarte.",
       "deleteMessageUnnamed": "Eres la única persona que queda en el círculo. Esto elimina este círculo y todas sus fotos para siempre, y no queda nadie que pueda volver a invitarte.",
-      "leaveMessageSuccessor": "El círculo desaparecerá de este teléfono y {{name}} pasará a administrarlo.",
-      "leaveMessageSuccessorUnnamed": "El círculo desaparecerá de este teléfono y el miembro más antiguo pasará a administrarlo.",
-      "leaveMessage": "El círculo desaparecerá de este teléfono y necesitarás una clave nueva para volver.",
+      "leaveMessageSuccessor": "El círculo se archivará en este teléfono y {{name}} pasará a administrarlo.",
+      "leaveMessageSuccessorUnnamed": "El círculo se archivará en este teléfono y el miembro más antiguo pasará a administrarlo.",
+      "leaveMessage": "El círculo se archivará en este teléfono y necesitarás una nueva invitación para volver.",
       "delete": "Eliminar",
       "leave": "Salir",
       "deleteFailed": "No se ha podido eliminar el círculo",
@@ -330,7 +332,7 @@
       "deleteRowDescription": "Eres la única persona aquí. El círculo y todas sus fotos se eliminan para siempre.",
       "leaveRow": "Salir de {{name}}",
       "leaveRowUnnamed": "Salir de este círculo",
-      "leaveRowDescription": "El círculo desaparece de este teléfono. Necesitarás una clave nueva para volver.",
+      "leaveRowDescription": "El círculo se queda archivado en este teléfono hasta que lo elimines. Necesitarás una nueva invitación para volver.",
       "members": "Miembros",
       "inTheCircle_one": "{{count}} en el círculo",
       "inTheCircle_other": "{{count}} en el círculo",
@@ -339,6 +341,16 @@
       "admin": "Admin",
       "joined": "Se unió en {{month}}",
       "thisMember": "Este miembro"
+    },
+    "archived": {
+      "title": "Ya no formas parte de este círculo.",
+      "body": "Lo que se compartió aquí se queda en este teléfono, pero ya no llegará nada nuevo.",
+      "removeRow": "Quitar de este teléfono",
+      "removeRowDescription": "Las fotos y las conversaciones se borran de este teléfono. Para volver necesitarás una nueva invitación.",
+      "removeTitle": "¿Quitar este círculo de este teléfono?",
+      "removeMessage": "Las fotos y las conversaciones se borrarán de este teléfono. Sin una nueva invitación no podrás volver.",
+      "removeConfirm": "Quitar",
+      "removeFailed": "No se ha podido quitar el círculo"
     }
   },
   "post": {

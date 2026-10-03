@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useJustJoinedRows } from '@/features/feed/components/just-joined-row';
+import { useNoLongerMemberRows } from '@/features/feed/components/no-longer-member-row';
 import { usePendingRequestRows } from '@/features/feed/components/pending-request-row';
 import { usePostRows } from '@/features/feed/components/post-row';
 import { useRosterChangeRows } from '@/features/feed/components/roster-change-row';
@@ -42,6 +43,8 @@ export type CircleFeedController = {
   rows: FeedRow[];
   circleName: string;
   memberCount: number;
+  /** This account is no longer in the circle — see `CircleFeedMeta.readOnly`. */
+  readOnly: boolean;
   /** Whether the first read has resolved — an empty `rows` before this is "still loading", not "no posts". */
   loaded: boolean;
   refreshing: boolean;
@@ -173,8 +176,14 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     [circleId, patchPost],
   );
 
-  const requests = usePendingRequestRows({ circleId, ownIsAdmin: meta?.ownIsAdmin ?? false, onRosterChanged: syncAndReload });
+  // An archived circle's own row may still say admin; the relay would refuse the listing either way.
+  const requests = usePendingRequestRows({
+    circleId,
+    ownIsAdmin: (meta?.ownIsAdmin ?? false) && !(meta?.readOnly ?? false),
+    onRosterChanged: syncAndReload,
+  });
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
+  const noLongerMember = useNoLongerMemberRows({ circleId, readOnly: meta?.readOnly ?? false });
   const language = useLanguage();
   const posts = usePostRows({
     circleId,
@@ -184,6 +193,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     selfPhotoUri: meta?.selfPhotoUri,
     ownPublicKey: meta?.ownPublicKey ?? null,
     ownIsAdmin: meta?.ownIsAdmin ?? false,
+    readOnly: meta?.readOnly ?? false,
     language,
   });
   // The only other thing roster changes share a timeline with — see
@@ -202,8 +212,8 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
    * it instead. Adding a kind is one hook call and one entry.
    */
   const sources: FeedRows[] = useMemo(
-    () => [requests, justJoined, posts, rosterChanges],
-    [requests, justJoined, posts, rosterChanges],
+    () => [noLongerMember, requests, justJoined, posts, rosterChanges],
+    [noLongerMember, requests, justJoined, posts, rosterChanges],
   );
   // In an effect, not during render: a discarded render would leave
   // `reload` fanning out to sources that never mounted.
@@ -246,6 +256,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     rows,
     circleName: meta?.circleName ?? '',
     memberCount: meta?.memberCount ?? 0,
+    readOnly: meta?.readOnly ?? false,
     loaded: feed !== null,
     refreshing,
     hasMore: feed !== null && feed.cursor !== null,

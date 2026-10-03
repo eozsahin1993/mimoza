@@ -21,7 +21,7 @@ export type CommentItem = {
 export type PostCommentsProps = {
   /** The newest comment, the only one a card shows. */
   latest?: CommentItem;
-  /** How many there are in all — the "Show all" link appears past one. */
+  /** How many there are in all — the "Show all" link appears past one, when there is somewhere to open it. */
   total: number;
   /** Revealed by the card's Comment button — a quiet post shows the chip row and nothing more. */
   composerOpen: boolean;
@@ -61,8 +61,8 @@ export function PostComments({
     <View style={styles.container}>
       {latest ? <CommentRow {...latest} size={AVATAR_SIZE} /> : null}
 
-      {total > 1 ? (
-        <Pressable style={styles.showAll} onPress={onPressShowAll} disabled={!onPressShowAll} hitSlop={6}>
+      {total > 1 && onPressShowAll ? (
+        <Pressable style={styles.showAll} onPress={onPressShowAll} hitSlop={6}>
           <ThemedText type="bodySmall" themeColor="secondary">
             {t('post.showAllComments', { count: total })}
           </ThemedText>

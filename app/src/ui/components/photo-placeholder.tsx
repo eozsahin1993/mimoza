@@ -17,10 +17,15 @@ import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
  */
 export type MissingPhoto = 'arriving' | 'unavailable';
 
-/** Maps an attachment's status to what to tell the reader. Undefined means there is nothing to explain. */
-export function missingPhotoFor(status: string | null | undefined): MissingPhoto | undefined {
+/**
+ * Maps an attachment's status to what to tell the reader. Undefined means
+ * there is nothing to explain. In an archived circle nothing is on its
+ * way: the photo queue skips it and the relay would refuse the download,
+ * so a photo that never landed is unavailable rather than arriving.
+ */
+export function missingPhotoFor(status: string | null | undefined, archived = false): MissingPhoto | undefined {
   if (status === 'fetched') return undefined;
-  return status === 'failed' ? 'unavailable' : 'arriving';
+  return archived || status === 'failed' ? 'unavailable' : 'arriving';
 }
 
 /** The gap between hatch lines, measured across them. */

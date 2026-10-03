@@ -8,6 +8,7 @@ import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ActionSheet, type ActionSheetOption } from '@/ui/components/action-sheet';
 import { Avatar } from '@/ui/components/avatar/avatar';
 import { Icon } from '@/ui/components/icon';
+import { confirmRemoveFromPhone } from '@/features/feed/components/no-longer-member-row';
 import { InviteSheet } from '@/features/invite/components/invite-sheet';
 import { OptionSheet } from '@/ui/components/option-sheet';
 import { PromptSheet } from '@/ui/components/prompt-sheet';
@@ -67,6 +68,8 @@ export default function CircleDetailsScreen() {
 
   const circle = details?.circle ?? null;
   const members = details?.members ?? NO_MEMBERS;
+  /** No longer in the circle: the roster reads as it was, and the only setting left is removing the archive. */
+  const readOnly = circle?.leftAt != null;
   const admin = details?.ownIsAdmin ?? false;
   const ownPublicKey = details?.ownPublicKey ?? null;
   const invite = details?.invite ?? null;
@@ -384,6 +387,19 @@ export default function CircleDetailsScreen() {
       : t('circle.details.inviteFootnote'),
   };
 
+  const archiveGroup: SettingsGroup = {
+    title: t('circle.details.careful'),
+    destructive: true,
+    rows: [
+      {
+        label: t('circle.archived.removeRow'),
+        description: t('circle.archived.removeRowDescription'),
+        destructive: true,
+        onPress: () => circleId && confirmRemoveFromPhone(circleId, t),
+      },
+    ],
+  };
+
   /**
    * Every setting on this screen, as data. Adding one is an entry here —
    * a row gated on `admin` can say so inline, and a group whose rows all
@@ -444,9 +460,6 @@ export default function CircleDetailsScreen() {
             }
           : {
               label: circle ? t('circle.details.leaveRow', { name: circle.name }) : t('circle.details.leaveRowUnnamed'),
-              // Not "you keep the photos": `markCircleLeft` is a soft delete and
-              // the bytes do survive, but every list filters left circles out,
-              // so there is no screen that can still show them.
               description: t('circle.details.leaveRowDescription'),
               destructive: true,
               onPress: handleLeave,
@@ -529,7 +542,7 @@ export default function CircleDetailsScreen() {
 
           {renderMemberList()}
 
-          <SettingsGroups groups={settingsGroups} />
+          {readOnly ? <SettingsGroups groups={[archiveGroup]} /> : <SettingsGroups groups={settingsGroups} />}
 
           <SafeAreaView edges={['bottom']} />
         </ScrollView>

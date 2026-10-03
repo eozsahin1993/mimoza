@@ -235,7 +235,9 @@
       "createCircle": "Çevre oluştur",
       "locked": "Kilitli",
       "lockedStatus": "Bir üye çevrimiçi olunca açılır",
-      "pendingStatus": "Beklemede"
+      "pendingStatus": "Beklemede",
+      "archivedSection": "Artık üye değilsin",
+      "archivedBadge": "Arşivde"
     },
     "feed": {
       "subtitle_one": "{{count}} kişi. Detaylar için dokun",
@@ -288,9 +290,9 @@
       "leaveTitleUnnamed": "Bu çevreden ayrılmak istediğine emin misin?",
       "deleteMessage": "Çevrede sadece sen kaldın. Bu işlem {{name}} çevresini ve içindeki tüm fotoğrafları kalıcı olarak siler; seni tekrar davet edebilecek kimse kalmaz.",
       "deleteMessageUnnamed": "Çevrede sadece sen kaldın. Bu işlem bu çevreyi ve içindeki tüm fotoğrafları kalıcı olarak siler; seni tekrar davet edebilecek kimse kalmaz.",
-      "leaveMessageSuccessor": "Çevre bu cihazdan kaldırılacak ve {{name}} yeni yönetici olacak.",
-      "leaveMessageSuccessorUnnamed": "Çevre bu cihazdan kaldırılacak ve en kıdemli üye yeni yönetici olacak.",
-      "leaveMessage": "Çevre bu cihazdan kaldırılacak; tekrar katılmak için yeni bir anahtara ihtiyacın olacak.",
+      "leaveMessageSuccessor": "Çevre bu telefonda arşivlenecek ve {{name}} yeni yönetici olacak.",
+      "leaveMessageSuccessorUnnamed": "Çevre bu telefonda arşivlenecek ve en kıdemli üye yeni yönetici olacak.",
+      "leaveMessage": "Çevre bu telefonda arşivlenecek; tekrar katılmak için yeni bir davete ihtiyacın olacak.",
       "delete": "Sil",
       "leave": "Ayrıl",
       "deleteFailed": "Çevre silinemedi",
@@ -330,7 +332,7 @@
       "deleteRowDescription": "Çevrede yalnızca sen kalmışsın. Çevre ve tüm fotoğraflar kalıcı olarak silinir.",
       "leaveRow": "{{name}} çevresinden ayrıl",
       "leaveRowUnnamed": "Bu çevreden ayrıl",
-      "leaveRowDescription": "Çevre bu cihazdan kaldırılır. Tekrar katılmak için yeni bir anahtara ihtiyacın olur.",
+      "leaveRowDescription": "Çevre sen silene kadar bu telefonda arşivde kalır. Geri dönmek için yeni bir davet gerekir.",
       "members": "Üyeler",
       "inTheCircle_one": "Çevrede {{count}} kişi var",
       "inTheCircle_other": "Çevrede {{count}} kişi var",
@@ -339,6 +341,16 @@
       "admin": "Yönetici",
       "joined": "Katılım: {{month}}",
       "thisMember": "Bu üye"
+    },
+    "archived": {
+      "title": "Artık bu çevrede değilsin.",
+      "body": "Burada paylaşılanlar bu telefonda kalır, ama artık yeni bir şey gelmez.",
+      "removeRow": "Bu telefondan kaldır",
+      "removeRowDescription": "Fotoğraflar ve konuşmalar bu telefondan silinir. Geri dönebilmek için yeni bir davet gerekir.",
+      "removeTitle": "Çevre bu telefondan kaldırılsın mı?",
+      "removeMessage": "Fotoğraflar ve konuşmalar bu telefondan silinir. Yeni bir davet olmadan geri dönemezsin.",
+      "removeConfirm": "Kaldır",
+      "removeFailed": "Çevre kaldırılamadı"
     }
   },
   "post": {

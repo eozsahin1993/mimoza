@@ -235,7 +235,9 @@
       "createCircle": "Créer un cercle",
       "locked": "Verrouillé",
       "lockedStatus": "S’ouvre quand un membre se connecte",
-      "pendingStatus": "En attente"
+      "pendingStatus": "En attente",
+      "archivedSection": "Tu n’en fais plus partie",
+      "archivedBadge": "Archivé"
     },
     "feed": {
       "subtitle_one": "{{count}} personne. Touche pour les détails",
@@ -288,9 +290,9 @@
       "leaveTitleUnnamed": "Quitter ce cercle ?",
       "deleteMessage": "Tu es la dernière personne ici. Cela supprime {{name}} et toutes ses photos définitivement, et plus personne ne pourra t’inviter à nouveau.",
       "deleteMessageUnnamed": "Tu es la dernière personne ici. Cela supprime ce cercle et toutes ses photos définitivement, et plus personne ne pourra t’inviter à nouveau.",
-      "leaveMessageSuccessor": "Le cercle disparaît de ce téléphone et {{name}} devient admin.",
-      "leaveMessageSuccessorUnnamed": "Le cercle disparaît de ce téléphone et le membre le plus ancien devient admin.",
-      "leaveMessage": "Le cercle disparaît de ce téléphone, et il te faudra une nouvelle clé pour revenir.",
+      "leaveMessageSuccessor": "Le cercle est archivé sur ce téléphone et {{name}} devient admin.",
+      "leaveMessageSuccessorUnnamed": "Le cercle est archivé sur ce téléphone et le membre le plus ancien devient admin.",
+      "leaveMessage": "Le cercle est archivé sur ce téléphone, et il te faudra une nouvelle invitation pour revenir.",
       "delete": "Supprimer",
       "leave": "Quitter",
       "deleteFailed": "Impossible de supprimer le cercle",
@@ -330,7 +332,7 @@
       "deleteRowDescription": "Il n’y a que toi ici. Le cercle et toutes ses photos sont supprimés définitivement.",
       "leaveRow": "Quitter {{name}}",
       "leaveRowUnnamed": "Quitter ce cercle",
-      "leaveRowDescription": "Le cercle disparaît de ce téléphone. Il te faudra une nouvelle clé pour revenir.",
+      "leaveRowDescription": "Le cercle reste archivé sur ce téléphone jusqu’à ce que tu le supprimes. Il te faudra une nouvelle invitation pour revenir.",
       "members": "Membres",
       "inTheCircle_one": "{{count}} dans le cercle",
       "inTheCircle_other": "{{count}} dans le cercle",
@@ -339,6 +341,16 @@
       "admin": "Admin",
       "joined": "Membre depuis {{month}}",
       "thisMember": "Ce membre"
+    },
+    "archived": {
+      "title": "Tu ne fais plus partie de ce cercle.",
+      "body": "Ce qui a été partagé ici reste sur ce téléphone, mais plus rien de nouveau n’arrivera.",
+      "removeRow": "Retirer de ce téléphone",
+      "removeRowDescription": "Les photos et les conversations sont supprimées de ce téléphone. Il te faudra une nouvelle invitation pour revenir.",
+      "removeTitle": "Retirer ce cercle de ce téléphone ?",
+      "removeMessage": "Les photos et les conversations seront supprimées de ce téléphone. Sans nouvelle invitation, impossible de revenir.",
+      "removeConfirm": "Retirer",
+      "removeFailed": "Impossible de retirer le cercle"
     }
   },
   "post": {

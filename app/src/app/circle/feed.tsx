@@ -43,6 +43,7 @@ export default function FeedScreen() {
     rows,
     circleName,
     memberCount,
+    readOnly,
     loaded,
     refreshing,
     hasMore,
@@ -112,13 +113,17 @@ export default function FeedScreen() {
           // itself.
           renderScrollComponent={(props) => <KeyboardAwareScrollView {...props} bottomOffset={KEYBOARD_BOTTOM_OFFSET} />}
           keyboardDismissMode="on-drag"
+          // An archived circle has nothing to pull: the relay no longer
+          // lists it, so a pass would skip it anyway.
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={theme.accent}
-              colors={[theme.accent]}
-            />
+            readOnly ? undefined : (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refresh}
+                tintColor={theme.accent}
+                colors={[theme.accent]}
+              />
+            )
           }
           keyExtractor={(row) => row.key}
           renderItem={({ item }) => item.render()}
@@ -146,7 +151,9 @@ export default function FeedScreen() {
                 <ThemedText type="bodyMedium" themeColor="muted" style={styles.emptyBody}>
                   {t('circle.feed.emptyBody')}
                 </ThemedText>
-                <SecondaryButton label={t('circle.feed.invitePeople')} onPress={openDetails} style={styles.emptyButton} />
+                {readOnly ? null : (
+                  <SecondaryButton label={t('circle.feed.invitePeople')} onPress={openDetails} style={styles.emptyButton} />
+                )}
               </View>
             ) : null
           }
@@ -164,13 +171,15 @@ export default function FeedScreen() {
         {/* Native `SafeAreaView`, not `useSafeAreaInsets`: that hook's value
             can arrive a render late right after navigating, which would
             show as the FAB visibly snapping to its final position. */}
-        <SafeAreaView edges={['bottom']} style={styles.fabAnchor} pointerEvents="box-none">
-          <FabButton
-            icon={Icons.composePost}
-            onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
-            style={styles.fab}
-          />
-        </SafeAreaView>
+        {readOnly ? null : (
+          <SafeAreaView edges={['bottom']} style={styles.fabAnchor} pointerEvents="box-none">
+            <FabButton
+              icon={Icons.composePost}
+              onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
+              style={styles.fab}
+            />
+          </SafeAreaView>
+        )}
       </ThemedSafeAreaView>
     </ThemedView>
   );

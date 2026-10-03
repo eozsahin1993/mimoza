@@ -107,6 +107,8 @@ async function resolvePhotos(circleId: string, photos: AlbumPhoto[]): Promise<Al
 export default function AlbumScreen() {
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [circleName, setCircleName] = useState('');
+  /** No longer in the circle: a photo that never landed is not coming. */
+  const [archived, setArchived] = useState(false);
   const [rows, setRows] = useState<AlbumRow[]>([]);
   // Avoids flashing the empty state before the first read resolves.
   const [loaded, setLoaded] = useState(false);
@@ -118,6 +120,7 @@ export default function AlbumScreen() {
 
     const [circle, posts] = await Promise.all([getCircle(circleId), getAlbum(circleId)]);
     setCircleName(circle?.name ?? '');
+    setArchived(circle?.leftAt != null);
     const photos: AlbumPhoto[] = posts.map((post) => ({ id: post.id, createdAt: post.createdAt }));
     setRows(buildRows(await resolvePhotos(circleId, photos)));
     setLoaded(true);
@@ -159,7 +162,7 @@ export default function AlbumScreen() {
                     ) : (
                       // Icon only: a cell this size has no room for the
                       // label the feed's placeholder carries.
-                      <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(photo.photoStatus)} compact />
+                      <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(photo.photoStatus, archived)} compact />
                     )}
                   </Pressable>
                 ))}

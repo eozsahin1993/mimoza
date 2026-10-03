@@ -8,7 +8,7 @@ import { PostCard, type Post, type Reaction } from '@/features/post/components/p
 import { Spacing } from '@/ui/theme/tokens';
 import { showError } from '@/core/services/messages';
 import type { CommentWithAuthor, LocalAccount } from '@/data/db';
-import { getComments } from '@/data/db';
+import { childrenAreStale, getComments } from '@/data/db';
 import type { FeedPostView } from '@/features/feed/usecases/circle-feed';
 import { resolveMemberPictures } from '@/features/circle/usecases/member-pictures';
 import { commentOnPost } from '@/features/post/usecases/comment-on-post';
@@ -35,6 +35,8 @@ export type PostRowsInput = {
   /** The reader's own account id, and whether they may re-file any photo — see set-album-visibility.ts. */
   ownPublicKey: string | null;
   ownIsAdmin: boolean;
+  /** The reader is no longer in the circle: cards render without their actions. */
+  readOnly: boolean;
   language: LanguageCode;
 };
 
@@ -63,6 +65,7 @@ export function usePostRows({
   selfPhotoUri,
   ownPublicKey,
   ownIsAdmin,
+  readOnly,
   language,
 }: PostRowsInput): FeedRows {
   const actions = useMemo<PostRowActions>(
@@ -121,10 +124,10 @@ export function usePostRows({
   return useMemo(
     () => ({
       rows: posts.map((view) =>
-        postRow(view, profile, selfPhotoUri, actions, ownIsAdmin || view.post.authorId === ownPublicKey, language),
+        postRow(view, profile, selfPhotoUri, actions, ownIsAdmin || view.post.authorId === ownPublicKey, readOnly, language),
       ),
     }),
-    [posts, profile, selfPhotoUri, actions, ownPublicKey, ownIsAdmin, language],
+    [posts, profile, selfPhotoUri, actions, ownPublicKey, ownIsAdmin, readOnly, language],
   );
 }
 
@@ -134,9 +137,10 @@ function postRow(
   selfPhotoUri: string | undefined,
   actions: PostRowActions,
   canEditAlbum: boolean,
+  readOnly: boolean,
   language: LanguageCode,
 ): FeedRow {
-  const post = toPostCard(view, profile, language);
+  const post = toPostCard(view, profile, readOnly, language);
 
   return {
     key: post.id,
@@ -151,9 +155,12 @@ function postRow(
         onToggleReaction={(emoji) => actions.onToggleReaction(post.id, emoji)}
         onAddComment={(body) => actions.onAddComment(post.id, body)}
         onPressPhoto={() => actions.onOpenPost(post.id)}
-        onPressComments={() => actions.onOpenPost(post.id)}
+        // An archive has only the threads opened before the circle was
+        // left; "Show all" for any other would open an empty one.
+        onPressComments={readOnly && childrenAreStale(view.post) ? undefined : () => actions.onOpenPost(post.id)}
         onExpandComments={() => actions.onExpandComments(post.id)}
         onToggleAlbum={canEditAlbum ? () => actions.onToggleAlbum(view) : undefined}
+        readOnly={readOnly}
       />
     ),
   };
@@ -171,7 +178,7 @@ function toReactions(summary: FeedPostView['reactions']): Reaction[] {
  * it resolves through profilePictures the same way for every author,
  * self included.
  */
-function toPostCard(view: FeedPostView, profile: LocalAccount | null, language: LanguageCode): Post {
+function toPostCard(view: FeedPostView, profile: LocalAccount | null, readOnly: boolean, language: LanguageCode): Post {
   const { post } = view;
   const isOwn = profile?.accountId === post.authorId;
 
@@ -182,7 +189,7 @@ function toPostCard(view: FeedPostView, profile: LocalAccount | null, language: 
     authorPublicKey: post.authorId,
     timestamp: formatTimestamp(post.createdAt, language),
     photoUri: view.photoUri,
-    missingPhoto: view.photoUri ? undefined : missingPhotoFor(view.photoStatus),
+    missingPhoto: view.photoUri ? undefined : missingPhotoFor(view.photoStatus, readOnly),
     caption: post.caption,
     reactions: toReactions(view.reactions),
     reactionsTotal: view.reactions.total,

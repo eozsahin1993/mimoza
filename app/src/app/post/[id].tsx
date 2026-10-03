@@ -97,6 +97,8 @@ export default function PostDetailsScreen() {
   const [canEditPost, setCanEditPost] = useState(false);
   /** Which of the two it is, so the sheet can say why deleting is offered. */
   const [ownPost, setOwnPost] = useState(false);
+  /** The circle is an archive now: the post reads as it was, and takes nothing. */
+  const [readOnly, setReadOnly] = useState(false);
 
   const load = useCallback(async () => {
     if (!circleId || !postId) return;
@@ -111,6 +113,7 @@ export default function PostDetailsScreen() {
     ]);
 
     setCircleName(circle?.name ?? '');
+    setReadOnly(circle?.leftAt != null);
     setPost(storedPost);
     setProfileName(profile?.name);
     setComments(postComments);
@@ -282,7 +285,7 @@ export default function PostDetailsScreen() {
               // header rather than among the chips, which are each about
               // one emoji. Both carry the same rule — the photo's author
               // or an admin — so they appear and disappear together.
-              canEditPost && post ? (
+              canEditPost && post && !readOnly ? (
                 <>
                   <HeaderIconButton
                     icon={Icons.inAlbum}
@@ -313,8 +316,8 @@ export default function PostDetailsScreen() {
             ) : (
               <PhotoPlaceholder
                 style={styles.photo}
-                missing={missingPhotoFor(photoStatus)}
-                onRetry={() => retryAttachment(circleId, postId)}
+                missing={missingPhotoFor(photoStatus, readOnly)}
+                onRetry={readOnly ? undefined : () => retryAttachment(circleId, postId)}
               />
             )}
 
@@ -358,10 +361,11 @@ export default function PostDetailsScreen() {
                   emoji={reaction.emoji}
                   label={String(reaction.count)}
                   reacted={reaction.reactedByMe}
+                  disabled={readOnly}
                   onPress={() => handleSelectReaction(reaction.emoji)}
                 />
               ))}
-              {reactions.length > 0 ? (
+              {readOnly ? null : reactions.length > 0 ? (
                 <ReactionChip label="+" accessibilityLabel={t('post.addReaction')} onPress={() => setShowPicker((v) => !v)} />
               ) : (
                 <ReactionChip icon={Icons.react} label={t('post.react')} onPress={() => setShowPicker((v) => !v)} />
@@ -408,6 +412,7 @@ export default function PostDetailsScreen() {
               ))}
             </View>
 
+          {readOnly ? null : (
           <View style={styles.composer}>
             <TextInput
               value={commentText}
@@ -427,6 +432,7 @@ export default function PostDetailsScreen() {
               style={!commentText.trim() ? styles.composerSendDisabled : undefined}
             />
           </View>
+          )}
         </KeyboardAwareScrollView>
       </ThemedSafeAreaView>
 

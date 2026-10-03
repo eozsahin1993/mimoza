@@ -66,6 +66,10 @@ export type PostCardProps = {
   selfName?: string;
   /** Adds or removes the photo from the circle's album. */
   onToggleAlbum?: () => void;
+  /**
+   * The reader is no longer in this circle. Reactions and comments still
+   * show as they were; nothing can be added. */
+  readOnly?: boolean;
 };
 
 /** How many distinct emoji the feed's single pill shows before the count speaks for the rest. */
@@ -89,6 +93,7 @@ export function PostCard({
   selfPhotoUri,
   selfName,
   onToggleAlbum,
+  readOnly = false,
 }: PostCardProps) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -192,20 +197,23 @@ export function PostCard({
             label={String(totalReactions)}
             reacted={reactedByMe}
             accessibilityLabel={t('post.reactionCount', { count: totalReactions })}
+            disabled={readOnly}
             onPress={() => setShowPicker((v) => !v)}
           />
-        ) : (
+        ) : readOnly ? null : (
           <ReactionChip icon={Icons.react} label={t('post.react')} onPress={() => setShowPicker((v) => !v)} />
         )}
 
-        <View style={styles.commentsChipWrap}>
-          <ReactionChip icon={Icons.comment} label={t('post.comment')} reacted={composerOpen} onPress={handleToggleComposer} />
-          {post.hasUnseenComments ? (
-            <View style={[styles.unseenDot, { backgroundColor: theme.accentBright }]} />
-          ) : null}
-        </View>
+        {readOnly ? null : (
+          <View style={styles.commentsChipWrap}>
+            <ReactionChip icon={Icons.comment} label={t('post.comment')} reacted={composerOpen} onPress={handleToggleComposer} />
+            {post.hasUnseenComments ? (
+              <View style={[styles.unseenDot, { backgroundColor: theme.accentBright }]} />
+            ) : null}
+          </View>
+        )}
 
-        {onToggleAlbum ? (
+        {onToggleAlbum && !readOnly ? (
           <ReactionChip
             icon={Icons.inAlbum}
             label={t('post.album')}
@@ -226,7 +234,7 @@ export function PostCard({
         <PostComments
           latest={post.latestComment}
           total={post.commentCount}
-          onPressShowAll={handleShowAll}
+          onPressShowAll={onPressComments ? handleShowAll : undefined}
           composerOpen={composerOpen}
           onSubmit={handleAddComment}
           selfPhotoUri={selfPhotoUri}

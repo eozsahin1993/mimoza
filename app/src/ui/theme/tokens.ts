@@ -6,6 +6,7 @@
 import { Platform } from 'react-native';
 
 import Album from 'lucide-react-native/icons/album';
+import Archive from 'lucide-react-native/icons/archive';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowUpRight from 'lucide-react-native/icons/arrow-up-right';
 import Bookmark from 'lucide-react-native/icons/bookmark';
@@ -266,6 +267,8 @@ export const Icons = {
   comment: MessageCircle,
   send: SendHorizontal,
   locked: Lock,
+  /** A circle this account is no longer in: kept on the phone, taking nothing new. */
+  archived: Archive,
   promote: ShieldCheck,
   demote: ShieldOff,
   removeMember: UserX,

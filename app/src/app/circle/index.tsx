@@ -25,6 +25,7 @@ import {
   getProfilePicture,
   getUnreadCount,
   listCircles,
+  listLeftCircles,
   listRequests,
   type Circle,
   type PendingRequest,
@@ -58,13 +59,17 @@ type ListItem =
   | { kind: 'header'; key: string; title: string }
   | { kind: 'pending'; key: string; request: PendingRequest }
   | { kind: 'circle'; key: string; circle: CircleListItem }
-  | { kind: 'locked'; key: string; circle: CircleListItem };
+  | { kind: 'locked'; key: string; circle: CircleListItem }
+  | { kind: 'archived'; key: string; circle: ArchivedListItem };
 
 type CircleListItem = Circle & {
   memberCount: number;
   photoUri?: string;
   newCount: number;
 };
+
+/** No member count or unread: an archive's roster is as of the day it was left, and nothing new is coming. */
+type ArchivedListItem = Circle & { photoUri?: string };
 
 /**
  * The badge's count: posts and roster changes since this circle was last
@@ -89,6 +94,9 @@ export default function CircleListScreen() {
   // that circle go" is the question the section exists to answer.
   const open = circles.filter((circle) => !circle.needsRewrap);
   const locked = circles.filter((circle) => circle.needsRewrap);
+  // Circles this account is no longer in, kept read-only until the person
+  // removes them. Last, and visibly apart: they are history, not a place.
+  const [archived, setArchived] = useState<ArchivedListItem[]>([]);
 
   // Avoids flashing the empty state before the first load resolves.
   const [loaded, setLoaded] = useState(false);
@@ -121,7 +129,7 @@ export default function CircleListScreen() {
 
     // listCircles rather than getAllCircles: the latter is select(), so it
     // drags every circle's cover blob into JS on each focus. See circles.ts.
-    const [allCircles, requests] = await Promise.all([listCircles(), listRequests()]);
+    const [allCircles, requests, left] = await Promise.all([listCircles(), listRequests(), listLeftCircles()]);
     const withCounts = await Promise.all(
       allCircles.map(async (circle) => {
         const [memberCount, photoUri, newCount] = await Promise.all([
@@ -133,6 +141,7 @@ export default function CircleListScreen() {
       }),
     );
     setCircles(withCounts);
+    setArchived(await Promise.all(left.map(async (circle) => ({ ...circle, photoUri: await resolveCircleCoverUri(circle.id) }))));
     setPending(requests);
     setLoaded(true);
   }, [setPending]);
@@ -274,6 +283,10 @@ export default function CircleListScreen() {
     items.push({ kind: 'header', key: 'header-locked', title: t('circle.list.locked') });
     for (const circle of locked) items.push({ kind: 'locked', key: `locked-${circle.id}`, circle });
   }
+  if (archived.length) {
+    items.push({ kind: 'header', key: 'header-archived', title: t('circle.list.archivedSection') });
+    for (const circle of archived) items.push({ kind: 'archived', key: `archived-${circle.id}`, circle });
+  }
 
   return (
     <ThemedView style={styles.screen}>
@@ -345,6 +358,18 @@ export default function CircleListScreen() {
                 );
               case 'locked':
                 return <CircleStatusRow icon={Icons.locked} name={item.circle.name} status={t('circle.list.lockedStatus')} />;
+              case 'archived':
+                return (
+                  <CircleCard
+                    archived
+                    name={item.circle.name}
+                    photoUri={item.circle.photoUri}
+                    latestActivity={
+                      item.circle.lastEntryAt > 0 ? formatRelative(item.circle.lastEntryAt, language) : undefined
+                    }
+                    onPress={() => router.push({ pathname: '/circle/feed', params: { circleId: item.circle.id } })}
+                  />
+                );
             }
           }}
           // Only once the first read has resolved — otherwise the empty

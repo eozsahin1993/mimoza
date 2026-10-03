@@ -11,13 +11,20 @@ import { useTints } from '@/ui/theme/hooks/use-theme';
 
 export type CircleCardProps = {
   name: string;
-  memberCount: number;
+  /** Left off an archived circle: its roster is as of the day the account left, so the number would only mislead. */
+  memberCount?: number;
   /** Data URI of the actual cover photo, when it's known — otherwise the hatch placeholder shows. */
   photoUri?: string;
   /** Unread count shown as a "3 new" pill in the corner — omitted entirely once there's nothing new. */
   newCount?: number;
   /** Compact age of the newest photo, e.g. "2h" — sits beside the member count. */
   latestActivity?: string;
+  /**
+   * A circle this account has left: the same card, dimmed and marked,
+   * since it opens but takes nothing new. No unread count — nothing new
+   * is coming.
+   */
+  archived?: boolean;
   onPress?: () => void;
 };
 
@@ -29,13 +36,18 @@ export const CARD_HEIGHT = 100;
 // dark by the bottom edge where the text is.
 const ON_PHOTO = Colors.dark.text;
 const SCRIM = ['rgba(20,16,12,0)', 'rgba(20,16,12,0.78)'] as const;
+// Over the photo and its scrim for an archived circle. Grey rather than
+// black: a veil toward grey takes the colour out of the cover as well as
+// the light, so it reads as faded, not just as a darker photo.
+const ARCHIVED_VEIL = 'rgba(60,58,56,0.62)';
+const ARCHIVED_LABEL = 'rgba(20,16,12,0.72)';
 
 /**
  * The cover photo edge to edge, with the name and the two numbers that
  * matter laid over its bottom edge. What's new sits in the opposite
  * corner so it never crowds the name.
  */
-export function CircleCard({ name, memberCount, photoUri, newCount, latestActivity, onPress }: CircleCardProps) {
+export function CircleCard({ name, memberCount, photoUri, newCount, latestActivity, archived, onPress }: CircleCardProps) {
   const { t } = useTranslation();
   const tints = useTints();
   return (
@@ -43,6 +55,16 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
       <PhotoPlaceholder style={StyleSheet.absoluteFill} />
       {photoUri ? <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
       <LinearGradient colors={SCRIM} locations={[0.4, 1]} style={StyleSheet.absoluteFill} />
+      {archived ? <View style={[StyleSheet.absoluteFill, { backgroundColor: ARCHIVED_VEIL }]} pointerEvents="none" /> : null}
+
+      {archived ? (
+        <View style={styles.archivedLabel}>
+          <Icon icon={Icons.archived} size={12} color={ON_PHOTO} />
+          <ThemedText type="labelSmall" style={{ color: ON_PHOTO }}>
+            {t('circle.list.archivedBadge')}
+          </ThemedText>
+        </View>
+      ) : null}
 
       {newCount ? (
         <View style={styles.badge} accessibilityLabel={t('circle.newCount', { count: newCount })}>
@@ -58,12 +80,14 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
         </ThemedText>
 
         <View style={styles.stats}>
-          <View style={styles.stat} accessibilityLabel={t('circle.peopleCount', { count: memberCount })}>
-            <Icon icon={Icons.members} size={14} color={ON_PHOTO} />
-            <ThemedText type="labelMedium" style={{ color: ON_PHOTO }}>
-              {memberCount}
-            </ThemedText>
-          </View>
+          {memberCount !== undefined ? (
+            <View style={styles.stat} accessibilityLabel={t('circle.peopleCount', { count: memberCount })}>
+              <Icon icon={Icons.members} size={14} color={ON_PHOTO} />
+              <ThemedText type="labelMedium" style={{ color: ON_PHOTO }}>
+                {memberCount}
+              </ThemedText>
+            </View>
+          ) : null}
           {latestActivity ? (
             <View style={styles.stat}>
               <Icon icon={Icons.waiting} size={14} color={ON_PHOTO} />
@@ -101,6 +125,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: Radius.pill,
     backgroundColor: Petal,
+  },
+  // Named, not just marked: a glyph alone was easy to read past, and the
+  // label is what says the circle is not live. Aligned with the name below.
+  archivedLabel: {
+    position: 'absolute',
+    top: Space.s300,
+    left: Space.s400,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.s100,
+    paddingVertical: Space.s100,
+    paddingHorizontal: Space.s200,
+    borderRadius: Radius.pill,
+    backgroundColor: ARCHIVED_LABEL,
   },
   footer: {
     flexDirection: 'row',
