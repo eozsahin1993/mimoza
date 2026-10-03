@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { setMessageListener, type Message } from '@/core/services/messages';
 
-/** How long each tone stands. An error has none: it stays until dismissed, because what it reports won't happen on its own. */
-const HOLD_MS: Record<Message['tone'], number | null> = { done: 3000, neutral: 4000, error: null };
+/** How long each tone stands. An error stands longest, as the one worth reading twice. */
+const HOLD_MS: Record<Message['tone'], number> = { done: 3000, neutral: 4000, error: 6000 };
 
 /** Longer than any tone's own time, so there's room to reach the way out. */
-const WITH_ACTION_MS = 6000;
+const WITH_ACTION_MS = 8000;
 
 export type MessageController = {
   /** What to draw, still set while it leaves so there's something to animate. */
@@ -65,11 +65,7 @@ export function useMessages(): MessageController {
 
   useEffect(() => {
     if (!message || !visible) return;
-    const hold = HOLD_MS[message.tone];
-    // An action extends the wait, but never gives an error a deadline it
-    // didn't have.
-    const holdMs = message.action && hold !== null ? WITH_ACTION_MS : hold;
-    if (holdMs === null) return;
+    const holdMs = message.action ? WITH_ACTION_MS : HOLD_MS[message.tone];
 
     const timer = setTimeout(dismiss, holdMs);
     return () => clearTimeout(timer);
