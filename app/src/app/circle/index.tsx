@@ -104,7 +104,10 @@ export default function CircleListScreen() {
   // later one until it's answered either way.
   const [offerNotifications, setOfferNotifications] = useState(false);
 
-  /** Re-reads the circle list from the local database. No network. */
+  /**
+   * Re-reads the circle list and the asks still waiting, from the local
+   * database. No network.
+   */
   const loadFromDatabase = useCallback(async () => {
     const profile = await getLocalAccount();
     const picture = profile ? await getProfilePicture(profile.accountId) : null;
@@ -118,7 +121,7 @@ export default function CircleListScreen() {
 
     // listCircles rather than getAllCircles: the latter is select(), so it
     // drags every circle's cover blob into JS on each focus. See circles.ts.
-    const allCircles = await listCircles();
+    const [allCircles, requests] = await Promise.all([listCircles(), listRequests()]);
     const withCounts = await Promise.all(
       allCircles.map(async (circle) => {
         const [memberCount, photoUri, newCount] = await Promise.all([
@@ -130,8 +133,9 @@ export default function CircleListScreen() {
       }),
     );
     setCircles(withCounts);
+    setPending(requests);
     setLoaded(true);
-  }, []);
+  }, [setPending]);
 
   /**
    * Completes any join whose approval has landed, reporting whether one
