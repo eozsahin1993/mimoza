@@ -18,7 +18,13 @@ so a stale "done" is visible.
       lookup page with Northwest's address. Gates the Apple conversion
       and the Play organization account. Apple copies this address to EU
       product pages for traders, so it must never be a home address.
-- [ ] **Google Play Console** — $25 once.
+- [x] **Google Play Console** — paid as a personal account. Convert to
+      organization in place once the D-U-N-S arrives: Developer account →
+      About you → verify the org website, then Change account type with a
+      new organization payments profile. Apps and history stay. Do not
+      create the Mimoza app record before the conversion: organization
+      accounts skip the 12-tester closed test, but an app born under a
+      personal account may keep that requirement after the switch.
 - [ ] **BIS notification email.** One message, no reply expected, to
       `crypt@bis.doc.gov` and `enc@nsa.gov` with the GitHub URL. Publicly
       available encryption source is not subject to the EAR once notified
