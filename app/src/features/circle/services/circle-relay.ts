@@ -30,6 +30,8 @@ export type Circle = {
 };
 
 export type PendingRequest = {
+  /** What withdrawing this ask names. Absent from a relay that predates it. */
+  requestId?: string;
   circleId: string;
   circleName?: string;
   status: string;

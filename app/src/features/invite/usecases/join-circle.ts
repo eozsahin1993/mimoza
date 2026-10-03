@@ -1,5 +1,8 @@
+import { JoinRequestGoneError } from '@/core/services/relay-errors';
 import { dropRequest, getCircle, getRequest, listRequests as listLocalRequests, upsertRequest } from '@/data/db';
+import { listCircles as listOnRelay } from '@/features/circle/services/circle-relay';
 import {
+  cancelRequest as cancelOnRelay,
   previewInvite as previewOnRelay,
   requestToJoin as askOnRelay,
   type InvitePreview,
@@ -61,8 +64,23 @@ export async function checkPendingJoinRequest(circleId: string): Promise<Pending
   return request.status === 'pending' ? { state: 'pending' } : { state: 'gone' };
 }
 
-/** Forgets the ask on this device. The relay keeps it until an admin answers or it expires. */
+/**
+ * Withdraws the ask on the relay, then forgets it here, in that order:
+ * the relay keeps an ask listed until it is answered or expires, so
+ * dropping it only locally would put it back on the next sync and leave
+ * an admin able to approve it. The id comes from the relay's own list,
+ * since this device never stored it. An ask no longer open there has
+ * nothing left to withdraw.
+ */
 export async function cancelPendingJoinRequest(circleId: string): Promise<void> {
+  const { requests } = await listOnRelay();
+  const ask = requests.find((request) => request.circleId === circleId);
+  if (ask?.status === 'pending') {
+    if (!ask.requestId) throw new Error('The relay did not name this ask, so it cannot be withdrawn.');
+    await cancelOnRelay(circleId, ask.requestId).catch((err: unknown) => {
+      if (!(err instanceof JoinRequestGoneError)) throw err;
+    });
+  }
   await dropRequest(circleId);
 }
 

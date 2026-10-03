@@ -228,6 +228,7 @@
       "cancelPendingMessage": "Yeni bir anahtarla tekrar katılma isteğinde bulunabilirsin.",
       "keepWaiting": "Beklemeye devam et",
       "cancelRequest": "İsteği iptal et",
+      "cancelRequestFailed": "Katılma isteği iptal edilemedi",
       "refreshFailed": "Çevreler yenilenemedi",
       "emptyTitle": "Henüz bir çevren yok",
       "emptyBody": "Anılarını paylaşmak için yeni bir çevre oluştur. Çevrelere sadece davetle girilir; birine katılmak için sana gönderilen bağlantıyı açabilirsin.",
@@ -484,7 +485,8 @@
       "withdrawTitle": "İsteği geri çekmek istiyor musun?",
       "withdrawMessage": "Yeni bir anahtar alarak tekrar katılma isteğinde bulunabilirsin.",
       "keepWaiting": "Beklemeye devam et",
-      "withdrawConfirm": "Geri çek"
+      "withdrawConfirm": "Geri çek",
+      "withdrawFailed": "Katılma isteği geri çekilemedi"
     },
     "request": {
       "someone": "Biri",

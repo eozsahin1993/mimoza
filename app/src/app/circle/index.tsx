@@ -234,6 +234,7 @@ export default function CircleListScreen() {
             await cancelPendingJoinRequest(request.circleId);
           } catch (err) {
             console.error('Failed to withdraw join request', err);
+            showError(t('circle.list.cancelRequestFailed'));
           }
           setPending(await listRequests());
         },

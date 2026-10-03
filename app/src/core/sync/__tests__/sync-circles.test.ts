@@ -18,6 +18,7 @@ import {
   upsertRequest,
 } from '@/data/db';
 import { syncCircles } from '@/core/sync/sync-circles';
+import { cancelPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 import type { Circle, Roster } from '@/features/circle/services/circle-relay';
 
 jest.mock('@/features/circle/services/circle-relay', () => ({
@@ -38,6 +39,11 @@ jest.mock('@/core/services/keystore/circle-keys', () => ({
   getCurrentContentKey: jest.fn(async () => ({ version: 1, key: new Uint8Array(32).fill(1) })),
 }));
 jest.mock('@/core/photo/photo-queue', () => ({ nudgePhotoQueue: jest.fn() }));
+jest.mock('@/features/invite/services/invite-relay', () => ({
+  cancelRequest: jest.fn(async () => undefined),
+  previewInvite: jest.fn(),
+  requestToJoin: jest.fn(),
+}));
 jest.mock('@/features/push-notifications/services/channels', () => ({
   ensureCircleNotificationChannel: jest.fn(async () => undefined),
   removeCircleNotificationChannel: jest.fn(async () => undefined),
@@ -53,6 +59,9 @@ const keys = jest.requireMock('@/features/circle/usecases/key-exchange') as {
 };
 const circleKeys = jest.requireMock('@/core/services/keystore/circle-keys') as {
   getCircleKeyMap: jest.Mock;
+};
+const invites = jest.requireMock('@/features/invite/services/invite-relay') as {
+  cancelRequest: jest.Mock;
 };
 const posts = jest.requireMock('@/features/post/services/post-relay') as {
   walkEntries: jest.Mock;
@@ -522,6 +531,69 @@ describe('a sync pass', () => {
     const [request] = await listRequests();
     expect(request.inviteCode).toBe('CODE');
     expect(request.circleName).toBe('Family');
+  });
+
+  // The relay keeps a denied ask listed until it expires, so the device
+  // can see the answer — but there is nothing left to wait for, and a row
+  // kept as "pending" would sit on the list that whole time.
+  test('a denied request is dropped rather than kept as waiting', async () => {
+    const id = circleId();
+    await upsertRequest({ circleId: id, inviteCode: 'CODE', circleName: 'Family', submittedAt: NOW, status: 'pending' });
+    relay.listCircles.mockResolvedValue({
+      circles: [],
+      requests: [{ requestId: 'r1', circleId: id, circleName: 'Family', status: 'denied', createdAt: NOW }],
+    });
+
+    await syncCircles();
+
+    expect(await listRequests()).toEqual([]);
+  });
+
+  test('a denied request the relay keeps listing does not come back on later syncs', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({
+      circles: [],
+      requests: [{ requestId: 'r1', circleId: id, circleName: 'Family', status: 'denied', createdAt: NOW }],
+    });
+
+    await syncCircles();
+    await syncCircles();
+
+    expect(await listRequests()).toEqual([]);
+  });
+
+  test('an open request made from another device shows up as waiting', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({
+      circles: [],
+      requests: [{ requestId: 'r1', circleId: id, circleName: 'Family', status: 'pending', createdAt: NOW }],
+    });
+
+    await syncCircles();
+
+    const requests = await listRequests();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ circleId: id, circleName: 'Family', status: 'pending', inviteCode: '' });
+  });
+
+  // Withdrawing used to forget the ask only on this device while the relay
+  // kept listing it, so the very next sync put it straight back.
+  test('a withdrawn request stays gone across the next sync', async () => {
+    const id = circleId();
+    const ask = { requestId: 'r1', circleId: id, circleName: 'Family', status: 'pending', createdAt: NOW };
+    relay.listCircles.mockResolvedValue({ circles: [], requests: [ask] });
+    await syncCircles();
+    expect(await listRequests()).toHaveLength(1);
+
+    // Once the relay has deleted it, its list stops carrying it.
+    invites.cancelRequest.mockImplementationOnce(async () => {
+      relay.listCircles.mockResolvedValue({ circles: [], requests: [] });
+    });
+    await cancelPendingJoinRequest(id);
+    await syncCircles();
+
+    expect(invites.cancelRequest).toHaveBeenCalledWith(id, 'r1');
+    expect(await listRequests()).toEqual([]);
   });
 
   // A profile picture is account-level and unencrypted now, so queuing it

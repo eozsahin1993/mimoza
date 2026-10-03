@@ -228,6 +228,7 @@
       "cancelPendingMessage": "Puedes volver a pedirlo con una clave nueva.",
       "keepWaiting": "Seguir esperando",
       "cancelRequest": "Cancelar solicitud",
+      "cancelRequestFailed": "No se ha podido cancelar la solicitud de unión",
       "refreshFailed": "No se han podido actualizar tus círculos",
       "emptyTitle": "Aún no tienes círculos",
       "emptyBody": "Crea uno para compartir recuerdos con quien tú quieras. A un círculo solo se entra por invitación: abre el enlace que te hayan enviado para unirte.",
@@ -484,7 +485,8 @@
       "withdrawTitle": "¿Retirar la solicitud?",
       "withdrawMessage": "Puedes volver a pedirlo con una clave nueva.",
       "keepWaiting": "Seguir esperando",
-      "withdrawConfirm": "Retirar"
+      "withdrawConfirm": "Retirar",
+      "withdrawFailed": "No se ha podido retirar la solicitud de unión"
     },
     "request": {
       "someone": "Alguien",

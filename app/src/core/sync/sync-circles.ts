@@ -59,14 +59,14 @@ export async function syncCircles(options: SyncOptions = {}): Promise<number> {
   // these are upserted rather than replaced. One the relay has stopped
   // listing has been answered.
   const asked = new Set(requests.map((request) => request.circleId));
-  // The relay keeps an answered ask listed until it expires (so the
-  // asking device can show the answer even if it missed the moment),
-  // but once the circle it names is also in this same response, holding
-  // onto the ask any longer only leaves a stale "pending" row on screen
-  // next to the circle that already landed.
+  // The relay keeps an answered ask listed until it expires, so an
+  // asking device can see the answer even if it missed the moment. Only
+  // an open one is kept here: an approved ask is done once its circle
+  // arrives, and a denied one has nothing left to wait for. Either would
+  // otherwise sit on screen as "pending" until it expired.
   const joined = new Set(circles.map((circle) => circle.circleId));
   for (const request of requests) {
-    if (joined.has(request.circleId)) {
+    if (request.status !== 'pending' || joined.has(request.circleId)) {
       await dropRequest(request.circleId);
       continue;
     }

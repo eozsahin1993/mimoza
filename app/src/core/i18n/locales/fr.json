@@ -228,6 +228,7 @@
       "cancelPendingMessage": "Tu pourras redemander avec une nouvelle clé.",
       "keepWaiting": "Continuer d’attendre",
       "cancelRequest": "Annuler la demande",
+      "cancelRequestFailed": "Impossible d’annuler la demande d’adhésion",
       "refreshFailed": "Impossible d’actualiser tes cercles",
       "emptyTitle": "Aucun cercle pour l’instant",
       "emptyBody": "Crée-en un pour partager des souvenirs avec qui tu veux. On ne rejoint un cercle que sur invitation : ouvre le lien qu’on t’a envoyé.",
@@ -484,7 +485,8 @@
       "withdrawTitle": "Retirer la demande ?",
       "withdrawMessage": "Tu pourras redemander avec une nouvelle clé.",
       "keepWaiting": "Continuer d’attendre",
-      "withdrawConfirm": "Retirer"
+      "withdrawConfirm": "Retirer",
+      "withdrawFailed": "Impossible de retirer la demande d’adhésion"
     },
     "request": {
       "someone": "Quelqu’un",

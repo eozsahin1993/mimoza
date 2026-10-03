@@ -103,6 +103,13 @@ export async function approveRequest(
   if (!response.ok) throw new Error(await describeError(response, 'approving an ask'));
 }
 
+/** The asker taking their own ask back. Anyone else's, or one already answered, reads as gone. */
+export async function cancelRequest(circleId: string, requestId: string): Promise<void> {
+  const response = await authorizedFetch(`/v1/circles/${circleId}/requests/${requestId}`, { method: 'DELETE' });
+  if (response.status === 404) throw new JoinRequestGoneError();
+  if (!response.ok) throw new Error(await describeError(response, 'withdrawing an ask'));
+}
+
 export async function denyRequest(circleId: string, requestId: string): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${circleId}/requests/${requestId}/deny`, { method: 'POST' });
   if (response.status === 404) throw new JoinRequestGoneError();

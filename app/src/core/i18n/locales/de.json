@@ -228,6 +228,7 @@
       "cancelPendingMessage": "Du kannst mit einem neuen Schlüssel erneut anfragen.",
       "keepWaiting": "Weiter warten",
       "cancelRequest": "Anfrage zurückziehen",
+      "cancelRequestFailed": "Die Beitrittsanfrage konnte nicht zurückgezogen werden",
       "refreshFailed": "Deine Kreise konnten nicht aktualisiert werden",
       "emptyTitle": "Noch keine Kreise",
       "emptyBody": "Erstelle einen, um Erinnerungen mit den Menschen zu teilen, die dir wichtig sind. In einen Kreis kommt man nur auf Einladung: Öffne den Link, den dir jemand geschickt hat.",
@@ -484,7 +485,8 @@
       "withdrawTitle": "Anfrage zurückziehen?",
       "withdrawMessage": "Mit einem neuen Schlüssel kannst du erneut anfragen.",
       "keepWaiting": "Weiter warten",
-      "withdrawConfirm": "Zurückziehen"
+      "withdrawConfirm": "Zurückziehen",
+      "withdrawFailed": "Die Beitrittsanfrage konnte nicht zurückgezogen werden"
     },
     "request": {
       "someone": "Jemand",

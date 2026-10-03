@@ -9,6 +9,7 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Space, Spacing } from '@/ui/theme/tokens';
 import { showAlert } from '@/core/services/alerts';
+import { showError } from '@/core/services/messages';
 import { getRequest } from '@/data/db';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 
@@ -99,6 +100,8 @@ export default function JoinPendingScreen() {
             await cancelPendingJoinRequest(circleId);
           } catch (err) {
             console.error('Failed to withdraw join request', err);
+            showError(t('invite.pending.withdrawFailed'));
+            return;
           }
           router.dismissTo('/circle');
         },

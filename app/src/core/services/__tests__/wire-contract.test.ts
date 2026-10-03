@@ -8,7 +8,13 @@ jest.mock('@/core/services/keystore/auth-token', () => ({
 }));
 
 import { createCircle, leaveCircle, patchMembership, removeMember, renameCircle, rewrapKeys, setCover } from '@/features/circle/services/circle-relay';
-import { approveRequest } from '@/features/invite/services/invite-relay';
+import {
+  approveRequest,
+  cancelRequest,
+  denyRequest,
+  listRequests,
+  requestToJoin,
+} from '@/features/invite/services/invite-relay';
 import { addComment, putPost, react, setVisibility } from '@/features/post/services/post-relay';
 
 /**
@@ -135,4 +141,49 @@ describe('what the client sends is what the relay reads', () => {
  */
 test('a join request carries the key an approver seals to', () => {
   expect(goFields('internal/circles/requests/request_response.go', 'requestResponse')).toContain('publicKey');
+});
+
+/**
+ * A client that calls a route the relay does not register gets a 404 that
+ * reads as "that ask is gone", which is exactly what withdrawing, approving
+ * and denying treat it as. So the paths themselves are checked against
+ * what the relay mounts, not just the bodies.
+ */
+function goRoutes(file: string): { method: string; pattern: RegExp }[] {
+  const source = readFileSync(resolve(SERVER, file), 'utf8');
+  return [...source.matchAll(/\{"(GET|POST|PUT|PATCH|DELETE) (\/[^"]+)"/g)].map(([, method, path]) => ({
+    method,
+    pattern: new RegExp(`^${path.replace(/\{[^}]+\}/g, '[^/]+')}$`),
+  }));
+}
+
+async function requestOf(call: () => Promise<unknown>): Promise<{ method: string; path: string }> {
+  const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}), text: async () => '{}' });
+  global.fetch = fetchMock as unknown as typeof fetch;
+
+  await call();
+  const [url, init] = fetchMock.mock.calls[0];
+  return { method: init?.method ?? 'GET', path: new URL(url).pathname.replace(/^\/v1/, '') };
+}
+
+describe('the join routes the client calls are ones the relay serves', () => {
+  const routes = goRoutes('internal/circles/requests/router.go');
+
+  test.each([
+    ['asking to join', () => requestToJoin('CODE'), 'POST', '/invites/CODE/requests'],
+    ['listing the asks', () => listRequests('c1'), 'GET', '/circles/c1/requests'],
+    ['approving an ask', () => approveRequest('c1', 'r1', { '1': 'sealed' }), 'POST', '/circles/c1/requests/r1/approve'],
+    ['denying an ask', () => denyRequest('c1', 'r1'), 'POST', '/circles/c1/requests/r1/deny'],
+    ['withdrawing an ask', () => cancelRequest('c1', 'r1'), 'DELETE', '/circles/c1/requests/r1'],
+  ])('%s', async (_name, call, method, path) => {
+    const sent = await requestOf(call);
+
+    expect(sent).toEqual({ method, path });
+    expect(routes.some((route) => route.method === sent.method && route.pattern.test(sent.path))).toBe(true);
+  });
+});
+
+/** What withdrawing an ask names: the sync list is the only place this device learns it. */
+test('the relay names each ask a device is waiting on', () => {
+  expect(goFields('internal/circles/circle/list.go', 'pendingResponse')).toContain('requestId');
 });

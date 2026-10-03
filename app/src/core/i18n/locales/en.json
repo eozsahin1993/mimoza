@@ -228,6 +228,7 @@
       "cancelPendingMessage": "You can ask again with a new key.",
       "keepWaiting": "Keep waiting",
       "cancelRequest": "Cancel request",
+      "cancelRequestFailed": "Could not cancel the request",
       "refreshFailed": "Could not refresh your circles",
       "emptyTitle": "No circles yet",
       "emptyBody": "Create one to share memories with the people in it. Circles are invite-only, so open a link someone sent you to join one.",
@@ -484,7 +485,8 @@
       "withdrawTitle": "Withdraw this request?",
       "withdrawMessage": "You can ask again with a new key.",
       "keepWaiting": "Keep waiting",
-      "withdrawConfirm": "Withdraw"
+      "withdrawConfirm": "Withdraw",
+      "withdrawFailed": "Could not withdraw the request"
     },
     "request": {
       "someone": "Someone",
