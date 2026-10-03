@@ -166,8 +166,9 @@ export const Tints = {
     chipReactedBorder: 'rgba(166,85,47,0.45)',
     privacyWashBg: 'rgba(166,85,47,0.09)',
     privacyWashBorder: 'rgba(166,85,47,0.22)',
-    // What these roles rendered with before they had a token of their own.
-    hatch: 'rgba(35,26,17,0.08)',
+    // The same lightness step against its slot as dark's hatch, so the two read alike.
+    hatch: 'rgba(35,26,17,0.09)',
+    // What this role rendered with before it had a token of its own.
     switchTrack: 'rgba(35,26,17,0.06)',
     dangerWashBorder: 'rgba(184,80,63,0.35)',
     dangerWashBg: 'rgba(184,80,63,0.12)',

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
+import Svg, { Line } from 'react-native-svg';
 import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/ui/components/icon';
@@ -20,6 +21,18 @@ export type MissingPhoto = 'arriving' | 'unavailable';
 export function missingPhotoFor(status: string | null | undefined): MissingPhoto | undefined {
   if (status === 'fetched') return undefined;
   return status === 'failed' ? 'unavailable' : 'arriving';
+}
+
+/** The gap between hatch lines, measured across them. */
+const HATCH_GAP = 22;
+/** What that gap is along the top edge, for a line at 45 degrees. */
+const HATCH_STEP = HATCH_GAP * Math.SQRT2;
+
+/** Where each hatch line meets the top edge: enough of them to cross the whole box. */
+function hatchStarts({ width, height }: { width: number; height: number }): number[] {
+  const starts: number[] = [];
+  for (let x = 0; x < width + height; x += HATCH_STEP) starts.push(x);
+  return starts;
 }
 
 const NOTES = {
@@ -52,6 +65,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, onRetry, .
   const tints = useTints();
   const hatchFill = scheme === 'dark' ? PhotoSlotDark : PhotoSlotLight;
   const retryable = missing === 'unavailable' && !compact && !!onRetry;
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   return (
     <View style={[styles.container, { backgroundColor: hatchFill }, style]} {...rest}>
@@ -64,20 +78,15 @@ export function PhotoPlaceholder({ style, children, missing, compact, onRetry, .
         wrapper is an ordinary ReactViewGroup, so it absorbs the move and
         the SvgView underneath is never touched.
       */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Plain lines, not an SVG `Pattern`: on iOS that drew at the wrong spacing and a fraction of the contrast. */}
+      <View
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+        onLayout={(event) => setSize(event.nativeEvent.layout)}>
         <Svg width="100%" height="100%">
-          <Defs>
-            <Pattern
-              id="hatch"
-              width={22}
-              height={22}
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(45)">
-              <Rect width={22} height={22} fill={hatchFill} />
-              <Line x1={0} y1={0} x2={0} y2={22} stroke={tints.hatch} strokeWidth={1} />
-            </Pattern>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#hatch)" />
+          {hatchStarts(size).map((x) => (
+            <Line key={x} x1={x} y1={0} x2={x - size.height} y2={size.height} stroke={tints.hatch} strokeWidth={0.5} />
+          ))}
         </Svg>
       </View>
       {missing ? (
