@@ -16,7 +16,7 @@ import {
 import { openContent, sealContent } from '@/core/crypto/content';
 import { decrypt } from '@/core/crypto/primitives';
 import { reactionTag } from '@/core/crypto/reaction-tags';
-import { NetworkUnreachableError } from '@/core/services/relay-errors';
+import { NetworkUnreachableError, RelayError } from '@/core/services/relay-errors';
 import { drainOutbox } from '@/core/sync/drain-outbox';
 import type { Entry } from '@/features/post/services/post-relay';
 
@@ -252,6 +252,26 @@ describe('draining the outbox', () => {
     const [waiting] = await due(circleId, Date.now() + 120_000);
     expect(waiting.op).toBe('post');
     expect(waiting.attempts).toBe(0);
+  });
+
+  // A rotation between the pass reading the circle and the write landing.
+  // The next pass fetches the new key; the row must still be there for it.
+  test('a stale key refusal waits without spending an attempt', async () => {
+    const { circleId, postId } = ids();
+    await seed(circleId);
+    queueOnePost(circleId, postId);
+    relay.putPost.mockRejectedValue(new RelayError('posting: 409 [stale_key_version] old key', 409, 'stale_key_version'));
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    await drainOutbox(circleId);
+    jest.spyOn(Date, 'now').mockRestore();
+
+    expect(await failed(circleId)).toEqual([]);
+    const [waiting] = await due(circleId, Date.now() + 120_000);
+    expect(waiting.op).toBe('post');
+    expect(waiting.attempts).toBe(0);
+    expect(waiting.lastError).toContain('stale_key_version');
   });
 
   test('coming back online sends what was waiting', async () => {

@@ -107,3 +107,19 @@ export class DeviceLinkAnsweredError extends Error {
     this.name = 'DeviceLinkAnsweredError';
   }
 }
+
+/**
+ * A relay refusal the caller may need to act on by kind. `code` is the
+ * relay's stable name for the error (`circles.Code`), or null when the
+ * response carried none; the message already includes it for logs.
+ */
+export class RelayError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | null
+  ) {
+    super(message);
+    this.name = 'RelayError';
+  }
+}

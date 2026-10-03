@@ -5,6 +5,7 @@ import {
   due,
   dropPendingComment,
   getAttachment,
+  getCircle,
   retryLater,
   settleReaction,
   type OutboxEntry,
@@ -13,7 +14,7 @@ import { sealContent } from '@/core/crypto/content';
 import { encrypt } from '@/core/crypto/primitives';
 import { reactionTag } from '@/core/crypto/reaction-tags';
 import { BlobPaths, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
-import { BlobAlreadyExistsError, NetworkUnreachableError } from '@/core/services/relay-errors';
+import { BlobAlreadyExistsError, NetworkUnreachableError, RelayError } from '@/core/services/relay-errors';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { applyPostEntry } from '@/core/sync/entry-handlers/post';
 import { entryContext, type EntryContext } from '@/core/sync/entry-handlers/types';
@@ -183,19 +184,40 @@ async function pushDue(circleId: string): Promise<void> {
   const key = await getCurrentContentKey(circleId);
   if (!ctx || !key) return;
 
-  for (const entry of await due(circleId, Date.now())) {
+  const dueRows = await due(circleId, Date.now());
+  if (dueRows.length === 0) return;
+
+  // The relay refuses a write sealed under anything but the circle's
+  // current key, so a keychain behind the row would turn every row here
+  // into a 409 that spends one of its five attempts. Sync's roster step
+  // is what closes the gap; until it does, these wait rather than fail.
+  const circle = await getCircle(circleId);
+  if (circle && key.version < circle.keyVersion) {
+    const reason = `content key v${key.version} behind circle v${circle.keyVersion}`;
+    console.warn(`Outbox for ${circleId} held: ${reason}`);
+    for (const entry of dueRows) await defer(entry.seq, Date.now() + OFFLINE_RETRY_MS, reason);
+    return;
+  }
+
+  for (const entry of dueRows) {
     try {
       await applyPostEntry(ctx, await send(ctx, entry, key));
       await done(entry.seq);
     } catch (err) {
-      // Never reaching the relay is not the write's fault. Counting it
-      // would put a post made on a plane in the failed banner inside
-      // half a minute, with nothing wrong with the post.
       if (err instanceof NetworkUnreachableError) {
         await defer(entry.seq, Date.now() + OFFLINE_RETRY_MS, String(err));
         return;
       }
+      // The key rotated between this pass reading the circle and the
+      // write landing. Simply defer..
+      if (err instanceof RelayError && err.code === 'stale_key_version') {
+        console.warn(`Outbox for ${circleId} held: relay refused v${key.version} as stale`);
+        await defer(entry.seq, Date.now() + OFFLINE_RETRY_MS, String(err));
+        return;
+      }
       const attempts = entry.attempts + 1;
+      const code = err instanceof RelayError ? (err.code ?? `http ${err.status}`) : 'local';
+      console.warn(`Outbox ${entry.op} ${entry.entryId ?? ''} in ${circleId} failed (attempt ${attempts}, ${code}): ${String(err)}`);
       // 2s, 4s, 8s, 16s — then the row's budget is spent and it waits
       // for someone to look at the banner.
       await retryLater(entry.seq, attempts, Date.now() + 2 ** attempts * 1000, String(err));

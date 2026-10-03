@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import { NativeModules, Platform } from 'react-native';
 
 import { getAuthToken } from '@/core/services/keystore/auth-token';
-import { NetworkUnreachableError, SessionExpiredError } from '@/core/services/relay-errors';
+import { NetworkUnreachableError, RelayError, SessionExpiredError } from '@/core/services/relay-errors';
 import { noteSessionExpired } from '@/core/services/session';
 
 /**
@@ -92,15 +92,28 @@ export function baseUrl(): string {
  * present; otherwise falls back to whatever raw text came back.
  */
 export async function describeError(response: Response, summary: string): Promise<string> {
+  return (await relayError(response, summary)).message;
+}
+
+/**
+ * `describeError` as a thrown value: the same message, plus the status
+ * and the relay's error code for a caller that reacts to one error and
+ * not another. The code is in the message too, so a stored or logged
+ * failure says which one it was.
+ */
+export async function relayError(response: Response, summary: string): Promise<RelayError> {
   const text = await response.text().catch(() => '');
   let detail = text;
+  let code: string | null = null;
   try {
     const body = JSON.parse(text);
     if (typeof body?.error === 'string' && body.error) detail = body.error;
+    if (typeof body?.code === 'string' && body.code) code = body.code;
   } catch {
     // not JSON — use the raw text as-is
   }
-  return detail ? `${summary}: ${response.status} ${detail}` : `${summary}: ${response.status}`;
+  const parts = [`${summary}:`, String(response.status), code ? `[${code}]` : '', detail].filter(Boolean);
+  return new RelayError(parts.join(' '), response.status, code);
 }
 
 /**
