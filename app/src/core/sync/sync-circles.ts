@@ -11,7 +11,6 @@ import {
   insertAttachment,
   listCircles as listLocalCircles,
   listRequests,
-  markCircleLeft,
   upsertProfilePictureRef,
   upsertRequest,
 } from '@/data/db';
@@ -23,7 +22,8 @@ import { entryContext } from '@/core/sync/entry-handlers';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getRoster, listCircles, type Circle, type RosterMember } from '@/features/circle/services/circle-relay';
 import { resealFor, storeSealedKeys } from '@/features/circle/usecases/key-exchange';
-import { ensureCircleNotificationChannel, removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
+import { archiveCircleLocally } from '@/features/circle/usecases/archive-circle';
+import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 export type SyncOptions = {
   /**
@@ -87,12 +87,7 @@ export async function syncCircles(options: SyncOptions = {}): Promise<number> {
   // deleted, so what was already synced is still readable.
   const present = new Set(circles.map((circle) => circle.circleId));
   for (const local of await listLocalCircles()) {
-    if (!present.has(local.id)) {
-      await markCircleLeft(local.id, now);
-      await removeCircleNotificationChannel(local.id).catch((err) =>
-        console.error(`Failed to remove notification channel for ${local.id}`, err)
-      );
-    }
+    if (!present.has(local.id)) await archiveCircleLocally(local.id, now);
   }
 
   let failed = 0;
@@ -145,7 +140,7 @@ async function syncCircle(circle: Circle, now: number, myAccountId: string, forc
   await applyCircle(circle, now);
 
   // A circle this device has never stored, is rejoining after having left
-  // (which deleted its Android channel — see removeCircleNotificationChannel
+  // (which deleted its Android channel — see archiveCircleLocally
   // above), or was just renamed needs its channel (re)created. Done here,
   // before the roster walk below can throw: applyCircle above already wrote
   // the current name regardless of what happens next, so a check placed

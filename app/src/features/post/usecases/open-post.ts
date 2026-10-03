@@ -1,4 +1,4 @@
-import { childrenAreStale, getPost, markPostViewed } from '@/data/db';
+import { childrenAreStale, getCircle, getPost, markPostViewed } from '@/data/db';
 import { applyChildrenEntries, entryContext } from '@/core/sync/entry-handlers';
 import { getChildren } from '@/features/post/services/post-relay';
 
@@ -12,12 +12,17 @@ import { getChildren } from '@/features/post/services/post-relay';
  * `childrenFetchedAt` against `updatedAt` decides.
  *
  * Always renders from what is stored first; this refreshes behind that.
+ * A circle this account has left is only ever read as stored: the relay
+ * would refuse the fetch as not-a-member.
  */
 export async function openPost(circleId: string, postId: string): Promise<void> {
   await markPostViewed(postId, Date.now());
 
   const post = await getPost(postId);
   if (!post || !childrenAreStale(post)) return;
+
+  const circle = await getCircle(circleId);
+  if (circle?.leftAt != null) return;
 
   const ctx = await entryContext(circleId);
   if (!ctx) return;

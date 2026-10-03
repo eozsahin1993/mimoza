@@ -11,7 +11,7 @@ jest.mock('@/features/push-notifications/services/channels', () => ({
   removeCircleNotificationChannel: jest.fn(async () => undefined),
 }));
 
-import { applyCircle, getCircle, initDatabase, saveLocalAccount } from '@/data/db';
+import { applyCircle, due, enqueue, getCircle, initDatabase, saveLocalAccount } from '@/data/db';
 import { generateUUID } from '@/core/crypto/primitives';
 import { getRoster, leaveCircle as leaveOnRelay, type RosterMember } from '@/features/circle/services/circle-relay';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
@@ -75,7 +75,29 @@ describe('leaving a circle', () => {
     expect(promote).toHaveBeenCalledWith(circleId, 'early', 'admin');
     expect(relayLeave).toHaveBeenCalledTimes(1);
     expect(promote.mock.invocationCallOrder[0]).toBeLessThan(relayLeave.mock.invocationCallOrder[0]);
-    expect((await getCircle(circleId))?.leftAt).not.toBeNull();
+    // Leaving keeps the circle, as the archive being removed leaves.
+    const circle = await getCircle(circleId);
+    expect(circle).not.toBeNull();
+    expect(circle?.leftAt).not.toBeNull();
+  });
+
+  test('what was queued for the circle is dropped when it is archived', async () => {
+    const circleId = generateUUID();
+    await applyCircle(
+      { circleId, name: 'Family', role: 'member', notifyLevel: 'all', keyVersion: 1, rosterVersion: 1 },
+      Date.now()
+    );
+    await enqueue({ circleId, op: 'post', postId: 'p1', entryId: 'p1', plaintext: '{}', createdAt: Date.now() });
+    roster.mockResolvedValue({
+      rosterVersion: 1,
+      keyVersion: 1,
+      keys: {},
+      members: [member(ME, 'member', 1), member('other', 'admin', 2)],
+    });
+
+    await leaveCircle(circleId);
+
+    expect(await due(circleId, Date.now() + 120_000)).toEqual([]);
   });
 
   test('an admin with a co-admin just leaves', async () => {
@@ -85,11 +107,13 @@ describe('leaving a circle', () => {
     expect(relayLeave).toHaveBeenCalledTimes(1);
   });
 
-  test('the last member out promotes nobody', async () => {
-    await leaveWith([member(ME, 'admin', 1)]);
+  // The row says Delete and the relay takes the circle, so nothing is kept.
+  test('the last member out promotes nobody, and deletes the circle from this phone', async () => {
+    const circleId = await leaveWith([member(ME, 'admin', 1)]);
 
     expect(promote).not.toHaveBeenCalled();
     expect(relayLeave).toHaveBeenCalledTimes(1);
+    expect(await getCircle(circleId)).toBeNull();
   });
 
   test('a failed promotion stops the leave, so the circle is never left without an admin', async () => {

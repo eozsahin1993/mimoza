@@ -1,8 +1,10 @@
-import { getLocalAccount, markCircleLeft } from '@/data/db';
+import { getLocalAccount } from '@/data/db';
 import { generateContentKey } from '@/features/circle/crypto';
 import { getRoster, leaveCircle as leaveOnRelay } from '@/features/circle/services/circle-relay';
 import { MemberRoles, setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { sealForEach } from '@/features/circle/usecases/key-exchange';
+import { archiveCircleLocally } from '@/features/circle/usecases/archive-circle';
+import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
 import { removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 
 type Standing = { accountId: string; role: string; joinedAt: number };
@@ -30,9 +32,11 @@ export function departingSuccessor<T extends Standing>(members: T[], ownAccountI
  * Rotates on the way out, so nothing written afterwards is readable with
  * the copy this device keeps.
  *
- * The keys already held are deliberately kept: posts synced before
- * leaving stay readable offline, which is what `leftAt` means — left,
- * not erased. The relay refuses the last admin, so an only admin
+ * The keys already held are deliberately kept: the circle stays on this
+ * phone as an archive until the person removes it, which is what `leftAt`
+ * means — left, not erased. The exception is the last member, whose
+ * leave is the circle's deletion and is offered as one. The relay
+ * refuses the last admin, so an only admin
  * promotes their successor first. Not atomic with the leave, and it
  * doesn't need to be: if the leave then fails the circle just has an
  * extra admin, and a retry finds one and leaves.
@@ -51,8 +55,12 @@ export async function leaveCircle(circleId: string): Promise<void> {
   // circle with them.
   await leaveOnRelay(circleId, roster.keyVersion, sealForEach(staying, generateContentKey()));
 
-  await markCircleLeft(circleId, Date.now());
-  await removeCircleNotificationChannel(circleId).catch((err) =>
-    console.error(`Failed to remove notification channel for ${circleId}`, err)
-  );
+  if (staying.length === 0) {
+    await purgeCircleLocally(circleId);
+    await removeCircleNotificationChannel(circleId).catch((err) =>
+      console.error(`Failed to remove notification channel for ${circleId}`, err)
+    );
+  } else {
+    await archiveCircleLocally(circleId, Date.now());
+  }
 }

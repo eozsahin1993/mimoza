@@ -24,7 +24,10 @@ export type CircleDetails = {
 export async function loadCircleDetails(circleId: string): Promise<CircleDetails> {
   const [circle, members, profile] = await Promise.all([getCircle(circleId), listMembers(circleId), getLocalAccount()]);
   const ownMember = profile ? await getMember(circleId, profile.accountId) : null;
-  const admin = ownMember?.role === 'admin';
+  // The member row outlives the membership: a circle this account was
+  // removed from keeps it, role and all, and nothing on this screen may
+  // act on that role.
+  const admin = ownMember?.role === 'admin' && circle?.leftAt == null;
   const avatarByAccount = await resolveMemberPictures(members.map((member) => member.accountId));
 
   // Admins only, and never fatal: the screen is worth showing without a

@@ -1,5 +1,6 @@
 import { setMemberRole as setRoleLocally } from '@/data/db';
 import { patchMembership } from '@/features/circle/services/circle-relay';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 export const MemberRoles = { ADMIN: 'admin', MEMBER: 'member' } as const;
 export type MemberRole = (typeof MemberRoles)[keyof typeof MemberRoles];
@@ -13,6 +14,7 @@ export type MemberRole = (typeof MemberRoles)[keyof typeof MemberRoles];
  * administered again.
  */
 export async function setMemberRole(circleId: string, accountId: string, role: MemberRole): Promise<void> {
+  await requireLiveCircle(circleId);
   await patchMembership(circleId, accountId, { role });
   await setRoleLocally(circleId, accountId, role);
 }

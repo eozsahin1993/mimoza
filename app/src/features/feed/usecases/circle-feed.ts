@@ -62,6 +62,8 @@ export type CircleFeedMeta = {
   /** Whether the reader is an admin — with authorship, decides who may re-file a photo. */
   ownIsAdmin: boolean;
   circleCreatedAt: number;
+  /** This account is no longer in the circle: the feed is a local archive and takes no writes. */
+  readOnly: boolean;
 };
 
 export type CircleFeedPage = {
@@ -91,6 +93,7 @@ export async function loadCircleFeedMeta(circleId: string): Promise<CircleFeedMe
     ownPublicKey: profile?.accountId ?? null,
     ownIsAdmin: ownMember?.role === 'admin',
     circleCreatedAt: circle?.createdAt ?? 0,
+    readOnly: circle?.leftAt != null,
   };
 }
 

@@ -1,6 +1,7 @@
 import { renameCircle as renameLocally } from '@/data/db';
 import { renameCircle as renameOnRelay } from '@/features/circle/services/circle-relay';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * Admin-only, enforced by the relay; the wall gets a `renamed` entry.
@@ -10,6 +11,7 @@ import { ensureCircleNotificationChannel } from '@/features/push-notifications/s
  * become the circle's name for everyone.
  */
 export async function renameCircle(circleId: string, name: string): Promise<void> {
+  await requireLiveCircle(circleId);
   const trimmed = name.trim();
   if (!trimmed) throw new Error('A circle needs a name.');
 

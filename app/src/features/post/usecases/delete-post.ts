@@ -1,6 +1,7 @@
 import { queuePostDeletion } from '@/data/db';
 import { deletePhotoFile } from '@/core/photo/photo-cache';
 import { drainOutbox } from '@/core/sync/drain-outbox';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * Removes a photo from the circle, for everyone. The relay enforces
@@ -12,6 +13,7 @@ import { drainOutbox } from '@/core/sync/drain-outbox';
  * deleting means here.
  */
 export async function deletePost(circleId: string, postId: string): Promise<void> {
+  await requireLiveCircle(circleId);
   const at = Date.now();
   queuePostDeletion(postId, at, { circleId, op: 'delete_post', postId, createdAt: at });
   deletePhotoFile(circleId, postId);

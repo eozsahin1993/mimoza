@@ -6,6 +6,7 @@ import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { drainOutbox } from '@/core/sync/drain-outbox';
 import { Visibility } from '@/features/post/services/post-relay';
 import { timedSync } from '@/core/utils/timing';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 export type CreatePostInput = {
   circleId: string;
@@ -27,6 +28,7 @@ export type CreatePostInput = {
  * ties them together.
  */
 export async function createPost(input: CreatePostInput): Promise<string> {
+  await requireLiveCircle(input.circleId);
   const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
   const current = await getCurrentContentKey(input.circleId);

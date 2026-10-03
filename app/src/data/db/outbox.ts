@@ -82,3 +82,14 @@ export async function queuedFor(postId: string): Promise<OutboxEntry[]> {
     .where(and(eq(outbox.postId, postId), eq(outbox.status, 'queued')))
     .orderBy(asc(outbox.seq));
 }
+
+/**
+ * Forgets everything queued for a circle this account is no longer in.
+ * The relay would refuse each row as not-a-member, and five refusals
+ * would put a post into the failed banner for a circle that cannot take
+ * it anyway. Not cascaded from the circle row, so the purge calls this
+ * too.
+ */
+export async function dropOutbox(circleId: string): Promise<void> {
+  await db.delete(outbox).where(eq(outbox.circleId, circleId));
+}

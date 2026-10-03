@@ -2,6 +2,8 @@ import {
   AttachmentKinds,
   AttachmentStatuses,
   coverEntryId,
+  due,
+  enqueue,
   forgetLocalAccount,
   getAttachment,
   getCircle,
@@ -272,6 +274,20 @@ describe('a sync pass', () => {
 
     expect((await listCircles()).map((circle) => circle.id)).not.toContain(id);
     expect((await listLeftCircles()).map((circle) => circle.id)).toContain(id);
+  });
+
+  // The relay would answer each queued write with not-a-member, and five
+  // of those put a post in the failed banner for a circle that cannot take it.
+  test('a circle the relay stops listing drops what was queued for it', async () => {
+    const id = circleId();
+    relay.listCircles.mockResolvedValue({ circles: [circleOf(id)], requests: [] });
+    await syncCircles();
+    await enqueue({ circleId: id, op: 'post', postId: 'p1', entryId: 'p1', plaintext: '{}', createdAt: Date.now() });
+
+    relay.listCircles.mockResolvedValue({ circles: [], requests: [] });
+    await syncCircles();
+
+    expect(await due(id, Date.now() + 120_000)).toEqual([]);
   });
 
   test('reseals for a member who replaced their keypair', async () => {

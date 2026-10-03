@@ -3,6 +3,7 @@ import { addCircleKeyVersion } from '@/core/services/keystore/circle-keys';
 import { generateContentKey } from '@/features/circle/crypto';
 import { getRoster, removeMember as removeOnRelay } from '@/features/circle/services/circle-relay';
 import { sealForEach } from '@/features/circle/usecases/key-exchange';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * Removes a member and rotates the content key past them.
@@ -13,6 +14,7 @@ import { sealForEach } from '@/features/circle/usecases/key-exchange';
  * makes two admins removing at once safe — the loser refetches.
  */
 export async function removeMember(circleId: string, accountId: string): Promise<void> {
+  await requireLiveCircle(circleId);
   const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
 

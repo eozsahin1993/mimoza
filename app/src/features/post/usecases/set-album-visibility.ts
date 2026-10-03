@@ -1,6 +1,7 @@
 import { queueVisibility } from '@/data/db';
 import { drainOutbox } from '@/core/sync/drain-outbox';
 import { Visibility } from '@/features/post/services/post-relay';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * Moves a photo in or out of the circle's album. The album is where a
@@ -8,6 +9,7 @@ import { Visibility } from '@/features/post/services/post-relay';
  * other and goes through the outbox.
  */
 export async function setAlbumVisibility(circleId: string, postId: string, inAlbum: boolean): Promise<void> {
+  await requireLiveCircle(circleId);
   const at = Date.now();
   queueVisibility(postId, inAlbum, {
     circleId,

@@ -3,6 +3,7 @@ import { reactionTag, reactionTagKey } from '@/core/crypto/reaction-tags';
 import { logEvent } from '@/core/services/analytics';
 import { getCircleKeyMap, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { drainOutbox } from '@/core/sync/drain-outbox';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * Adds or removes one of this account's reactions. A member may hold
@@ -14,6 +15,7 @@ import { drainOutbox } from '@/core/sync/drain-outbox';
  * anyway, which is what the drain sends.
  */
 export async function toggleReaction(circleId: string, postId: string, emoji: string): Promise<void> {
+  await requireLiveCircle(circleId);
   const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
   const current = await getCurrentContentKey(circleId);

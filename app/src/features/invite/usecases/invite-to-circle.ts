@@ -12,6 +12,7 @@ import {
   type Invite,
   type JoinRequest,
 } from '@/features/invite/services/invite-relay';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * The admin side of getting someone in. Nothing here is secret except
@@ -26,12 +27,14 @@ export async function isCircleAdmin(circleId: string): Promise<boolean> {
 
 /** Any admin sees the same code: it belongs to the circle, not to whoever made it. */
 export async function getOrCreateInvite(circleId: string): Promise<Invite> {
+  await requireLiveCircle(circleId);
   const [existing] = await listInvites(circleId);
   return existing ?? createInvite(circleId);
 }
 
 /** Burns the current code and hands back a fresh one, for a link that got out. */
 export async function replaceInvite(circleId: string): Promise<Invite> {
+  await requireLiveCircle(circleId);
   for (const invite of await listInvites(circleId)) {
     await revokeInvite(circleId, invite.code);
   }
@@ -51,6 +54,7 @@ export async function discoverPendingRequests(circleId: string): Promise<JoinReq
  * their key is published — one without it can never be approved.
  */
 export async function approveJoinRequest(circleId: string, requestId: string): Promise<void> {
+  await requireLiveCircle(circleId);
   const request = (await listRequests(circleId)).find((pending) => pending.requestId === requestId);
   if (!request) throw new Error('That ask is no longer waiting.');
   if (!request.publicKey) throw new Error('That ask carries no key to seal to.');
@@ -68,5 +72,6 @@ export async function approveJoinRequest(circleId: string, requestId: string): P
 }
 
 export async function denyJoinRequest(circleId: string, requestId: string): Promise<void> {
+  await requireLiveCircle(circleId);
   await denyRequest(circleId, requestId);
 }

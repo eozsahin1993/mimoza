@@ -2,6 +2,7 @@ import { getLocalAccount, queueComment, queueCommentDeletion } from '@/data/db';
 import { generateUUID } from '@/core/crypto/primitives';
 import { logEvent } from '@/core/services/analytics';
 import { drainOutbox } from '@/core/sync/drain-outbox';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * Writes a comment and queues it. The row is inserted pending, so it
@@ -9,6 +10,7 @@ import { drainOutbox } from '@/core/sync/drain-outbox';
  * until the write lands and replaces both.
  */
 export async function commentOnPost(circleId: string, postId: string, body: string): Promise<string> {
+  await requireLiveCircle(circleId);
   const profile = await getLocalAccount();
   if (!profile) throw new Error('No profile on this device.');
 
@@ -45,6 +47,7 @@ export async function commentOnPost(circleId: string, postId: string, body: stri
  * than being guessed at here.
  */
 export async function deleteComment(circleId: string, postId: string, commentId: string): Promise<void> {
+  await requireLiveCircle(circleId);
   const at = Date.now();
   queueCommentDeletion(commentId, at, {
     circleId,

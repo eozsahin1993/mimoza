@@ -10,6 +10,7 @@ import { writeCoverFile } from '@/core/photo/photo-cache';
 import { BlobPaths, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { setCover } from '@/features/circle/services/circle-relay';
+import { requireLiveCircle } from '@/features/circle/usecases/require-live-circle';
 
 /**
  * A fresh id every time rather than one key overwritten in place: that
@@ -21,6 +22,7 @@ import { setCover } from '@/features/circle/services/circle-relay';
  * pointing at nothing.
  */
 export async function setCoverPhoto(circleId: string, photo: Uint8Array): Promise<string> {
+  await requireLiveCircle(circleId);
   const current = await getCurrentContentKey(circleId);
   if (!current) throw new Error('No content key on this device.');
 
