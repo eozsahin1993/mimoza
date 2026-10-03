@@ -223,18 +223,18 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID, 
 
 	version := strconv.FormatInt(expectedVersion+1, 10)
 	items := []types.TransactWriteItem{
+		// Delete the membership row.
 		{Delete: &types.Delete{
 			TableName:           aws.String(s.Name),
 			Key:                 s.Key(dynamo.CirclePK(circleID), dynamo.MemberKey(accountID)),
 			ConditionExpression: aws.String("attribute_exists(sk)"),
 		}},
-		// Their sealed copies go with them. They already hold the keys up
-		// to this version on their device, so this is tidiness rather
-		// than a lock — the rotation is what actually shuts them out.
+		// Delete the removed member's sealed-key row.
 		{Delete: &types.Delete{
 			TableName: aws.String(s.Name),
 			Key:       s.Key(dynamo.CirclePK(circleID), dynamo.SealedKeyKey(accountID)),
 		}},
+		// Bump the circle's key and roster versions and member counts.
 		{Update: &types.Update{
 			TableName: aws.String(s.Name),
 			Key:       s.Key(dynamo.CirclePK(circleID), dynamo.MetaSK),
@@ -251,6 +251,7 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID, 
 				":minusOne": dynamoutil.Num(-1),
 			},
 		}},
+		// Write the "removed" activity entry.
 		{Put: &types.Put{
 			TableName: aws.String(s.Name),
 			Item: dynamo.ActivityItem(circleID, circles.Entry{
@@ -263,6 +264,7 @@ func (s *Store) RemoveMember(ctx context.Context, circleID, accountID, actorID, 
 			}),
 		}},
 	}
+	// Add the new key version to each survivor's sealed-key map.
 	for _, member := range survivors {
 		items = append(items, types.TransactWriteItem{Update: &types.Update{
 			TableName:        aws.String(s.Name),
