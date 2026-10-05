@@ -10,10 +10,15 @@ import { removeCircleNotificationChannel } from '@/features/push-notifications/s
  * it directly, so a leave, a removal and a leave made on another phone
  * all end in one state, and whichever runs first leaves the other
  * nothing to do.
+ *
+ * Outbox first: the drain does not check `leftAt`, so a crash after the
+ * mark but before the drop would leave rows that fail five times into
+ * the banner. The other way round, the next sync pass simply archives
+ * again.
  */
 export async function archiveCircleLocally(circleId: string, at: number): Promise<void> {
-  await markCircleLeft(circleId, at);
   await dropOutbox(circleId);
+  await markCircleLeft(circleId, at);
   await removeCircleNotificationChannel(circleId).catch((err) =>
     console.error(`Failed to remove notification channel for ${circleId}`, err)
   );
