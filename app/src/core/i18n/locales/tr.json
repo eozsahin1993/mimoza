@@ -332,7 +332,7 @@
       "deleteRowDescription": "Çevrede yalnızca sen kalmışsın. Çevre ve tüm fotoğraflar kalıcı olarak silinir.",
       "leaveRow": "{{name}} çevresinden ayrıl",
       "leaveRowUnnamed": "Bu çevreden ayrıl",
-      "leaveRowDescription": "Çevre sen silene kadar bu telefonda arşivde kalır. Geri dönmek için yeni bir davet gerekir.",
+      "leaveRowDescription": "Çevre sen kaldırana kadar bu telefonda arşivde kalır. Geri dönmek için yeni bir davet gerekir.",
       "members": "Üyeler",
       "inTheCircle_one": "Çevrede {{count}} kişi var",
       "inTheCircle_other": "Çevrede {{count}} kişi var",

@@ -332,7 +332,7 @@
       "deleteRowDescription": "Il n’y a que toi ici. Le cercle et toutes ses photos sont supprimés définitivement.",
       "leaveRow": "Quitter {{name}}",
       "leaveRowUnnamed": "Quitter ce cercle",
-      "leaveRowDescription": "Le cercle reste archivé sur ce téléphone jusqu’à ce que tu le supprimes. Il te faudra une nouvelle invitation pour revenir.",
+      "leaveRowDescription": "Le cercle reste archivé sur ce téléphone jusqu’à ce que tu le retires. Il te faudra une nouvelle invitation pour revenir.",
       "members": "Membres",
       "inTheCircle_one": "{{count}} dans le cercle",
       "inTheCircle_other": "{{count}} dans le cercle",

@@ -332,7 +332,7 @@
       "deleteRowDescription": "Außer dir ist niemand hier. Der Kreis und alle Fotos darin werden endgültig gelöscht.",
       "leaveRow": "{{name}} verlassen",
       "leaveRowUnnamed": "Diesen Kreis verlassen",
-      "leaveRowDescription": "Der Kreis bleibt auf diesem Handy archiviert, bis du ihn löschst. Um zurückzukommen, brauchst du eine neue Einladung.",
+      "leaveRowDescription": "Der Kreis bleibt auf diesem Handy archiviert, bis du ihn entfernst. Um zurückzukommen, brauchst du eine neue Einladung.",
       "members": "Mitglieder",
       "inTheCircle_one": "{{count}} im Kreis",
       "inTheCircle_other": "{{count}} im Kreis",
