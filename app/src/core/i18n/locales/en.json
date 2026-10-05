@@ -236,7 +236,7 @@
       "locked": "Locked",
       "lockedStatus": "Opens when a member is online",
       "pendingStatus": "Pending",
-      "archivedSection": "No longer in",
+      "archivedSection": "No longer a member",
       "archivedBadge": "Archived"
     },
     "feed": {
