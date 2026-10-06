@@ -1,6 +1,6 @@
 Mimoza is for sharing photos with the people closest to you. You make a circle for your family or a few close friends, and everyone in it shares one feed.
 
-Post a photo with a caption, comment on what others share, and react with emoji. Each circle also has an album, so the photos worth keeping are easy to find again later. To add someone, send them an invite link and approve their request to join.
+Post a photo with a caption, comment on what others share, and react with emoji. Each circle also has a shared photo album that everyone adds to, with photos grouped by month, so the ones worth keeping are easy to find later. To add someone, send them an invite link and approve their request to join.
 
 What you share stays inside the circle. Photos, captions, comments and reactions are encrypted on your phone, and only the members of a circle can open them. Our servers store that content but can't read it. We don't sell your information or use it for ads.
 
