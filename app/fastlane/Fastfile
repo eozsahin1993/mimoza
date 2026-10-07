@@ -14,7 +14,7 @@ ENVIRONMENTS = {
     project: 'ios/MimozaStaging.xcodeproj',
     target: 'MimozaStaging',
     package_name: 'com.rarekiwisoftware.mimoza.staging',
-    firebase_app: '1:1049240173156:android:f139763b32092d5ac97d71',
+    firebase_app: '1:1049240173156:android:d3a9fcbe1d8c48cec97d71',
   },
   'production' => {
     scheme: 'Mimoza',

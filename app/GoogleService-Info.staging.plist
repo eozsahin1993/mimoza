@@ -2,10 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CLIENT_ID</key>
-	<string>1049240173156-v39ni2q1o5qpjtmr11btbbpnjm09suav.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1049240173156-v39ni2q1o5qpjtmr11btbbpnjm09suav</string>
 	<key>ANDROID_CLIENT_ID</key>
 	<string>1049240173156-43ohisd8mvcqc4nv9s0qpkdjbjsuc6a7.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
@@ -15,7 +11,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.eozsahin.mimoza.staging</string>
+	<string>com.rarekiwisoftware.mimoza.staging</string>
 	<key>PROJECT_ID</key>
 	<string>mimoza-staging</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +27,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1049240173156:ios:1e8316027ffa9cacc97d71</string>
+	<string>1:1049240173156:ios:3502d41388f89898c97d71</string>
 </dict>
 </plist>
