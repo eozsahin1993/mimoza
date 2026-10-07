@@ -159,7 +159,8 @@ export async function signOut(): Promise<void> {
   await deleteAuthToken();
 
   // The SDK remembers its account apart from our session; without this the
-  // next sign-in reuses it and the account picker never shows.
+  // next sign-in reuses it and the account picker never shows. A forced
+  // logout (session.ts) and the dev reset skip signOut, so they still do.
   try {
     ensureGoogleConfigured();
     await GoogleSignin.signOut();
