@@ -7,31 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:139258907115:android:b815540d6b500a7f3571ae",
-        "android_client_info": {
-          "package_name": "com.eozsahin.mimoza"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyA3Y8dwEvnGZPbF_8E_hri2pTnBnXqsmkQ"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:139258907115:android:a45dec8ce48a68b13571ae",
         "android_client_info": {
           "package_name": "com.rarekiwisoftware.mimoza"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "139258907115-3c20flmk2d38bhgd4e5glktrkgjliffe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA3Y8dwEvnGZPbF_8E_hri2pTnBnXqsmkQ"
@@ -39,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "139258907115-3c20flmk2d38bhgd4e5glktrkgjliffe.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "139258907115-h7seo98iqusdgtkfbg39bijdclrc4512.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.rarekiwisoftware.mimoza"
+              }
+            }
+          ]
         }
       }
     }
