@@ -29,7 +29,7 @@ func testKey(t *testing.T) Key {
 	return Key{
 		KeyID:      "TESTKEYID1",
 		TeamID:     "TESTTEAMID",
-		ClientID:   "com.eozsahin.mimoza",
+		ClientID:   "com.rarekiwisoftware.mimoza",
 		PrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})),
 	}
 }

@@ -383,7 +383,7 @@ app between builds is what makes staging pass and real upgrades fail.
 
 | | Staging | Prod |
 |---|---|---|
-| Bundle ID | `com.eozsahin.mimoza.staging` | `com.eozsahin.mimoza` |
+| Bundle ID | `com.rarekiwisoftware.mimoza.staging` | `com.rarekiwisoftware.mimoza` |
 | Relay URL | `api.staging.joinmimoza.com` | `api.joinmimoza.com` |
 | iOS | TestFlight, internal | TestFlight → App Store |
 | Android | Firebase App Distribution | Play internal → production |

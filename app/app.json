@@ -8,7 +8,7 @@
     "scheme": "mimoza",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.eozsahin.mimoza",
+      "bundleIdentifier": "com.rarekiwisoftware.mimoza",
       "appleTeamId": "N323492Q8L",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -24,7 +24,7 @@
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.eozsahin.mimoza",
+      "package": "com.rarekiwisoftware.mimoza",
       "adaptiveIcon": {
         "backgroundColor": "#14100C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

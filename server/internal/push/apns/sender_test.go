@@ -51,7 +51,7 @@ func TestProviderTokenIsReusedAcrossSends(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.eozsahin.mimoza", false)
+	sender := New(testKey(t), "com.rarekiwisoftware.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	for range 2 {
@@ -75,7 +75,7 @@ func TestAnExpiredProviderTokenIsReminted(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.eozsahin.mimoza", false)
+	sender := New(testKey(t), "com.rarekiwisoftware.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	if err := sender.Send(context.Background(), "device-token", testMessage()); err != nil {
@@ -97,7 +97,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.eozsahin.mimoza", false)
+	sender := New(testKey(t), "com.rarekiwisoftware.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	err := sender.Send(context.Background(), "device-token", testMessage())
@@ -116,7 +116,7 @@ func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 		PrivateKey: "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 
-	err := New(key, "com.eozsahin.mimoza", false).Send(context.Background(), "device-token", testMessage())
+	err := New(key, "com.rarekiwisoftware.mimoza", false).Send(context.Background(), "device-token", testMessage())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -164,7 +164,7 @@ func TestSendPostsLocalizationKeys(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.eozsahin.mimoza", false)
+	sender := New(testKey(t), "com.rarekiwisoftware.mimoza", false)
 	sender.Client = apnsAPI.Client()
 	sender.Production = false
 	transport := apnsAPI.Client().Transport
@@ -211,7 +211,7 @@ func TestSendPostsASilentPushWithNoAlert(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.eozsahin.mimoza", false)
+	sender := New(testKey(t), "com.rarekiwisoftware.mimoza", false)
 	sender.Client = &http.Client{Transport: rewriteHost{to: apnsAPI.URL, inner: apnsAPI.Client().Transport}}
 
 	message := testMessage()

@@ -9,21 +9,21 @@ ENVIRONMENTS = {
   'staging' => {
     scheme: 'MimozaStaging',
     workspace: 'ios/MimozaStaging.xcworkspace',
-    app_identifier: 'com.eozsahin.mimoza.staging',
+    app_identifier: 'com.rarekiwisoftware.mimoza.staging',
     env_file: '.env.staging',
     project: 'ios/MimozaStaging.xcodeproj',
     target: 'MimozaStaging',
-    package_name: 'com.eozsahin.mimoza.staging',
+    package_name: 'com.rarekiwisoftware.mimoza.staging',
     firebase_app: '1:1049240173156:android:f139763b32092d5ac97d71',
   },
   'production' => {
     scheme: 'Mimoza',
     workspace: 'ios/Mimoza.xcworkspace',
-    app_identifier: 'com.eozsahin.mimoza',
+    app_identifier: 'com.rarekiwisoftware.mimoza',
     env_file: '.env.production',
     project: 'ios/Mimoza.xcodeproj',
     target: 'Mimoza',
-    package_name: 'com.eozsahin.mimoza',
+    package_name: 'com.rarekiwisoftware.mimoza',
   },
 }.freeze
 
