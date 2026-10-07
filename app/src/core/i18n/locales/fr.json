@@ -48,7 +48,6 @@
     "deleteConfirm": "Supprimer",
     "deleting": "Suppression de ton compte…",
     "deletingDetail": "Cela peut prendre un moment. Ne ferme pas l’app.",
-    "notifications": "Notifications",
     "notifyLevels": {
       "photos": "Nouvelles photos uniquement",
       "comments": "Photos et commentaires",
@@ -61,63 +60,6 @@
       "photos": "Photos",
       "welcomePhoto": "Photo d’accueil",
       "welcomePhotoCredit": "{{author}} sur Unsplash"
-    },
-    "recovery": {
-      "title": "Mots de récupération",
-      "intro": "Ces 12 mots permettent de recréer les clés de tes cercles sur un nouveau téléphone. Toute personne qui les possède peut en faire autant, alors garde-les dans un endroit où personne d’autre que toi n’a accès.",
-      "cardSaved": "Enregistre-la dans un endroit qui survivra à ce téléphone",
-      "cannotShare": "Cet appareil ne peut pas partager de fichiers",
-      "cardFailed": "Impossible de créer la carte de récupération",
-      "shareMessage": "Mots de récupération Mimoza\n\n{{words}}\n\nCes 12 mots restaurent tes cercles sur un nouveau téléphone. Toute personne qui les possède peut en faire autant.",
-      "preparing": "Préparation…",
-      "saveCard": "Enregistrer la carte de récupération",
-      "sendAsText": "Envoyer les mots en texte",
-      "done": "Terminé"
-    },
-    "recoveryCard": {
-      "heading": "CARTE DE RÉCUPÉRATION MIMOZA",
-      "restoresAccount": "Ce fichier restaure ton compte sur un nouveau téléphone.",
-      "keepSafe": "Quiconque l’a peut se faire passer pour toi, alors garde-le dans un endroit où personne d’autre que toi n’a accès.",
-      "howToUse": "Pour l’utiliser : ouvre Mimoza, connecte-toi, choisis « {{option}} », puis « {{button}} ».",
-      "saved": "Enregistrée le {{date}}"
-    },
-    "restore": {
-      "title": "Mots de récupération",
-      "intro": "Choisis la carte de récupération que tu as enregistrée, ou tape les {{total}} mots de ton ancien téléphone, dans l’ordre, séparés par des espaces.",
-      "restored": "Compte récupéré",
-      "restoredWithCircles_one": "Compte et {{count}} cercle récupérés",
-      "restoredWithCircles_other": "Compte et {{count}} cercles récupérés",
-      "alreadyInCircle": "Ce téléphone est déjà dans un cercle. En restaurant, tu le perdrais.",
-      "invalidPhrase": "Ces mots ne semblent pas corrects. Vérifie qu’il n’y a pas de faute de frappe.",
-      "noPhraseInFile": "Ce fichier ne contient pas de mots de récupération.",
-      "unreadableFile": "Impossible de lire ce fichier.",
-      "reading": "Lecture…",
-      "chooseCard": "Choisir la carte de récupération",
-      "wordCount": "{{typed}} mots sur {{total}}",
-      "identityNote": "Cela te redonne ton identité : quand quelqu’un te laisse revenir dans un cercle, tu y reviens en tant que toi, et tes anciennes photos restent les tiennes. Il te faudra quand même une nouvelle invitation pour chaque cercle.",
-      "restore": "Restaurer"
-    },
-    "returning": {
-      "header": "Bon retour",
-      "titleCertain": "Tu as déjà utilisé Mimoza",
-      "titleUncertain": "Tu as déjà utilisé Mimoza ?",
-      "bodyCertain": "Tes cercles sont toujours là ; ce téléphone ne peut juste pas encore les lire.",
-      "bodyUncertain": "Impossible de joindre le serveur pour vérifier. Si tu avais déjà un compte, transfère-le maintenant. Dès que ce téléphone aura créé le sien, l’ancien sera hors d’atteinte.",
-      "useDevice": "Utiliser un autre appareil",
-      "useDeviceDescription": "Ton ancien téléphone scanne un code affiché sur celui-ci. Tout est restauré.",
-      "usePhrase": "Utiliser tes mots de récupération",
-      "usePhraseDescription": "Tu reviens en tant que toi. Quelqu’un de chaque cercle doit quand même te laisser entrer.",
-      "startFresh": "Ou repartir de zéro. Les informations de ton ancien compte seront perdues."
-    },
-    "startFresh": {
-      "header": "Repartir de zéro",
-      "title": "Laisser l’ancien compte derrière toi ?",
-      "body": "Tu auras une nouvelle identité sur ce téléphone. Les cercles dont tu faisais partie continuent sans toi, et leurs membres gardent tout ce que tu as publié.",
-      "recordNote": "Cela efface aussi la liste de ces cercles. Des mots de récupération retrouvés plus tard prouveront toujours qui tu es, mais ne retrouveront pas ces cercles pour toi. Les membres d’un cercle peuvent toujours t’y réinviter.",
-      "starting": "Démarrage…",
-      "confirm": "Repartir de zéro",
-      "goBack": "Retour",
-      "failed": "Impossible de repartir de zéro. Réessaie."
     },
     "keyRecovery": {
       "header": "Configurer cet appareil",
@@ -132,23 +74,12 @@
       "creating": "Configuration de cet appareil…"
     },
     "transfer": {
-      "header": "Transférer un compte",
-      "subtitle": "N’importe quel téléphone ou tablette qui a déjà Mimoza peut transférer tes cercles sur cet appareil. Scanne ce code depuis l’autre et tu retrouves ton compte tout de suite, sans attendre personne.",
-      "instructions": "Sur ton autre appareil, ouvre Compte, touche « Ajouter un autre appareil », puis vise ce code avec sa caméra.",
-      "unnamedDevice": "Un nouveau téléphone",
-      "broughtOver_one": "{{count}} cercle transféré",
-      "broughtOver_other": "{{count}} cercles transférés",
-      "failed": "Impossible de terminer le transfert",
       "somethingWrong": "Un problème est survenu. Reviens en arrière et réessaie.",
-      "waiting": "En attente de ton autre appareil…",
-      "reassurance": "Ton autre appareil te demande de confirmer avant d’envoyer quoi que ce soit. Rien sur cet écran n’est secret en soi.",
-      "noOldPhone": "Je n’ai pas Mimoza sur un autre appareil",
-      "scanInstead": "Je préfère scanner avec ce téléphone"
+      "waiting": "En attente de ton autre appareil…"
     },
     "scanDevice": {
       "header": "Ajouter un autre appareil",
       "instructions": "Connecte-toi à Mimoza sur l’appareil que tu veux ajouter, puis vise le code qu’il affiche avec cette caméra.",
-      "confirmTitle": "Ajouter {{name}} ?",
       "confirmTitleUnnamed": "Ajouter cet appareil ?",
       "confirmMessage_one": "Il aura les mêmes clés que ce téléphone et verra ton cercle. Tu ne pourras pas revenir en arrière.",
       "confirmMessage_other": "Il aura les mêmes clés que ce téléphone et verra tes {{count}} cercles. Tu ne pourras pas revenir en arrière.",
@@ -219,8 +150,6 @@
     "peopleCount_other": "{{count}} personnes",
     "newCount_one": "{{count}} nouvelle",
     "newCount_other": "{{count}} nouvelles",
-    "profileUpdateFailedIn": "Impossible de mettre à jour ton profil dans {{name}}",
-    "profileUpdateFailed": "Ton profil n’a pas pu être mis à jour dans tous les cercles",
     "list": {
       "yourCircles": "Cercles",
       "waitingToJoin": "En attente d’acceptation",

@@ -48,7 +48,6 @@
     "deleteConfirm": "Delete",
     "deleting": "Deleting your account…",
     "deletingDetail": "This can take a moment. Don't close the app.",
-    "notifications": "Notifications",
     "notifyLevels": {
       "photos": "New photos only",
       "comments": "Photos and comments",
@@ -61,63 +60,6 @@
       "photos": "Photos",
       "welcomePhoto": "Welcome photo",
       "welcomePhotoCredit": "{{author}} on Unsplash"
-    },
-    "recovery": {
-      "title": "Recovery phrase",
-      "intro": "These 12 words can rebuild your circle keys on a new phone. Anyone who has them can too, so keep them somewhere only you can get to.",
-      "cardSaved": "Save it somewhere that survives this phone",
-      "cannotShare": "This device can't share files",
-      "cardFailed": "Could not make your recovery card",
-      "shareMessage": "Mimoza recovery phrase\n\n{{words}}\n\nThese 12 words restore your circles on a new phone. Anyone who has them can too.",
-      "preparing": "Preparing…",
-      "saveCard": "Save recovery card",
-      "sendAsText": "Send the words as text",
-      "done": "Done"
-    },
-    "recoveryCard": {
-      "heading": "MIMOZA RECOVERY CARD",
-      "restoresAccount": "This file restores your account on a new phone.",
-      "keepSafe": "Anyone who has it is you, so keep it somewhere only you can reach.",
-      "howToUse": "To use it: open Mimoza, sign in, choose “{{option}}”, then “{{button}}”.",
-      "saved": "Saved {{date}}"
-    },
-    "restore": {
-      "title": "Recovery phrase",
-      "intro": "Pick the recovery card you saved, or type the {{total}} words from your old phone, in order, separated by spaces.",
-      "restored": "Recovered your account",
-      "restoredWithCircles_one": "Recovered your account and {{count}} circle",
-      "restoredWithCircles_other": "Recovered your account and {{count}} circles",
-      "alreadyInCircle": "This phone is already in a circle. Restoring would lose it.",
-      "invalidPhrase": "Those words aren't a valid recovery phrase. Check for a typo.",
-      "noPhraseInFile": "That file doesn't have a recovery phrase in it.",
-      "unreadableFile": "Couldn't read that file.",
-      "reading": "Reading…",
-      "chooseCard": "Choose recovery card",
-      "wordCount": "{{typed}} of {{total}} words",
-      "identityNote": "This gets your identity back, so when someone lets you into a circle again you return as yourself, with your old posts still yours. You will still need a new invite for each one.",
-      "restore": "Restore"
-    },
-    "returning": {
-      "header": "Welcome back",
-      "titleCertain": "You've used Mimoza before",
-      "titleUncertain": "Used Mimoza before?",
-      "bodyCertain": "Your circles are still there. This phone just can't read them yet.",
-      "bodyUncertain": "We couldn't reach the server to check. If you've had an account, bring it over now. Once this phone makes its own, the old one is out of reach.",
-      "useDevice": "Use another device",
-      "useDeviceDescription": "Your old phone scans a code from this one. Restores everything.",
-      "usePhrase": "Use your recovery phrase",
-      "usePhraseDescription": "Comes back as yourself. Someone in each circle still has to let you in.",
-      "startFresh": "Start fresh instead. Your previous account details will be gone."
-    },
-    "startFresh": {
-      "header": "Start fresh",
-      "title": "Leave the old account behind?",
-      "body": "You'll get a new identity on this phone. The circles you were in carry on without you, and the people in them keep everything you posted.",
-      "recordNote": "This also clears the record of which circles those were. A recovery phrase found later still proves who you are, but it won't find them for you. The people already in a circle can always invite you back into it.",
-      "starting": "Starting…",
-      "confirm": "Start fresh",
-      "goBack": "Go back",
-      "failed": "Could not start fresh. Try again."
     },
     "keyRecovery": {
       "header": "Set up this device",
@@ -132,23 +74,12 @@
       "creating": "Setting up this device…"
     },
     "transfer": {
-      "header": "Bring over an account",
-      "subtitle": "Any phone or tablet that already has Mimoza set up can bring your circles over to this one. Scan this code from that device and you're back in right away, no need to wait for anyone else.",
-      "instructions": "On your other device, open Account and tap Add another device, then point its camera at this code.",
-      "unnamedDevice": "A new phone",
-      "broughtOver_one": "Brought over {{count}} circle",
-      "broughtOver_other": "Brought over {{count}} circles",
-      "failed": "That transfer couldn't be completed",
       "somethingWrong": "Something went wrong. Go back and try again.",
-      "waiting": "Waiting for your other device…",
-      "reassurance": "Your other device asks you to confirm before anything is sent. Nothing on this screen is secret on its own.",
-      "noOldPhone": "I don't have Mimoza on another device",
-      "scanInstead": "Scan with this phone instead"
+      "waiting": "Waiting for your other device…"
     },
     "scanDevice": {
       "header": "Add another device",
       "instructions": "Sign in to Mimoza on the device you're adding, then point this camera at the code it shows.",
-      "confirmTitle": "Add {{name}}?",
       "confirmTitleUnnamed": "Add that device?",
       "confirmMessage_one": "It will hold the same keys as this phone and see your circle. You cannot take that back later.",
       "confirmMessage_other": "It will hold the same keys as this phone and see all {{count}} of your circles. You cannot take that back later.",
@@ -219,8 +150,6 @@
     "peopleCount_other": "{{count}} people",
     "newCount_one": "{{count}} new",
     "newCount_other": "{{count}} new",
-    "profileUpdateFailedIn": "Could not update your profile in {{name}}",
-    "profileUpdateFailed": "Could not update your profile everywhere",
     "list": {
       "yourCircles": "Circles",
       "waitingToJoin": "Waiting to join",

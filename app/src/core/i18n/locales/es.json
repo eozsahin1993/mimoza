@@ -48,7 +48,6 @@
     "deleteConfirm": "Eliminar",
     "deleting": "Eliminando tu cuenta…",
     "deletingDetail": "Puede tardar un momento. No cierres la app.",
-    "notifications": "Notificaciones",
     "notifyLevels": {
       "photos": "Solo fotos nuevas",
       "comments": "Fotos y comentarios",
@@ -61,63 +60,6 @@
       "photos": "Fotos",
       "welcomePhoto": "Foto de la pantalla de bienvenida",
       "welcomePhotoCredit": "{{author}} en Unsplash"
-    },
-    "recovery": {
-      "title": "Palabras de recuperación",
-      "intro": "Con estas 12 palabras puedes recuperar las claves de tus círculos en un teléfono nuevo. Cualquiera que las tenga puede hacer lo mismo, así que guárdalas donde solo tú puedas llegar.",
-      "cardSaved": "Guárdala en un sitio que sobreviva a este teléfono",
-      "cannotShare": "Este dispositivo no puede compartir archivos",
-      "cardFailed": "No se ha podido crear la tarjeta de recuperación",
-      "shareMessage": "Palabras de recuperación de Mimoza\n\n{{words}}\n\nEstas 12 palabras recuperan tus círculos en un teléfono nuevo. Cualquiera que las tenga puede hacer lo mismo.",
-      "preparing": "Preparando…",
-      "saveCard": "Guardar tarjeta de recuperación",
-      "sendAsText": "Enviar las palabras como texto",
-      "done": "Listo"
-    },
-    "recoveryCard": {
-      "heading": "TARJETA DE RECUPERACIÓN DE MIMOZA",
-      "restoresAccount": "Este archivo recupera tu cuenta en un teléfono nuevo.",
-      "keepSafe": "Quien lo tenga puede hacerse pasar por ti, así que guárdalo en un sitio al que solo tú puedas acceder.",
-      "howToUse": "Para usarlo: abre Mimoza, inicia sesión, elige «{{option}}» y después «{{button}}».",
-      "saved": "Guardada el {{date}}"
-    },
-    "restore": {
-      "title": "Palabras de recuperación",
-      "intro": "Elige la tarjeta de recuperación que guardaste o escribe las {{total}} palabras de tu teléfono antiguo, en orden y separadas por espacios.",
-      "restored": "Cuenta recuperada",
-      "restoredWithCircles_one": "Cuenta y {{count}} círculo recuperados",
-      "restoredWithCircles_other": "Cuenta y {{count}} círculos recuperados",
-      "alreadyInCircle": "Este teléfono ya está en un círculo. Si recuperas la cuenta, lo perderás.",
-      "invalidPhrase": "Las palabras no parecen correctas. Revisa si hay alguna errata.",
-      "noPhraseInFile": "El archivo no contiene palabras de recuperación.",
-      "unreadableFile": "No se ha podido leer el archivo.",
-      "reading": "Leyendo…",
-      "chooseCard": "Elegir tarjeta de recuperación",
-      "wordCount": "{{typed}} de {{total}} palabras",
-      "identityNote": "Esto recupera tu identidad: cuando alguien te vuelva a dejar entrar en un círculo, volverás siendo tú y tus fotos antiguas seguirán siendo tuyas. Aun así, necesitarás una invitación nueva para cada uno.",
-      "restore": "Recuperar"
-    },
-    "returning": {
-      "header": "Hola de nuevo",
-      "titleCertain": "Ya has usado Mimoza antes",
-      "titleUncertain": "¿Has usado Mimoza antes?",
-      "bodyCertain": "Tus círculos siguen ahí. Solo que este teléfono aún no puede leerlos.",
-      "bodyUncertain": "No hemos podido conectar con el servidor para comprobarlo. Si ya tenías una cuenta, transfiérela ahora. En cuanto este teléfono cree la suya, la antigua quedará fuera de tu alcance.",
-      "useDevice": "Usar otro dispositivo",
-      "useDeviceDescription": "Escanea un código de esta pantalla con tu teléfono antiguo. Se recupera todo.",
-      "usePhrase": "Usar tus palabras de recuperación",
-      "usePhraseDescription": "Vuelves siendo tú. Aun así, alguien de cada círculo tiene que dejarte entrar.",
-      "startFresh": "O empieza de cero. Los datos de tu cuenta anterior se perderán."
-    },
-    "startFresh": {
-      "header": "Empezar de cero",
-      "title": "¿Dejar atrás la cuenta antigua?",
-      "body": "Tendrás una identidad nueva en este teléfono. Los círculos en los que estabas siguen sin ti, y sus miembros conservan todo lo que publicaste.",
-      "recordNote": "Esto también borra el registro de qué círculos eran. Unas palabras de recuperación que encuentres más tarde seguirán demostrando quién eres, pero no encontrarán esos círculos por ti. Quienes ya están en un círculo siempre pueden volver a invitarte.",
-      "starting": "Empezando…",
-      "confirm": "Empezar de cero",
-      "goBack": "Volver",
-      "failed": "No se ha podido empezar de cero. Inténtalo de nuevo."
     },
     "keyRecovery": {
       "header": "Configurar este dispositivo",
@@ -132,23 +74,12 @@
       "creating": "Configurando este dispositivo…"
     },
     "transfer": {
-      "header": "Transferir una cuenta",
-      "subtitle": "Cualquier teléfono o tableta que ya tenga Mimoza puede traer tus círculos a este dispositivo. Escanea este código desde el otro y recuperas tu cuenta al instante, sin esperar a nadie.",
-      "instructions": "En tu otro dispositivo, entra en Cuenta, toca «Añadir otro dispositivo» y apunta su cámara a este código.",
-      "unnamedDevice": "Un teléfono nuevo",
-      "broughtOver_one": "{{count}} círculo transferido",
-      "broughtOver_other": "{{count}} círculos transferidos",
-      "failed": "No se ha podido completar la transferencia",
       "somethingWrong": "Algo ha fallado. Vuelve atrás e inténtalo de nuevo.",
-      "waiting": "Esperando a tu otro dispositivo…",
-      "reassurance": "Tu otro dispositivo te pedirá confirmación antes de enviar nada. Nada de lo que hay en esta pantalla es secreto por sí solo.",
-      "noOldPhone": "No tengo Mimoza en otro dispositivo",
-      "scanInstead": "Prefiero escanear con este teléfono"
+      "waiting": "Esperando a tu otro dispositivo…"
     },
     "scanDevice": {
       "header": "Añadir otro dispositivo",
       "instructions": "Inicia sesión en Mimoza en el dispositivo que quieres añadir y apunta esta cámara al código que aparece.",
-      "confirmTitle": "¿Añadir {{name}}?",
       "confirmTitleUnnamed": "¿Añadir este dispositivo?",
       "confirmMessage_one": "Tendrá las mismas claves que este teléfono y verá tu círculo. No podrás deshacerlo más adelante.",
       "confirmMessage_other": "Tendrá las mismas claves que este teléfono y verá tus {{count}} círculos. No podrás deshacerlo más adelante.",
@@ -219,8 +150,6 @@
     "peopleCount_other": "{{count}} personas",
     "newCount_one": "{{count}} nueva",
     "newCount_other": "{{count}} nuevas",
-    "profileUpdateFailedIn": "No se ha podido actualizar tu perfil en {{name}}",
-    "profileUpdateFailed": "Tu perfil no se ha actualizado en todos los círculos",
     "list": {
       "yourCircles": "Círculos",
       "waitingToJoin": "Solicitudes pendientes",

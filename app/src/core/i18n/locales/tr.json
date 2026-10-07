@@ -48,7 +48,6 @@
     "deleteConfirm": "Sil",
     "deleting": "Hesabın siliniyor…",
     "deletingDetail": "Bu işlem biraz zaman alabilir. Lütfen uygulamayı kapatma.",
-    "notifications": "Bildirimler",
     "notifyLevels": {
       "photos": "Sadece yeni fotoğraflar",
       "comments": "Fotoğraflar ve yorumlar",
@@ -61,63 +60,6 @@
       "photos": "Fotoğraflar",
       "welcomePhoto": "Hoş geldin ekranı fotoğrafı",
       "welcomePhotoCredit": "{{author}} / Unsplash"
-    },
-    "recovery": {
-      "title": "Kurtarma kelimeleri",
-      "intro": "Bu 12 kelimeyle çevrelerinin anahtarlarını yeni bir telefonda geri getirebilirsin. Bu kelimeleri ele geçiren herkes de aynısını yapabilir; o yüzden onları sadece senin ulaşabileceğin bir yerde sakla.",
-      "cardSaved": "Bu telefona bir şey olsa bile erişebileceğin bir yere kaydet",
-      "cannotShare": "Bu cihazda dosya paylaşımı yapılamıyor",
-      "cardFailed": "Kurtarma kartı oluşturulamadı",
-      "shareMessage": "Mimoza kurtarma kelimeleri\n\n{{words}}\n\nBu 12 kelime çevrelerini yeni bir telefonda geri getirir. Bu kelimelere sahip olan herkes de aynısını yapabilir.",
-      "preparing": "Hazırlanıyor…",
-      "saveCard": "Kurtarma kartını kaydet",
-      "sendAsText": "Kelimeleri metin olarak gönder",
-      "done": "Tamam"
-    },
-    "recoveryCard": {
-      "heading": "MIMOZA KURTARMA KARTI",
-      "restoresAccount": "Bu dosya hesabını yeni bir telefonda geri yükler.",
-      "keepSafe": "Bu dosyayı eline geçiren herkes senin yerine geçebilir. O yüzden onu sadece senin ulaşabileceğin bir yerde sakla.",
-      "howToUse": "Kullanmak için: Mimoza’yı aç, giriş yap, “{{option}}” ve ardından “{{button}}” seçeneğine dokun.",
-      "saved": "Kaydedilme tarihi: {{date}}"
-    },
-    "restore": {
-      "title": "Kurtarma kelimeleri",
-      "intro": "Kaydettiğin kurtarma kartını seç veya eski telefonundaki {{total}} kelimeyi sırasıyla, aralarında boşluk bırakarak yaz.",
-      "restored": "Hesabın geri yüklendi",
-      "restoredWithCircles_one": "Hesabın ve {{count}} çevren geri yüklendi",
-      "restoredWithCircles_other": "Hesabın ve {{count}} çevren geri yüklendi",
-      "alreadyInCircle": "Bu telefon zaten bir çevrede. Geri yüklersen o çevre kaybolur.",
-      "invalidPhrase": "Kelimeler doğru görünmüyor. Yazım hatası olup olmadığına bak.",
-      "noPhraseInFile": "Seçilen dosyada kurtarma kelimeleri bulunamadı.",
-      "unreadableFile": "Dosya okunamadı.",
-      "reading": "Okunuyor…",
-      "chooseCard": "Kurtarma kartı seç",
-      "wordCount": "{{typed}} / {{total}} kelime",
-      "identityNote": "Bu işlem kimliğini geri getirir: bir çevreye yeniden alındığında kendin olarak dönersin ve eski paylaşımların yine sana ait olur. Yine de her çevre için yeni bir davet alman gerekir.",
-      "restore": "Geri yükle"
-    },
-    "returning": {
-      "header": "Tekrar hoş geldin",
-      "titleCertain": "Daha önce Mimoza kullanmışsın",
-      "titleUncertain": "Daha önce Mimoza kullandın mı?",
-      "bodyCertain": "Çevrelerin hâlâ yerinde; sadece bu telefonda henüz onları açacak anahtarlar yok.",
-      "bodyUncertain": "Kontrol etmek için sunucuya ulaşamadık. Daha önce bir hesabın varsa onu şimdi aktar. Bu telefon kendi hesabını oluşturduktan sonra eskisine bir daha ulaşamazsın.",
-      "useDevice": "Başka bir cihaz kullan",
-      "useDeviceDescription": "Eski telefonunla bu ekrandaki kodu tara. Her şey geri gelir.",
-      "usePhrase": "Kurtarma kelimelerini kullan",
-      "usePhraseDescription": "Kendi kimliğinle geri dönersin. Ancak her çevreye tekrar kabul edilmen gerekir.",
-      "startFresh": "Ya da sıfırdan başla. Eski hesabının bilgileri silinir."
-    },
-    "startFresh": {
-      "header": "Sıfırdan başla",
-      "title": "Eski hesap geride kalsın mı?",
-      "body": "Bu telefonda yeni bir kimliğin olur. Eskiden olduğun çevreler sensiz devam eder ve paylaştığın her şey oradaki kişilerde kalır.",
-      "recordNote": "Bu işlem hangi çevrelerde olduğunun kaydını da siler. Sonradan bulduğun kurtarma kelimeleri yine kim olduğunu kanıtlar ama o çevreleri senin için bulamaz. Çevrede kalanlar seni her zaman yeniden davet edebilir.",
-      "starting": "Başlatılıyor…",
-      "confirm": "Sıfırdan başla",
-      "goBack": "Geri dön",
-      "failed": "Sıfırdan başlatılamadı. Lütfen tekrar dene."
     },
     "keyRecovery": {
       "header": "Bu cihazı kur",
@@ -132,23 +74,12 @@
       "creating": "Bu cihaz kuruluyor…"
     },
     "transfer": {
-      "header": "Hesap aktarma",
-      "subtitle": "Mimoza’nın kurulu olduğu herhangi bir telefon ya da tablet, çevrelerini bu cihaza aktarabilir. Bu kodu o cihazdan taratırsan hemen kaldığın yerden devam edersin, kimseyi beklemen gerekmez.",
-      "instructions": "Diğer cihazında Hesap bölümünü açıp “Başka bir cihaz ekle” seçeneğine dokun ve kamerasını bu koda doğrult.",
-      "unnamedDevice": "Yeni bir telefon",
-      "broughtOver_one": "{{count}} çevre aktarıldı",
-      "broughtOver_other": "{{count}} çevre aktarıldı",
-      "failed": "Aktarım tamamlanamadı",
       "somethingWrong": "Bir şeyler ters gitti. Lütfen geri dönüp tekrar dene.",
-      "waiting": "Diğer cihazın bekleniyor…",
-      "reassurance": "Diğer cihazın, herhangi bir şey göndermeden önce senden onay isteyecek. Bu ekranda görünenler tek başına gizli bir bilgi değil.",
-      "noOldPhone": "Başka bir cihazımda Mimoza yok",
-      "scanInstead": "Bunun yerine bu telefonla tara"
+      "waiting": "Diğer cihazın bekleniyor…"
     },
     "scanDevice": {
       "header": "Başka bir cihaz ekle",
       "instructions": "Eklemek istediğin cihazda Mimoza’ya giriş yap, ardından bu kamerayı orada çıkan koda tut.",
-      "confirmTitle": "{{name}} eklensin mi?",
       "confirmTitleUnnamed": "Bu cihaz eklensin mi?",
       "confirmMessage_one": "Bu cihaz mevcut telefonunla aynı anahtarlara sahip olacak ve çevreni görebilecek. Bu erişimi sonradan geri alamazsın.",
       "confirmMessage_other": "Bu cihaz mevcut telefonunla aynı anahtarlara sahip olacak ve toplam {{count}} çevreni görebilecek. Bu erişimi sonradan geri alamazsın.",
@@ -219,8 +150,6 @@
     "peopleCount_other": "{{count}} kişi",
     "newCount_one": "{{count}} yeni",
     "newCount_other": "{{count}} yeni",
-    "profileUpdateFailedIn": "Profilin {{name}} çevresinde güncellenemedi",
-    "profileUpdateFailed": "Profilin bazı çevrelerde güncellenemedi",
     "list": {
       "yourCircles": "Çevreler",
       "waitingToJoin": "Onay bekleyen istekler",

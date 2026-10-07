@@ -48,7 +48,6 @@
     "deleteConfirm": "Löschen",
     "deleting": "Dein Konto wird gelöscht…",
     "deletingDetail": "Das kann einen Moment dauern. Schließ die App nicht.",
-    "notifications": "Mitteilungen",
     "notifyLevels": {
       "photos": "Nur neue Fotos",
       "comments": "Fotos und Kommentare",
@@ -61,63 +60,6 @@
       "photos": "Fotos",
       "welcomePhoto": "Foto auf dem Startbildschirm",
       "welcomePhotoCredit": "{{author}} auf Unsplash"
-    },
-    "recovery": {
-      "title": "Wiederherstellungswörter",
-      "intro": "Mit diesen 12 Wörtern lassen sich die Schlüssel deiner Kreise auf einem neuen Handy wiederherstellen. Das kann jeder, der sie hat – bewahre sie also an einem Ort auf, an den nur du herankommst.",
-      "cardSaved": "Speichere sie an einem Ort, der dieses Handy überdauert",
-      "cannotShare": "Dieses Gerät kann keine Dateien teilen",
-      "cardFailed": "Die Wiederherstellungskarte konnte nicht erstellt werden",
-      "shareMessage": "Mimoza-Wiederherstellungswörter\n\n{{words}}\n\nDiese 12 Wörter stellen deine Kreise auf einem neuen Handy wieder her. Das kann jeder, der sie hat.",
-      "preparing": "Wird vorbereitet…",
-      "saveCard": "Wiederherstellungskarte speichern",
-      "sendAsText": "Wörter als Text senden",
-      "done": "Fertig"
-    },
-    "recoveryCard": {
-      "heading": "MIMOZA-WIEDERHERSTELLUNGSKARTE",
-      "restoresAccount": "Mit dieser Datei stellst du dein Konto auf einem neuen Handy wieder her.",
-      "keepSafe": "Wer sie hat, kann sich als du ausgeben – bewahre sie also an einem Ort auf, an den nur du herankommst.",
-      "howToUse": "So verwendest du sie: Öffne Mimoza, melde dich an, wähle „{{option}}“ und dann „{{button}}“.",
-      "saved": "Gespeichert am {{date}}"
-    },
-    "restore": {
-      "title": "Wiederherstellungswörter",
-      "intro": "Wähle die Wiederherstellungskarte, die du gespeichert hast, oder gib die {{total}} Wörter von deinem alten Handy ein – in der richtigen Reihenfolge, getrennt durch Leerzeichen.",
-      "restored": "Konto wiederhergestellt",
-      "restoredWithCircles_one": "Konto und {{count}} Kreis wiederhergestellt",
-      "restoredWithCircles_other": "Konto und {{count}} Kreise wiederhergestellt",
-      "alreadyInCircle": "Dieses Handy ist schon in einem Kreis. Beim Wiederherstellen würdest du ihn verlieren.",
-      "invalidPhrase": "Die Wörter scheinen nicht zu stimmen. Prüf sie auf Tippfehler.",
-      "noPhraseInFile": "Die Datei enthält keine Wiederherstellungswörter.",
-      "unreadableFile": "Die Datei konnte nicht gelesen werden.",
-      "reading": "Wird gelesen…",
-      "chooseCard": "Wiederherstellungskarte wählen",
-      "wordCount": "{{typed}} von {{total}} Wörtern",
-      "identityNote": "Damit bekommst du deine Identität zurück: Wenn dich jemand wieder in einen Kreis lässt, kommst du als du selbst zurück, und deine alten Fotos gehören weiter dir. Für jeden Kreis brauchst du trotzdem eine neue Einladung.",
-      "restore": "Wiederherstellen"
-    },
-    "returning": {
-      "header": "Willkommen zurück",
-      "titleCertain": "Du hast Mimoza schon mal benutzt",
-      "titleUncertain": "Schon mal Mimoza benutzt?",
-      "bodyCertain": "Deine Kreise sind noch da. Dieses Handy kann sie nur noch nicht lesen.",
-      "bodyUncertain": "Wir konnten den Server nicht erreichen, um das zu prüfen. Wenn du schon ein Konto hattest, übertrag es jetzt. Sobald dieses Handy ein eigenes anlegt, ist das alte nicht mehr erreichbar.",
-      "useDevice": "Anderes Gerät verwenden",
-      "useDeviceDescription": "Dein altes Handy scannt einen Code auf diesem. Stellt alles wieder her.",
-      "usePhrase": "Wiederherstellungswörter verwenden",
-      "usePhraseDescription": "Du kommst als du selbst zurück. Jemand in jedem Kreis muss dich trotzdem wieder reinlassen.",
-      "startFresh": "Oder neu anfangen. Die Daten deines bisherigen Kontos sind dann weg."
-    },
-    "startFresh": {
-      "header": "Neu anfangen",
-      "title": "Das alte Konto zurücklassen?",
-      "body": "Du bekommst auf diesem Handy eine neue Identität. Die Kreise, in denen du warst, gehen ohne dich weiter, und die Leute darin behalten alles, was du gepostet hast.",
-      "recordNote": "Damit wird auch gelöscht, welche Kreise das waren. Später gefundene Wiederherstellungswörter beweisen zwar weiterhin, wer du bist, finden diese Kreise aber nicht für dich. Die Leute in einem Kreis können dich jederzeit wieder einladen.",
-      "starting": "Wird gestartet…",
-      "confirm": "Neu anfangen",
-      "goBack": "Zurück",
-      "failed": "Neu anfangen hat nicht geklappt. Versuch es noch mal."
     },
     "keyRecovery": {
       "header": "Dieses Gerät einrichten",
@@ -132,23 +74,12 @@
       "creating": "Dieses Gerät wird eingerichtet…"
     },
     "transfer": {
-      "header": "Konto übertragen",
-      "subtitle": "Jedes Handy oder Tablet, auf dem Mimoza schon eingerichtet ist, kann deine Kreise auf dieses Gerät übertragen. Scanne diesen Code von dort und du bist sofort wieder drin, ohne auf jemanden zu warten.",
-      "instructions": "Öffne auf deinem anderen Gerät „Konto“, tippe auf „Weiteres Gerät hinzufügen“ und richte seine Kamera auf diesen Code.",
-      "unnamedDevice": "Ein neues Handy",
-      "broughtOver_one": "{{count}} Kreis übertragen",
-      "broughtOver_other": "{{count}} Kreise übertragen",
-      "failed": "Die Übertragung konnte nicht abgeschlossen werden",
       "somethingWrong": "Etwas ist schiefgelaufen. Geh zurück und versuch es noch mal.",
-      "waiting": "Warte auf dein anderes Gerät…",
-      "reassurance": "Dein anderes Gerät fragt dich, bevor irgendetwas gesendet wird. Nichts auf diesem Bildschirm ist für sich allein geheim.",
-      "noOldPhone": "Ich habe Mimoza auf keinem anderen Gerät",
-      "scanInstead": "Lieber mit diesem Handy scannen"
+      "waiting": "Warte auf dein anderes Gerät…"
     },
     "scanDevice": {
       "header": "Weiteres Gerät hinzufügen",
       "instructions": "Melde dich auf dem Gerät, das du hinzufügen willst, bei Mimoza an. Richte dann diese Kamera auf den Code, den es anzeigt.",
-      "confirmTitle": "{{name}} hinzufügen?",
       "confirmTitleUnnamed": "Dieses Gerät hinzufügen?",
       "confirmMessage_one": "Es bekommt dieselben Schlüssel wie dieses Handy und sieht deinen Kreis. Das kannst du später nicht rückgängig machen.",
       "confirmMessage_other": "Es bekommt dieselben Schlüssel wie dieses Handy und sieht alle deine {{count}} Kreise. Das kannst du später nicht rückgängig machen.",
@@ -219,8 +150,6 @@
     "peopleCount_other": "{{count}} Personen",
     "newCount_one": "{{count}} neu",
     "newCount_other": "{{count}} neu",
-    "profileUpdateFailedIn": "Dein Profil konnte in {{name}} nicht aktualisiert werden",
-    "profileUpdateFailed": "Dein Profil konnte nicht überall aktualisiert werden",
     "list": {
       "yourCircles": "Kreise",
       "waitingToJoin": "Beitritt ausstehend",
