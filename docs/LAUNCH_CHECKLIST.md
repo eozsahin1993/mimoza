@@ -4,27 +4,38 @@ Everything between here and both stores. Grouped by what blocks what, not
 by store — several items gate others, and two of them cost calendar time
 rather than work.
 
-Status as of 2026-10-01. Tick items as they land; add a date when you do,
+Status as of 2026-10-07. Tick items as they land; add a date when you do,
 so a stale "done" is visible.
 
 ## Start these first — they cost waiting, not doing
 
-- [x] **Apple Developer Program** — paid 2026-10-01 as an individual
-      membership. Convert to organization once the D-U-N-S arrives:
-      Contact Us → Membership and Account → Program Enrollment, with the
-      legal name, D-U-N-S, Northwest address, and the business phone.
-      Same Apple ID and Team ID carry over.
-- [ ] **D-U-N-S for RareKiwi Software LLC** — requested via Apple's
-      lookup page with Northwest's address. Gates the Apple conversion
-      and the Play organization account. Apple copies this address to EU
-      product pages for traders, so it must never be a home address.
-- [x] **Google Play Console** — paid as a personal account. Convert to
-      organization in place once the D-U-N-S arrives: Developer account →
-      About you → verify the org website, then Change account type with a
-      new organization payments profile. Apps and history stay. Do not
-      create the Mimoza app record before the conversion: organization
-      accounts skip the 12-tester closed test, but an app born under a
-      personal account may keep that requirement after the switch.
+- [ ] **Apple Developer Program** — paid 2026-10-01 as an individual
+      membership. Conversion to organization requested 2026-10-06 via
+      Contact Us → Membership and Account, with the legal name, D-U-N-S,
+      Northwest address and the business phone. Same Apple ID and Team ID
+      carry over; a free developer@rarekiwisoftware.com Apple ID exists
+      but holds nothing — invite it as Admin after the conversion. Expect
+      a new Program License Agreement to accept once it lands; TestFlight
+      uploads fail until then.
+- [x] **D-U-N-S for RareKiwi Software LLC** — 149977686, confirmed by
+      D&B 2026-10-05, on Northwest's address. Apple copies this address
+      to EU product pages for traders, so it must never be a home address.
+- [ ] **Google Play Console** — the personal account is abandoned
+      (nothing was ever created on it). A new organization account was
+      registered 2026-10-06 under developer@rarekiwisoftware.com, website
+      verified through a Search Console URL-prefix property matching
+      Play's string exactly; org verification pending. Create the Mimoza
+      app there once verified, link a service account for `PLAY_JSON_KEY`,
+      and close the old account afterwards.
+- [ ] **Bundle id / package** moved to `com.rarekiwisoftware.mimoza`
+      (staging `.staging`) on 2026-10-07, before anything reached a store.
+      Repo, Firebase apps, OAuth clients, SSM and CI secrets are done.
+      Still open: `terraform apply` per env (CI deploy), match profiles,
+      the Sign in with Apple key's Primary App ID in the portal (the
+      relay's revoke call signs `sub` = bundle id and fails as
+      `invalid_client` until it points at the new one), and deleting the
+      old App IDs, Firebase apps and OAuth clients once new builds are
+      out.
 - [ ] **BIS notification email.** One message, no reply expected, to
       `crypt@bis.doc.gov` and `enc@nsa.gov` with the GitHub URL. Publicly
       available encryption source is not subject to the EAR once notified
@@ -52,8 +63,9 @@ Prod is 852138521113, staging 223057859233. See
       with Apple key does not: it belongs to a primary App ID, so prod has
       its own.
 - [x] FCM key in SSM, from the prod Firebase project (`mimozaapp-1587f`).
-- [x] Google OAuth clients for the prod bundle id — they already existed,
-      since dev shares production's bundle id and had been using them. No
+- [x] Google OAuth clients for the prod bundle id, in `mimozaapp-1587f`.
+      Dev shares the bundle id but since 2026-10-07 has its own clients in
+      `mimoza-dev`, so prod's can be deleted without touching dev. No
       Apple Services ID: that's for web and Android Apple sign-in, and a
       native app authenticates as its bundle id.
 - [x] `.env.production` locally: `APP_ENV=production`, relay URL, three
