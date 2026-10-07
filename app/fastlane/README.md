@@ -39,6 +39,14 @@ Build production and upload it to TestFlight
 
 Fetch or create signing certificates and profiles for every bundle id
 
+### ios listing
+
+```sh
+[bundle exec] fastlane ios listing
+```
+
+Upload the App Store listing: copy and review notes
+
 ----
 
 
@@ -59,6 +67,14 @@ Build staging and upload it to Play internal testing
 ```
 
 Build production and upload it to Play internal testing
+
+### android listing
+
+```sh
+[bundle exec] fastlane android listing
+```
+
+Upload the Play listing: copy only
 
 ----
 
