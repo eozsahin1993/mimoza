@@ -175,6 +175,10 @@ jobs:
           EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
           EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+          # Without these the app config has no update URL and the binary
+          # ships with expo-updates disabled: it never checks the channel.
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+          EAS_PROJECT_OWNER: ${{ secrets.EAS_PROJECT_OWNER }}
 
   ios:
     name: iOS to TestFlight
@@ -243,6 +247,10 @@ jobs:
           EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
           EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID }}
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+          # Without these the app config has no update URL and the binary
+          # ships with expo-updates disabled: it never checks the channel.
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+          EAS_PROJECT_OWNER: ${{ secrets.EAS_PROJECT_OWNER }}
 
       - name: Keep the build log
         if: always()

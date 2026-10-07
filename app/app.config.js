@@ -117,8 +117,14 @@ function withBuildNumber(config) {
  * a staging app, with staging's bundle id, talking to localhost. The
  * relay then rejects every token for an audience it doesn't expect, which
  * reads like a sign-in bug rather than a build one.
+ *
+ * Likewise no EAS_PROJECT_ID: the update url is simply left out, and the
+ * binary builds fine with expo-updates off, never checking its channel.
  */
 function requireEnvironment(name, env) {
+  if (env.channel && !process.env.EAS_PROJECT_ID) {
+    throw new Error(`APP_ENV=${name} needs EAS_PROJECT_ID, or the build ships without an update url and never receives updates.`);
+  }
   if (!env.idSuffix) return;
 
   const relay = process.env.EXPO_PUBLIC_RELAY_URL;
