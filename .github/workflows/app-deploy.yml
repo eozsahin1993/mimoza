@@ -60,6 +60,7 @@ jobs:
 
       - run: npm ci
       - run: npm run lint -- --max-warnings 0
+      - run: npm run typecheck
       - run: npx jest --ci
 
   # What decides build vs update. The fingerprint hashes everything that

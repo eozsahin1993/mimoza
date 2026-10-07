@@ -99,6 +99,7 @@
     "fingerprint:staging": "dotenv -e .env.staging -- fingerprint fingerprint:generate",
     "fingerprint:prod": "dotenv -e .env.production -- fingerprint fingerprint:generate",
     "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
     "test": "fnm exec --using=22.23.2 -- jest",
     "db:generate": "drizzle-kit generate",
     "i18n:push": "node scripts/generate-push-strings.js",
