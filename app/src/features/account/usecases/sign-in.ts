@@ -157,4 +157,13 @@ export async function signOut(): Promise<void> {
     }
   }
   await deleteAuthToken();
+
+  // The SDK remembers its account apart from our session; without this the
+  // next sign-in reuses it and the account picker never shows.
+  try {
+    ensureGoogleConfigured();
+    await GoogleSignin.signOut();
+  } catch (err) {
+    console.error('Failed to clear the Google account while signing out', err);
+  }
 }
