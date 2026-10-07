@@ -301,8 +301,6 @@ export default function CircleDetailsScreen() {
           text: lastMember ? t('circle.details.delete') : t('circle.details.leave'),
           style: 'destructive',
           onPress: async () => {
-            // All local: the entry announcing the departure is queued, not
-            // pushed, so this works offline and can't fail on a connection.
             try {
               await leaveCircle(circleId);
             } catch (err) {

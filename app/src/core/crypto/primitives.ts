@@ -88,11 +88,9 @@ export function decrypt(ciphertext: Uint8Array, secret: Uint8Array): Uint8Array 
 }
 
 /**
- * `sha256(bytes)`, hex-encoded — a generic content hash, distinct from
- * `hashWriteToken`. Binds a blob's actual bytes into a log entry's
- * already-signed payload (e.g. `photoHash`), catching a member swapping
- * another member's uploaded photo — something a shared write token can't
- * prevent on its own.
+ * `sha256(bytes)`, hex-encoded. A post carries the hash of its photo inside
+ * its ciphertext, so a device can check that the bytes it downloads are the
+ * ones that were posted; the photo queue refuses a mismatch.
  */
 export function hashBytes(bytes: Uint8Array): string {
   return bytesToHex(sha256(bytes));

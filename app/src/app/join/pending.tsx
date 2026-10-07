@@ -37,8 +37,8 @@ export default function JoinPendingScreen() {
   //
   // Never dependent on push arriving — approval must complete even if
   // notifications are disabled or the platform never delivers one. Also
-  // survives the app being closed and reopened entirely:
-  // `pendingJoinRequests` is the local source for `circleName` below, not
+  // survives the app being closed and reopened entirely: the local
+  // pending request row is the source for `circleName` below, not
   // component state carried from the previous screen.
   useFocusEffect(
     useCallback(() => {
