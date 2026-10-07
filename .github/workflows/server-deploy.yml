@@ -1,4 +1,4 @@
-name: Deploy Relay
+name: Deploy Server
 
 # id-token is what makes the keyless AWS login possible: the job asks
 # GitHub for a signed token describing itself, and AWS trades it for
