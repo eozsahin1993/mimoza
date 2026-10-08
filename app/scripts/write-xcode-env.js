@@ -20,6 +20,9 @@ const KEYS = [
   'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID',
   'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID',
   'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+  // Read by the "Generate updates resources" phase, which would otherwise
+  // hash the prebuilt project and embed a runtime version no update matches.
+  'EXPO_UPDATES_FINGERPRINT_OVERRIDE',
 ];
 
 const ios = path.join(__dirname, '..', 'ios');
