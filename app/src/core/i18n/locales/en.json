@@ -29,8 +29,8 @@
     "privacyDescription": "What end-to-end encrypted means here",
     "about": "About",
     "credits": "Credits & attribution",
-    "reportProblem": "Report a problem",
-    "reportProblemDescription": "Email us about content or anything else that's wrong",
+    "feedback": "Send feedback",
+    "feedbackDescription": "Something broken, a post to report, or just a thought",
     "account": "Account",
     "signOut": "Sign out",
     "signOutDescription": "Your circles and photos stay on this device",
@@ -38,9 +38,6 @@
     "signOutTitle": "Sign out?",
     "signOutMessage": "Your circles and photos stay on this device. Signing back in picks up right where you left off.",
     "signOutConfirm": "Sign out",
-    "reportProblemFailedTitle": "No mail app to open",
-    "reportProblemFailedMessage": "Please send your reports or concerns to {{email}}",
-    "copyEmail": "Copy",
     "deleteAccount": "Delete account",
     "deleteAccountDescription": "Erases everything you've posted, everywhere, then deletes your account",
     "deleteTitle": "Delete your account?",
@@ -54,6 +51,34 @@
       "all": "Photos, comments and reactions",
       "none": "Off"
     }
+  },
+  "feedback": {
+    "title": "Send feedback",
+    "intro": "Found a bug, seen something that shouldn't be here, or just have a thought? We read every message.",
+    "kind": {
+      "bug": "Something's not working",
+      "content": "Report a post",
+      "feedback": "Just a thought"
+    },
+    "prompt": {
+      "bug": "What went wrong?",
+      "content": "What did you see, and where?",
+      "feedback": "What's on your mind?"
+    },
+    "messagePlaceholder": "Tell us as much as you can…",
+    "emailLabel": "Want a reply? Leave your email",
+    "emailPlaceholder": "you@example.com",
+    "includes": "We'll send this along: {{details}}",
+    "includesNote": "Your circles and photos stay on your phone.",
+    "send": "Send",
+    "sending": "Sending…",
+    "sent": "Got it, thank you",
+    "failed": "That didn't go through",
+    "failedOffline": "You're offline. Try again once you're back online.",
+    "failedTooMany": "You've sent a few already. Try again in a bit.",
+    "failedTitle": "That didn't go through",
+    "failedMessage": "Give it another go in a moment, or write to us at {{email}}",
+    "copyEmail": "Copy email"
   },
   "account": {
     "credits": {

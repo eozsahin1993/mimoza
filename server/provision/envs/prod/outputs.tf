@@ -8,6 +8,7 @@ output "dns_records" {
   value = {
     certificate_validation = one(module.certificate[*].validation_records)
     cnames                 = module.cdn.dns_records
+    feedback_email_dkim    = module.email.dkim_records
   }
 }
 

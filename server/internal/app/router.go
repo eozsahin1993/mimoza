@@ -25,6 +25,8 @@ import (
 	"mimoza-relay/internal/circles/posts"
 	"mimoza-relay/internal/circles/reactions"
 	"mimoza-relay/internal/circles/requests"
+	"mimoza-relay/internal/feedback"
+	"mimoza-relay/internal/feedback/submit"
 	"mimoza-relay/internal/push"
 	"mimoza-relay/internal/ratelimit"
 	"mimoza-relay/internal/util/httputil"
@@ -48,11 +50,16 @@ type Deps struct {
 	// the CDN directly.
 	Blobs *blobstore.Store
 	Auth  auth.Store
+	// FeedbackNotify is who hears about a feedback report — nil where no
+	// sender is configured, and the route then answers 503.
+	FeedbackNotify feedback.Notifier
 	// Writes and reads carry different budgets — see internal/ratelimit.
-	WriteLimit ratelimit.Store
-	ReadLimit  ratelimit.Store
-	Google     *oidcverify.Verifier
-	Apple      *oidcverify.Verifier
+	// Feedback has a third, small one: every accepted report is an email.
+	WriteLimit    ratelimit.Store
+	ReadLimit     ratelimit.Store
+	FeedbackLimit ratelimit.Store
+	Google        *oidcverify.Verifier
+	Apple         *oidcverify.Verifier
 	// AppleID is nil unless this environment has a Sign in with Apple key
 	// configured — see appleid.NewClient. Without it, sign-in and
 	// deletion both still work; deletion just cannot revoke the grant
@@ -146,6 +153,11 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	devicelink.Register(accountMux, &devicelink.Service{Store: devicelink.NewStore(deps.Accounts)}, readLimit, writeLimit)
 	mux.Handle("/account", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
+
+	feedbackMux := http.NewServeMux()
+	submit.Register(feedbackMux, &submit.Service{Notify: deps.FeedbackNotify},
+		func(h http.Handler) http.Handler { return ratelimit.Require(deps.FeedbackLimit, h) })
+	mux.Handle("/feedback", auth.RequireSession(deps.Auth, httputil.LogRoutes(feedbackMux)))
 
 	deleteAccountService := &deletion.Service{
 		AuthStore: deps.Auth,

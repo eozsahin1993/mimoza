@@ -29,8 +29,8 @@
     "privacyDescription": "Was Ende-zu-Ende-verschlüsselt hier bedeutet",
     "about": "Über",
     "credits": "Danksagungen",
-    "reportProblem": "Ein Problem melden",
-    "reportProblemDescription": "Schreib uns bei Inhalten oder allem anderen, das nicht stimmt",
+    "feedback": "Feedback senden",
+    "feedbackDescription": "Etwas kaputt, ein Beitrag zum Melden oder einfach ein Gedanke",
     "account": "Konto",
     "signOut": "Abmelden",
     "signOutDescription": "Deine Kreise und Fotos bleiben auf diesem Gerät",
@@ -38,9 +38,6 @@
     "signOutTitle": "Abmelden?",
     "signOutMessage": "Deine Kreise und Fotos bleiben auf diesem Gerät. Wenn du dich wieder anmeldest, machst du genau dort weiter.",
     "signOutConfirm": "Abmelden",
-    "reportProblemFailedTitle": "Keine Mail-App zum Öffnen",
-    "reportProblemFailedMessage": "Schick uns dein Anliegen oder deine Meldung bitte an {{email}}",
-    "copyEmail": "Kopieren",
     "deleteAccount": "Konto löschen",
     "deleteAccountDescription": "Löscht überall alles, was du gepostet hast, und dann dein Konto",
     "deleteTitle": "Dein Konto löschen?",
@@ -54,6 +51,34 @@
       "all": "Fotos, Kommentare und Reaktionen",
       "none": "Aus"
     }
+  },
+  "feedback": {
+    "title": "Feedback senden",
+    "intro": "Einen Fehler gefunden, etwas gesehen, das hier nicht hingehört, oder einfach einen Gedanken? Wir lesen jede Nachricht.",
+    "kind": {
+      "bug": "Etwas funktioniert nicht",
+      "content": "Beitrag melden",
+      "feedback": "Nur ein Gedanke"
+    },
+    "prompt": {
+      "bug": "Was ist schiefgelaufen?",
+      "content": "Was hast du gesehen, und wo?",
+      "feedback": "Erzähl mal"
+    },
+    "messagePlaceholder": "Erzähl uns so viel du kannst…",
+    "emailLabel": "Möchtest du eine Antwort? Lass deine E-Mail da",
+    "emailPlaceholder": "du@beispiel.de",
+    "includes": "Das schicken wir mit: {{details}}",
+    "includesNote": "Deine Kreise und Fotos bleiben auf deinem Handy.",
+    "send": "Senden",
+    "sending": "Wird gesendet…",
+    "sent": "Angekommen, danke",
+    "failed": "Das hat nicht geklappt",
+    "failedOffline": "Du bist offline. Versuch es, sobald du wieder Verbindung hast.",
+    "failedTooMany": "Du hast gerade einige geschickt. Versuch es gleich noch mal.",
+    "failedTitle": "Das hat nicht geklappt",
+    "failedMessage": "Versuch es gleich noch mal oder schreib uns an {{email}}",
+    "copyEmail": "E-Mail kopieren"
   },
   "account": {
     "credits": {

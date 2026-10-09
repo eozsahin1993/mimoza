@@ -1,12 +1,14 @@
 package testsupport
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
 
 	"mimoza-relay/internal/app"
 	"mimoza-relay/internal/auth/oidcverify"
+	"mimoza-relay/internal/feedback"
 )
 
 // testRateLimitMaxRequests is deliberately huge — end-to-end router tests
@@ -24,14 +26,18 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 	google = NewFakeOIDCProvider(t, "https://accounts.google.com")
 	apple = NewFakeOIDCProvider(t, "https://appleid.apple.com")
 	mux = app.NewRouter(app.Deps{
-		Accounts:   NewAccountTable(t),
-		Circles:    NewCircleTable(t),
-		Blobs:      NewBlobBucket(t),
-		Auth:       NewAuthStore(t),
-		WriteLimit: NewRateLimitStore(t, "write", testRateLimitMaxRequests, time.Hour),
-		ReadLimit:  NewRateLimitStore(t, "read", testRateLimitMaxRequests, time.Hour),
-		Google:     oidcverify.New(google.Issuer, google.JWKSURL, []string{TestGoogleClientID}),
-		Apple:      oidcverify.New(apple.Issuer, apple.JWKSURL, []string{TestAppleClientID}),
+		Accounts:      NewAccountTable(t),
+		Circles:       NewCircleTable(t),
+		Blobs:         NewBlobBucket(t),
+		Auth:          NewAuthStore(t),
+		WriteLimit:    NewRateLimitStore(t, "write", testRateLimitMaxRequests, time.Hour),
+		ReadLimit:     NewRateLimitStore(t, "read", testRateLimitMaxRequests, time.Hour),
+		FeedbackLimit: NewRateLimitStore(t, "feedback", testRateLimitMaxRequests, time.Hour),
+		// Delivered nowhere: the end-to-end tests cover the route, the
+		// ses package covers the email.
+		FeedbackNotify: feedback.NotifierFunc(func(context.Context, feedback.Report) error { return nil }),
+		Google:         oidcverify.New(google.Issuer, google.JWKSURL, []string{TestGoogleClientID}),
+		Apple:          oidcverify.New(apple.Issuer, apple.JWKSURL, []string{TestAppleClientID}),
 	})
 	return mux, google, apple
 }

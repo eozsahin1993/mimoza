@@ -122,6 +122,15 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     ]
   }
 
+  # Feedback from the app is emailed as the support domain — see
+  # internal/feedback/ses and modules/email. Scoped to that one identity,
+  # so a compromised relay can send as nothing else.
+  statement {
+    sid       = "FeedbackEmail"
+    actions   = ["ses:SendEmail"]
+    resources = [var.feedback_identity_arn]
+  }
+
   # Where the blob CDN is, written by modules/cdn because it knows and the
   # Lambda can't be told without a dependency cycle. Absent until blobs
   # move to CloudFront, which the relay treats as "keep presigning S3".

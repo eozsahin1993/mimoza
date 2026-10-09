@@ -109,6 +109,18 @@ through the `lookup` row. Sign-in is `POST /auth/google` or
 token of the relay's own that every other route requires;
 `POST /auth/logout` ends one.
 
+## Feedback
+
+`POST /feedback` from the app's feedback screen: a kind (bug, content
+report, general feedback), the message, an optional reply address, and what the app
+knows about itself. The app shows that context before sending; none of
+it names a circle or a post. The one thing passing through the relay
+that a person wrote for us to read, and it is not stored: the relay
+emails it to the support inbox through SES, with the account id in the
+body, and answers 502 when the send fails so the person is told to try
+again or write to us directly. On its own small
+rate budget, since every accepted report is an email.
+
 ## Circles table
 
 | pk | sk | attributes |

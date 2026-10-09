@@ -1,11 +1,8 @@
-import * as Application from 'expo-application';
-import * as Clipboard from 'expo-clipboard';
-import Constants from 'expo-constants';
 import { useLocales } from 'expo-localization';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -28,33 +25,8 @@ import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 import { bytesToDataUri } from '@/core/photo/image';
+import { appVersion, buildNumbers } from '@/core/services/build-info';
 import type { ThemePreference } from '@/core/services/settings';
-
-/** From app.json's "version" — Constants.expoConfig is only ever missing in a context this screen doesn't run in. */
-const appVersion = Constants.expoConfig?.version ?? 'Unknown';
-
-/** Apple's Guideline 1.2 (user-generated content) wants a way to report content and reach us — this is that route. */
-const SUPPORT_EMAIL = 'hello@joinmimoza.com';
-const REPORT_PROBLEM_URL = `mailto:${SUPPORT_EMAIL}`;
-
-/**
- * What someone is actually running, as two numbers they can read out: the
- * build that shipped the native app, and the CI run that published the
- * JavaScript on top of it. They differ once an update lands, which is the
- * only way to tell an updated app from a fresh install of the same build.
- *
- * The build number comes from the binary rather than the config — after an
- * update the config is the one the update was exported with. An update is
- * fetched on one launch and run on the next, so the second number changes
- * only after the app is fully quit and reopened, not merely foregrounded.
- */
-function buildLabel(): string {
-  const native = Application.nativeBuildVersion;
-  const jsBuild = (Constants.expoConfig?.extra as { jsBuild?: unknown } | undefined)?.jsBuild;
-  const js = typeof jsBuild === 'string' ? jsBuild : null;
-  if (!native) return '';
-  return js && js !== native ? ` (${native}.${js})` : ` (${native})`;
-}
 
 export default function AccountScreen() {
   const { t } = useTranslation();
@@ -131,10 +103,10 @@ export default function AccountScreen() {
           onPress: () => setPrivacyVisible(true),
         },
         {
-          label: t('settings.reportProblem'),
-          description: t('settings.reportProblemDescription'),
+          label: t('settings.feedback'),
+          description: t('settings.feedbackDescription'),
           control: { kind: 'navigate' },
-          onPress: handleReportProblem,
+          onPress: () => router.push('/account/feedback'),
         },
         {
           label: t('settings.credits'),
@@ -203,15 +175,6 @@ export default function AccountScreen() {
         },
       },
     ]);
-  }
-
-  function handleReportProblem() {
-    Linking.openURL(REPORT_PROBLEM_URL).catch(() => {
-      showAlert(t('settings.reportProblemFailedTitle'), t('settings.reportProblemFailedMessage', { email: SUPPORT_EMAIL }), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('settings.copyEmail'), onPress: () => Clipboard.setStringAsync(SUPPORT_EMAIL) },
-      ]);
-    });
   }
 
   function handleSignOut() {
@@ -314,7 +277,8 @@ export default function AccountScreen() {
 
           <View style={styles.version}>
             <ThemedText type="labelSmall" themeColor="faint">
-              v{appVersion}{buildLabel()}
+              v{appVersion}
+              {buildNumbers() ? ` (${buildNumbers()})` : ''}
             </ThemedText>
           </View>
 

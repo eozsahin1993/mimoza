@@ -16,12 +16,22 @@ module "storage" {
   point_in_time_recovery = true
 }
 
+# Feedback from the app is emailed as the support domain, which is the
+# same for every environment: the subject line says which one sent.
+module "email" {
+  source = "../../modules/email"
+  domain = "joinmimoza.com"
+  inbox  = "hello@joinmimoza.com"
+}
+
 module "lambda" {
   source      = "../../modules/lambda"
   name_prefix = local.name_prefix
   aws_region  = local.aws_region
   binary_path = "${path.root}/../../build/bootstrap"
   storage     = module.storage
+
+  feedback_identity_arn = module.email.identity_arn
 
   # Permanent, not pending: locking the URL makes Lambda demand a body hash
   # on every write, and only the app is in a position to add it.
@@ -35,6 +45,8 @@ module "lambda" {
     RATE_LIMIT_WRITE_MAX_REQUESTS = "500"
     RATE_LIMIT_READ_MAX_REQUESTS  = "2000"
     RATE_LIMIT_PUSH_MAX_REQUESTS  = "500"
+    # Every accepted report is an email to the inbox.
+    RATE_LIMIT_FEEDBACK_MAX_REQUESTS = "5"
     RATE_LIMIT_WINDOW_MINUTES     = "10"
   }
   # -1 leaves it unset, which a new account needs: the default limit is 10

@@ -65,6 +65,7 @@ every member of a circle.
 | `<prefix>-rate-limit` | Per-account request budgets. |
 | `<prefix>-blobs` (S3) | Photo and cover ciphertext, plus plain profile picture bytes under `account/`. Glacier IR after 90 days. |
 | SSM `/<prefix>/*` | Settings, and the four SecureString credentials. |
+| SES, `joinmimoza.com` identity | Emails each feedback report from the app to the support inbox. Nothing is kept on this side. Sandbox on purpose: both addresses are ours, so no production access request. `modules/email`; the DKIM CNAMEs come out with the other DNS records. |
 | Firebase, one project per env | Outside AWS: push (FCM), crash reports and usage analytics from the app. Route patterns and three parameterless events — no ids, no content; see `RELAY_DESIGN.md`, *Telemetry*. |
 
 Every AWS name derives from `RESOURCE_PREFIX` on both sides —

@@ -7,6 +7,7 @@ jest.mock('@/core/services/keystore/auth-token', () => ({
   deleteAuthToken: async () => undefined,
 }));
 
+import { sendFeedback } from '@/features/account/services/feedback-relay';
 import { createCircle, leaveCircle, patchMembership, removeMember, renameCircle, rewrapKeys, setCover } from '@/features/circle/services/circle-relay';
 import {
   approveRequest,
@@ -112,6 +113,18 @@ describe('what the client sends is what the relay reads', () => {
       () => addComment('c1', 'p1', { commentId: 'k1', keyVersion: 1, ciphertext: 'x', parentCommentId: 'k0' }),
       'internal/circles/comments/add.go',
       'addRequest',
+    ],
+    [
+      'sending feedback',
+      () =>
+        sendFeedback({
+          kind: 'bug',
+          message: 'x',
+          email: '',
+          context: { appVersion: '1', build: '1', platform: 'ios', osVersion: '1', device: 'd', language: 'en', environment: 'staging' },
+        }),
+      'internal/feedback/submit/submit.go',
+      'submitRequest',
     ],
     [
       'reacting',

@@ -29,8 +29,8 @@
     "privacyDescription": "Qué significa aquí el cifrado de extremo a extremo",
     "about": "Acerca de",
     "credits": "Créditos",
-    "reportProblem": "Reportar un problema",
-    "reportProblemDescription": "Escríbenos sobre contenido o cualquier otro problema",
+    "feedback": "Enviar comentarios",
+    "feedbackDescription": "Algo que no funciona, una publicación que reportar o algo que contarnos",
     "account": "Cuenta",
     "signOut": "Cerrar sesión",
     "signOutDescription": "Tus círculos y fotos se quedan en este dispositivo",
@@ -38,9 +38,6 @@
     "signOutTitle": "¿Cerrar sesión?",
     "signOutMessage": "Tus círculos y fotos se quedan en este dispositivo. Al volver a iniciar sesión, sigues justo donde lo dejaste.",
     "signOutConfirm": "Cerrar sesión",
-    "reportProblemFailedTitle": "No hay ninguna app de correo para abrir",
-    "reportProblemFailedMessage": "Envíanos tus reportes o inquietudes a {{email}}",
-    "copyEmail": "Copiar",
     "deleteAccount": "Eliminar cuenta",
     "deleteAccountDescription": "Borra todo lo que has publicado, en todas partes, y después elimina tu cuenta",
     "deleteTitle": "¿Eliminar tu cuenta?",
@@ -54,6 +51,34 @@
       "all": "Fotos, comentarios y reacciones",
       "none": "Desactivado"
     }
+  },
+  "feedback": {
+    "title": "Enviar comentarios",
+    "intro": "¿Encontraste un error, viste algo que no debería estar aquí o simplemente tienes algo que decirnos? Leemos todos los mensajes.",
+    "kind": {
+      "bug": "Algo no funciona",
+      "content": "Reportar una publicación",
+      "feedback": "Tengo algo que decir"
+    },
+    "prompt": {
+      "bug": "¿Qué salió mal?",
+      "content": "¿Qué viste y dónde?",
+      "feedback": "Cuéntanos"
+    },
+    "messagePlaceholder": "Cuéntanos todo lo que puedas…",
+    "emailLabel": "¿Quieres respuesta? Deja tu correo",
+    "emailPlaceholder": "tu@ejemplo.com",
+    "includes": "Esto va junto con tu mensaje: {{details}}",
+    "includesNote": "Tus círculos y fotos se quedan en tu teléfono.",
+    "send": "Enviar",
+    "sending": "Enviando…",
+    "sent": "Recibido, ¡gracias!",
+    "failed": "No se pudo enviar",
+    "failedOffline": "Estás sin conexión. Inténtalo cuando vuelvas a tener internet.",
+    "failedTooMany": "Has enviado varios seguidos. Inténtalo de nuevo en un rato.",
+    "failedTitle": "No se pudo enviar",
+    "failedMessage": "Inténtalo otra vez en un momento o escríbenos a {{email}}",
+    "copyEmail": "Copiar correo"
   },
   "account": {
     "credits": {

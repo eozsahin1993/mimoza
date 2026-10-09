@@ -29,8 +29,8 @@
     "privacyDescription": "Ce que « chiffré de bout en bout » veut dire ici",
     "about": "À propos",
     "credits": "Crédits",
-    "reportProblem": "Signaler un problème",
-    "reportProblemDescription": "Écrivez-nous à propos d'un contenu ou de tout autre souci",
+    "feedback": "Envoyer un retour",
+    "feedbackDescription": "Un bug, une publication à signaler ou une remarque",
     "account": "Compte",
     "signOut": "Se déconnecter",
     "signOutDescription": "Tes cercles et tes photos restent sur cet appareil",
@@ -38,9 +38,6 @@
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Tes cercles et tes photos restent sur cet appareil. En te reconnectant, tu reprends là où tu en étais.",
     "signOutConfirm": "Se déconnecter",
-    "reportProblemFailedTitle": "Aucune appli mail à ouvrir",
-    "reportProblemFailedMessage": "Envoie tes signalements ou préoccupations à {{email}}",
-    "copyEmail": "Copier",
     "deleteAccount": "Supprimer le compte",
     "deleteAccountDescription": "Efface tout ce que tu as publié, partout, puis supprime ton compte",
     "deleteTitle": "Supprimer ton compte ?",
@@ -54,6 +51,34 @@
       "all": "Photos, commentaires et réactions",
       "none": "Désactivé"
     }
+  },
+  "feedback": {
+    "title": "Envoyer un retour",
+    "intro": "Un bug, un contenu qui ne devrait pas être là, ou simplement une remarque ? On lit chaque message.",
+    "kind": {
+      "bug": "Quelque chose ne marche pas",
+      "content": "Signaler une publication",
+      "feedback": "Une remarque"
+    },
+    "prompt": {
+      "bug": "Qu'est-ce qui a cloché ?",
+      "content": "Qu'as-tu vu, et où ?",
+      "feedback": "Dis-nous tout"
+    },
+    "messagePlaceholder": "Raconte-nous le plus de détails possible…",
+    "emailLabel": "Tu veux une réponse ? Laisse ton e-mail",
+    "emailPlaceholder": "toi@exemple.com",
+    "includes": "Envoyé avec ton message : {{details}}",
+    "includesNote": "Tes cercles et tes photos restent sur ton téléphone.",
+    "send": "Envoyer",
+    "sending": "Envoi…",
+    "sent": "Bien reçu, merci",
+    "failed": "Ça n'est pas parti",
+    "failedOffline": "Tu es hors ligne. Réessaie une fois connecté.",
+    "failedTooMany": "Tu en as envoyé plusieurs d'affilée. Réessaie dans un moment.",
+    "failedTitle": "Ça n'est pas parti",
+    "failedMessage": "Réessaie dans un instant, ou écris-nous à {{email}}",
+    "copyEmail": "Copier l'e-mail"
   },
   "account": {
     "credits": {

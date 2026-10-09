@@ -12,12 +12,14 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	awssesv2 "github.com/aws/aws-sdk-go-v2/service/sesv2"
 
 	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/oidcverify"
@@ -31,6 +33,8 @@ import (
 	"mimoza-relay/internal/blobs/cdn"
 	blobstore "mimoza-relay/internal/blobs/s3"
 	circlesdynamo "mimoza-relay/internal/circles/dynamo"
+	"mimoza-relay/internal/feedback"
+	feedbackses "mimoza-relay/internal/feedback/ses"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
 )
 
@@ -111,14 +115,27 @@ func AWSDeps(cfg config.Config, awsCfg aws.Config) Deps {
 			"reason", "apple_revocation_not_configured")
 	}
 
+	// Feedback is the one thing the relay emails. Nothing to configure:
+	// the role sends as the verified domain, and an unverified one fails
+	// the send, which the route answers with 502.
+	feedbackNotify := &feedbackses.Sender{
+		Client: awssesv2.NewFromConfig(awsCfg),
+		From:   feedback.SenderAddress,
+		To:     feedback.SupportInbox,
+		// "staging", not "mimoza-staging": the subject line reads it.
+		Environment: strings.TrimPrefix(cfg.Prefix, "mimoza-"),
+	}
+
 	return Deps{
 		Accounts:        accountsdynamo.NewTable(dynamo(), cfg.AccountsTableName),
+		FeedbackNotify:  feedbackNotify,
 		Circles:         circlesdynamo.NewTable(dynamo(), cfg.CirclesTableName),
 		InviteRetention: time.Duration(cfg.InviteRetentionDays) * 24 * time.Hour,
 		Blobs:           blob,
 		Auth:            authdynamodb.New(dynamo(), cfg.SessionsTableName),
 		WriteLimit:      limit("write", cfg.RateLimitWriteMaxRequests),
 		ReadLimit:       limit("read", cfg.RateLimitReadMaxRequests),
+		FeedbackLimit:   limit("feedback", cfg.RateLimitFeedbackMaxRequests),
 		Google:          oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb)),
 		Apple:           oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS)),
 		AppleID:         appleID,

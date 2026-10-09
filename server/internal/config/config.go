@@ -17,6 +17,8 @@ const DefaultInviteRetentionDays = 7
 // derived from its prefix. A rename in provision/modules/storage must
 // happen in ResourcesFor too.
 type Resources struct {
+	// Prefix is what every name below derives from: mimoza-<env>.
+	Prefix             string
 	BucketName         string
 	SessionsTableName  string
 	AccountsTableName  string
@@ -27,6 +29,7 @@ type Resources struct {
 // ResourcesFor derives every resource name from one prefix.
 func ResourcesFor(prefix string) Resources {
 	return Resources{
+		Prefix:             prefix,
 		BucketName:         prefix + "-blobs",
 		SessionsTableName:  prefix + "-sessions",
 		AccountsTableName:  prefix + "-accounts",
@@ -63,7 +66,11 @@ type Config struct {
 	// guesses, env-tunable so they can change without a redeploy.
 	RateLimitWriteMaxRequests int64
 	RateLimitReadMaxRequests  int64
-	// RateLimitWindowMinutes is the fixed window both budgets reset on.
+	// RateLimitFeedbackMaxRequests is a third, much smaller budget: each
+	// accepted report becomes an email, and the write budget would let one
+	// account send hundreds in a window.
+	RateLimitFeedbackMaxRequests int64
+	// RateLimitWindowMinutes is the fixed window every budget resets on.
 	RateLimitWindowMinutes int64
 	// GoogleClientIDIOS/Android/Web are the accepted "aud" values for
 	// Google Sign-In, one per platform so a missing one is an empty field
@@ -117,34 +124,35 @@ type Config struct {
 func Load() Config {
 	prefix := mustEnv("RESOURCE_PREFIX")
 	return Config{
-		Resources:                  ResourcesFor(prefix),
-		FCMCredentialParameter:     "/" + prefix + "/fcm-service-account",
-		FCMCredentialFile:          os.Getenv("FCM_CREDENTIAL_FILE"),
-		APNSAuthKeyParameter:       "/" + prefix + "/apns-auth-key",
-		APNSAuthKeyFile:            os.Getenv("APNS_AUTH_KEY_FILE"),
-		APNSKeyID:                  envOr("APNS_KEY_ID", ""),
-		APNSTeamID:                 envOr("APNS_TEAM_ID", ""),
-		APNSTopic:                  envOr("APNS_TOPIC", ""),
-		APNSProduction:             envOr("APNS_PRODUCTION", "false") == "true",
-		RateLimitWriteMaxRequests:  intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
-		RateLimitReadMaxRequests:   intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
-		RateLimitWindowMinutes:     intEnv("RATE_LIMIT_WINDOW_MINUTES", 10),
-		GoogleClientIDIOS:          envOr("GOOGLE_CLIENT_ID_IOS", ""),
-		GoogleClientIDAndroid:      envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
-		GoogleClientIDWeb:          envOr("GOOGLE_CLIENT_ID_WEB", ""),
-		AppleClientIDIOS:           envOr("APPLE_CLIENT_ID_IOS", ""),
-		AppleSignInKeyParameter:    "/" + prefix + "/apple-signin-key",
-		AppleSignInKeyFile:         os.Getenv("APPLE_SIGNIN_KEY_FILE"),
-		AppleSignInKeyID:           envOr("APPLE_SIGNIN_KEY_ID", ""),
-		AppleSignInTeamID:          envOr("APPLE_SIGNIN_TEAM_ID", ""),
-		BlobCDNSettingsParameter:   "/" + prefix + "/cdn",
-		BlobCDNSigningKeyParameter: "/" + prefix + "/cloudfront-signing-key",
-		MaxBlobSize:                intEnv("MAX_BLOB_SIZE_BYTES", 0),
-		InviteRetentionDays:        positiveIntEnv("INVITE_RETENTION_DAYS", DefaultInviteRetentionDays),
-		LogLevel:                   envOr("LOG_LEVEL", "info"),
-		Port:                       envOr("PORT", "8080"),
-		S3ForcePathStyle:           envOr("S3_FORCE_PATH_STYLE", "false") == "true",
-		AWSEndpointURL:             os.Getenv("AWS_ENDPOINT_URL"),
+		Resources:                    ResourcesFor(prefix),
+		FCMCredentialParameter:       "/" + prefix + "/fcm-service-account",
+		FCMCredentialFile:            os.Getenv("FCM_CREDENTIAL_FILE"),
+		APNSAuthKeyParameter:         "/" + prefix + "/apns-auth-key",
+		APNSAuthKeyFile:              os.Getenv("APNS_AUTH_KEY_FILE"),
+		APNSKeyID:                    envOr("APNS_KEY_ID", ""),
+		APNSTeamID:                   envOr("APNS_TEAM_ID", ""),
+		APNSTopic:                    envOr("APNS_TOPIC", ""),
+		APNSProduction:               envOr("APNS_PRODUCTION", "false") == "true",
+		RateLimitWriteMaxRequests:    intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
+		RateLimitReadMaxRequests:     intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
+		RateLimitFeedbackMaxRequests: intEnv("RATE_LIMIT_FEEDBACK_MAX_REQUESTS", 5),
+		RateLimitWindowMinutes:       intEnv("RATE_LIMIT_WINDOW_MINUTES", 10),
+		GoogleClientIDIOS:            envOr("GOOGLE_CLIENT_ID_IOS", ""),
+		GoogleClientIDAndroid:        envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
+		GoogleClientIDWeb:            envOr("GOOGLE_CLIENT_ID_WEB", ""),
+		AppleClientIDIOS:             envOr("APPLE_CLIENT_ID_IOS", ""),
+		AppleSignInKeyParameter:      "/" + prefix + "/apple-signin-key",
+		AppleSignInKeyFile:           os.Getenv("APPLE_SIGNIN_KEY_FILE"),
+		AppleSignInKeyID:             envOr("APPLE_SIGNIN_KEY_ID", ""),
+		AppleSignInTeamID:            envOr("APPLE_SIGNIN_TEAM_ID", ""),
+		BlobCDNSettingsParameter:     "/" + prefix + "/cdn",
+		BlobCDNSigningKeyParameter:   "/" + prefix + "/cloudfront-signing-key",
+		MaxBlobSize:                  intEnv("MAX_BLOB_SIZE_BYTES", 0),
+		InviteRetentionDays:          positiveIntEnv("INVITE_RETENTION_DAYS", DefaultInviteRetentionDays),
+		LogLevel:                     envOr("LOG_LEVEL", "info"),
+		Port:                         envOr("PORT", "8080"),
+		S3ForcePathStyle:             envOr("S3_FORCE_PATH_STYLE", "false") == "true",
+		AWSEndpointURL:               os.Getenv("AWS_ENDPOINT_URL"),
 	}
 }
 

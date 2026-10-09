@@ -29,8 +29,8 @@
     "privacyDescription": "Uçtan uca şifreleme burada ne demek",
     "about": "Hakkında",
     "credits": "Emeği geçenler",
-    "reportProblem": "Bir sorunu bildir",
-    "reportProblemDescription": "İçerikle ilgili ya da başka bir sorun için bize e-posta at",
+    "feedback": "Geri bildirim gönder",
+    "feedbackDescription": "Bozuk bir şey, bildirmek istediğin bir paylaşım ya da aklındaki bir şey",
     "account": "Hesap",
     "signOut": "Çıkış yap",
     "signOutDescription": "Çevrelerin ve fotoğrafların bu cihazda kalır",
@@ -38,9 +38,6 @@
     "signOutTitle": "Çıkış yapılsın mı?",
     "signOutMessage": "Çevrelerin ve fotoğrafların bu cihazda kalır. Tekrar giriş yaptığında kaldığın yerden devam edebilirsin.",
     "signOutConfirm": "Çıkış yap",
-    "reportProblemFailedTitle": "Açılacak bir e-posta uygulaması yok",
-    "reportProblemFailedMessage": "Bildirmek istediğin sorunları veya endişeleri {{email}} adresine gönderebilirsin",
-    "copyEmail": "Kopyala",
     "deleteAccount": "Hesabı sil",
     "deleteAccountDescription": "Paylaştığın her şeyi her yerden kaldırır ve hesabını siler",
     "deleteTitle": "Hesabını silmek istediğine emin misin?",
@@ -54,6 +51,34 @@
       "all": "Fotoğraflar, yorumlar ve tepkiler",
       "none": "Kapalı"
     }
+  },
+  "feedback": {
+    "title": "Geri bildirim gönder",
+    "intro": "Bir hata mı buldun, olmaması gereken bir şey mi gördün, ya da aklında bir şey mi var? Her mesajı okuyoruz.",
+    "kind": {
+      "bug": "Bir şey çalışmıyor",
+      "content": "Bir paylaşımı bildir",
+      "feedback": "Aklımda bir şey var"
+    },
+    "prompt": {
+      "bug": "Ne ters gitti?",
+      "content": "Ne gördün, nerede gördün?",
+      "feedback": "Anlat bakalım"
+    },
+    "messagePlaceholder": "Elinden geldiğince anlat…",
+    "emailLabel": "Yanıt istersen e-postanı bırak",
+    "emailPlaceholder": "sen@ornek.com",
+    "includes": "Mesajınla birlikte şunlar gidecek: {{details}}",
+    "includesNote": "Çevrelerin ve fotoğrafların telefonunda kalır.",
+    "send": "Gönder",
+    "sending": "Gönderiliyor…",
+    "sent": "Aldık, teşekkürler",
+    "failed": "Gönderilemedi",
+    "failedOffline": "Çevrimdışısın. İnternete bağlanınca tekrar dene.",
+    "failedTooMany": "Art arda epey gönderdin, biraz sonra tekrar dene.",
+    "failedTitle": "Gönderilemedi",
+    "failedMessage": "Birazdan bir daha dene ya da bize {{email}} adresinden yaz",
+    "copyEmail": "E-postayı kopyala"
   },
   "account": {
     "credits": {
