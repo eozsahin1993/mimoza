@@ -44,7 +44,9 @@ const REPORT_PROBLEM_URL = `mailto:${SUPPORT_EMAIL}`;
  * only way to tell an updated app from a fresh install of the same build.
  *
  * The build number comes from the binary rather than the config — after an
- * update the config is the one the update was exported with.
+ * update the config is the one the update was exported with. An update is
+ * fetched on one launch and run on the next, so the second number changes
+ * only after the app is fully quit and reopened, not merely foregrounded.
  */
 function buildLabel(): string {
   const native = Application.nativeBuildVersion;
