@@ -14,6 +14,7 @@ import Camera from 'lucide-react-native/icons/camera';
 import CameraOff from 'lucide-react-native/icons/camera-off';
 import Check from 'lucide-react-native/icons/check';
 import Clock from 'lucide-react-native/icons/clock';
+import Flag from 'lucide-react-native/icons/flag';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleAlert from 'lucide-react-native/icons/circle-alert';
 import CloudDownload from 'lucide-react-native/icons/cloud-download';
@@ -274,6 +275,8 @@ export const Icons = {
   removeMember: UserX,
   /** Deletes a photo from the circle for everyone — not "remove me from it". */
   deletePost: Trash,
+  /** Tells us about a photo that should not be here. */
+  report: Flag,
   /** A photo whose entry has landed but whose bytes haven't yet. */
   photoArriving: CloudDownload,
   /** A photo whose download has failed enough times to stop looking temporary. Also what a failed message is marked with — see `SnackbarHost`. */

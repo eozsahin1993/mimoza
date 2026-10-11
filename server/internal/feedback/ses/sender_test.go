@@ -33,6 +33,7 @@ func sampleReport() feedback.Report {
 		Context: feedback.Context{
 			AppVersion: "1.0.0", Build: "113.114", Platform: "iOS", OSVersion: "26.0",
 			Device: "iPhone 15", Language: "en", Environment: "staging",
+			CircleID: "circle-1", PostID: "post-9",
 		},
 		CreatedAt: time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC),
 	}
@@ -60,7 +61,7 @@ func TestNotify_SendsTheReportAsSESExpects(t *testing.T) {
 		t.Errorf("subject = %q", subject)
 	}
 	body := aws.ToString(in.Content.Simple.Body.Text.Data)
-	for _, want := range []string{"Second line.", "Reply to: me@example.com", "App: 1.0.0 (113.114)", "Device: iPhone 15, iOS 26.0", "Account: acct-1", "Report: abc123 at 2026-10-09T12:00:00Z"} {
+	for _, want := range []string{"Second line.", "Reply to: me@example.com", "App: 1.0.0 (113.114)", "Device: iPhone 15, iOS 26.0", "Post: post-9 in circle circle-1", "Account: acct-1", "Report: abc123 at 2026-10-09T12:00:00Z"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body is missing %q:\n%s", want, body)
 		}

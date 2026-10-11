@@ -39,7 +39,9 @@ func (k Kind) Valid() bool {
 	return false
 }
 
-// Context is what the app knows about itself when the report is sent.
+// Context is what the app knows about itself when the report is sent,
+// shown to the person before sending. Only a report opened from a post
+// names a circle and a post, so the thing reported can be found.
 type Context struct {
 	AppVersion string `json:"appVersion"`
 	// Build is the app's own label: the native build, and the CI run that
@@ -50,6 +52,10 @@ type Context struct {
 	Device      string `json:"device"`
 	Language    string `json:"language"`
 	Environment string `json:"environment"`
+	// CircleID and PostID are set when the report was opened from a post,
+	// and empty otherwise.
+	CircleID string `json:"circleId"`
+	PostID   string `json:"postId"`
 }
 
 // Report is one message from one account.

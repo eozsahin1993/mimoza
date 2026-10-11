@@ -12,6 +12,7 @@ import (
 	"mimoza-relay/internal/auth"
 	"mimoza-relay/internal/feedback"
 	"mimoza-relay/internal/util/httputil"
+	"mimoza-relay/internal/util/ids"
 )
 
 // Limits on what one report may carry. The message cap is generous for a
@@ -64,6 +65,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !validContext(body.Context) {
 		httputil.WriteError(w, http.StatusBadRequest, "context fields are too long")
+		return
+	}
+	// Both or neither: a post is only findable inside its circle.
+	if (body.Context.CircleID == "") != (body.Context.PostID == "") ||
+		(body.Context.PostID != "" && (!ids.Valid(body.Context.CircleID) || !ids.Valid(body.Context.PostID))) {
+		httputil.WriteError(w, http.StatusBadRequest, "circleId and postId must be given together, as ids")
 		return
 	}
 

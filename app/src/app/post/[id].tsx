@@ -241,6 +241,12 @@ export default function PostDetailsScreen() {
    * the same weight `removeMember` carries on the details screen. Leaves
    * the screen on success: what it was showing no longer exists.
    */
+  function handleReport() {
+    if (!circleId || !postId) return;
+    setShowActions(false);
+    router.push({ pathname: '/account/feedback', params: { kind: 'content', circleId, postId } });
+  }
+
   function handleDelete() {
     if (!circleId || !postId) return;
 
@@ -283,16 +289,18 @@ export default function PostDetailsScreen() {
             actions={
               // Both are about the post as a whole, so they sit in the
               // header rather than among the chips, which are each about
-              // one emoji. Both carry the same rule — the photo's author
-              // or an admin — so they appear and disappear together.
-              canEditPost && post && !readOnly ? (
+              // one emoji. The album toggle is the author's or an admin's;
+              // the menu is everyone's, since anyone may report a photo.
+              post && !readOnly ? (
                 <>
-                  <HeaderIconButton
-                    icon={Icons.inAlbum}
-                    active={post.inAlbum}
-                    accessibilityLabel={post.inAlbum ? t('post.removeFromAlbum') : t('post.addToAlbum')}
-                    onPress={handleToggleAlbum}
-                  />
+                  {canEditPost ? (
+                    <HeaderIconButton
+                      icon={Icons.inAlbum}
+                      active={post.inAlbum}
+                      accessibilityLabel={post.inAlbum ? t('post.removeFromAlbum') : t('post.addToAlbum')}
+                      onPress={handleToggleAlbum}
+                    />
+                  ) : null}
                   <HeaderIconButton
                     icon={Icons.more}
                     accessibilityLabel={t('post.details.more')}
@@ -447,13 +455,28 @@ export default function PostDetailsScreen() {
         avatarUri={photoUri}
         avatarRadius={Radius.input}
         options={[
-          {
-            label: t('post.details.deleteThisPhoto'),
-            description: ownPost ? t('post.details.deleteBecauseYours') : t('post.details.deleteBecauseAdmin'),
-            icon: Icons.deletePost,
-            destructive: true,
-            onPress: handleDelete,
-          },
+          // Someone else's photo can be reported; your own can only be deleted.
+          ...(ownPost
+            ? []
+            : [
+                {
+                  label: t('post.details.reportThisPhoto'),
+                  description: t('post.details.reportDescription'),
+                  icon: Icons.report,
+                  onPress: handleReport,
+                },
+              ]),
+          ...(canEditPost
+            ? [
+                {
+                  label: t('post.details.deleteThisPhoto'),
+                  description: ownPost ? t('post.details.deleteBecauseYours') : t('post.details.deleteBecauseAdmin'),
+                  icon: Icons.deletePost,
+                  destructive: true,
+                  onPress: handleDelete,
+                },
+              ]
+            : []),
         ]}
       />
     </ThemedView>

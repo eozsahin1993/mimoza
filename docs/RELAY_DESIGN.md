@@ -112,9 +112,10 @@ token of the relay's own that every other route requires;
 ## Feedback
 
 `POST /feedback` from the app's feedback screen: a kind (bug, content
-report, general feedback), the message, an optional reply address, and what the app
-knows about itself. The app shows that context before sending; none of
-it names a circle or a post. The one thing passing through the relay
+report, general feedback), the message, an optional reply address, and
+what the app knows about itself. The app shows that context before
+sending. Only a report opened from a post names a circle and a post, so
+the thing reported can be found. The one thing passing through the relay
 that a person wrote for us to read, and it is not stored: the relay
 emails it to the support inbox through SES, with the account id in the
 body, and answers 502 when the send fails so the person is told to try

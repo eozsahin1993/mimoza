@@ -20,7 +20,7 @@ server_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "Recreating the localstack container..."
 docker rm -f localstack >/dev/null 2>&1 || true
-docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,ssm "$localstack_version" >/dev/null
+docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,ssm,ses "$localstack_version" >/dev/null
 
 echo -n "Waiting for DynamoDB and S3..."
 for _ in $(seq 1 30); do

@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -26,11 +26,18 @@ const FOOTER_CLEARANCE = 110;
 
 const KINDS: FeedbackKind[] = ['bug', 'content', 'feedback'];
 
+/**
+ * Opened from Account with no params, or from a post's menu with the
+ * content kind and the post it is about, which then travels with the
+ * report so the thing reported can be found.
+ */
 export default function FeedbackScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
-  const [kind, setKind] = useState<FeedbackKind>('bug');
+  const params = useLocalSearchParams<{ kind?: string; circleId?: string; postId?: string }>();
+  const about = params.circleId && params.postId ? { circleId: params.circleId, postId: params.postId } : undefined;
+  const [kind, setKind] = useState<FeedbackKind>(KINDS.includes(params.kind as FeedbackKind) ? (params.kind as FeedbackKind) : 'bug');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
@@ -38,13 +45,14 @@ export default function FeedbackScreen() {
 
   // Built once per open: what it says is what gets sent, and both read
   // the same values.
-  const [context] = useState(feedbackContext);
+  const [context] = useState(() => feedbackContext(about));
   const included = [
     `Mimoza ${context.appVersion}${context.build ? ` (${context.build})` : ''}`,
     [context.platform, context.osVersion].filter(Boolean).join(' '),
     context.device,
     context.language,
     context.environment,
+    about ? t('feedback.includesPhoto') : '',
   ]
     .filter(Boolean)
     .join(' · ');

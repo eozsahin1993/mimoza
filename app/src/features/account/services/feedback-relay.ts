@@ -17,8 +17,8 @@ export type FeedbackKind = 'bug' | 'content' | 'feedback';
 /**
  * What the app knows about itself, sent beside the message. Built here
  * rather than on the relay, which sees only a session, and shown on the
- * screen before sending so nothing travels unseen. Nothing in it names a
- * circle or a post.
+ * screen before sending so nothing travels unseen. Only a report opened
+ * from a post names a circle and a post.
  */
 export type FeedbackContext = {
   appVersion: string;
@@ -28,10 +28,17 @@ export type FeedbackContext = {
   device: string;
   language: string;
   environment: string;
+  /** Set when the report was opened from a post, so the thing reported can be found. Ids only, never content. */
+  circleId?: string;
+  postId?: string;
 };
 
-export function feedbackContext(): FeedbackContext {
+/** What a report opened from a post is about. */
+export type FeedbackSubject = { circleId: string; postId: string };
+
+export function feedbackContext(about?: FeedbackSubject): FeedbackContext {
   return {
+    ...(about ?? {}),
     appVersion,
     build: buildNumbers() ?? '',
     // "iOS" rather than "ios": this is read by a person, in the email

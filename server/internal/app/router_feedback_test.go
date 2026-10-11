@@ -40,6 +40,15 @@ func TestEndToEnd_Feedback(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts a report about a post", func(t *testing.T) {
+		body := `{"kind":"content","message":"This should not be here.","context":{"circleId":"circle-1","postId":"post-9"}}`
+		resp := authedRequest(t, http.MethodPost, server.URL+"/v1/feedback", token, body)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("expected 201, got %d", resp.StatusCode)
+		}
+	})
+
 	t.Run("refuses without a session", func(t *testing.T) {
 		resp, err := http.Post(server.URL+"/v1/feedback", "application/json", strings.NewReader(`{"kind":"bug","message":"x"}`))
 		if err != nil {
@@ -52,12 +61,14 @@ func TestEndToEnd_Feedback(t *testing.T) {
 	})
 
 	for name, body := range map[string]string{
-		"not json":        `nope`,
-		"unknown kind":    `{"kind":"rant","message":"x"}`,
-		"empty message":   `{"kind":"bug","message":"   "}`,
-		"message too big": `{"kind":"bug","message":"` + strings.Repeat("a", 4001) + `"}`,
-		"bad email":       `{"kind":"bug","message":"x","email":"not an address"}`,
-		"context too big": `{"kind":"bug","message":"x","context":{"device":"` + strings.Repeat("d", 201) + `"}}`,
+		"not json":            `nope`,
+		"unknown kind":        `{"kind":"rant","message":"x"}`,
+		"empty message":       `{"kind":"bug","message":"   "}`,
+		"message too big":     `{"kind":"bug","message":"` + strings.Repeat("a", 4001) + `"}`,
+		"bad email":           `{"kind":"bug","message":"x","email":"not an address"}`,
+		"context too big":     `{"kind":"bug","message":"x","context":{"device":"` + strings.Repeat("d", 201) + `"}}`,
+		"post without circle": `{"kind":"content","message":"x","context":{"postId":"post-9"}}`,
+		"post id not an id":   `{"kind":"content","message":"x","context":{"circleId":"circle-1","postId":"../etc"}}`,
 	} {
 		t.Run("refuses "+name, func(t *testing.T) {
 			resp := authedRequest(t, http.MethodPost, server.URL+"/v1/feedback", token, body)

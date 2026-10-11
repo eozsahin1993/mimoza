@@ -194,6 +194,16 @@ export function PrivacyPolicy() {
                 track what you write, post, or view.
               </td>
             </tr>
+            <tr>
+              <td>Feedback you send</td>
+              <td>
+                Only if you use "Send feedback" in the app. We receive what you write, the kind of report, your
+                email address if you choose to leave one, the app version, your device model, operating system
+                version and language, and your account identifier. If you report a photo, we also receive the
+                identifiers of that photo and its circle, never the photo itself, which we cannot decrypt. The
+                report is emailed to us and kept in our mailbox; the server does not store it.
+              </td>
+            </tr>
           </tbody>
         </table>
 
@@ -236,7 +246,8 @@ export function PrivacyPolicy() {
               <td>Amazon Web Services</td>
               <td>
                 Hosts the Mimoza server, database and encrypted file storage, and delivers files through its content
-                network. Data is stored in the United States (us-east-1).
+                network. Its email service carries feedback you send from the app to our mailbox. Data is stored in
+                the United States (us-east-1).
               </td>
             </tr>
             <tr>
@@ -325,6 +336,7 @@ export function PrivacyPolicy() {
           <li>Invite codes and join requests expire on their own.</li>
           <li>Session tokens expire after 90 days, or immediately when you sign out.</li>
           <li>Server logs are deleted after 90 days.</li>
+          <li>Feedback you send stays in our mailbox so we can act on it and reply. Ask us and we'll delete it.</li>
           <li>Database backups can hold a copy of deleted records for up to 35 days before they age out. Backups
             are only used to recover from a failure, never to restore something you deleted.
           </li>

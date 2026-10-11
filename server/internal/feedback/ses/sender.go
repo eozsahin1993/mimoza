@@ -84,6 +84,9 @@ func Body(report feedback.Report) string {
 	fmt.Fprintf(&b, "Device: %s, %s %s\n", c.Device, c.Platform, c.OSVersion)
 	fmt.Fprintf(&b, "Language: %s\n", c.Language)
 	fmt.Fprintf(&b, "Environment: %s\n", c.Environment)
+	if c.PostID != "" {
+		fmt.Fprintf(&b, "Post: %s in circle %s\n", c.PostID, c.CircleID)
+	}
 	fmt.Fprintf(&b, "Account: %s\n", report.AccountID)
 	fmt.Fprintf(&b, "Report: %s at %s\n", report.ReportID, report.CreatedAt.UTC().Format(time.RFC3339))
 	return b.String()
