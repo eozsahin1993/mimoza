@@ -14,3 +14,8 @@ output "dkim_records" {
     }
   ]
 }
+
+output "website_sender_name" {
+  description = "The IAM user to mint the website's access key for, or null where none was created."
+  value       = one(aws_iam_user.website_sender[*].name)
+}

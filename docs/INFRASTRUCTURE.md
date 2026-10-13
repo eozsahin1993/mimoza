@@ -407,13 +407,21 @@ tested against a relay set to sandbox.
 
 ### The website
 
-`landing/` is a Vite site plus one Cloudflare Pages Function
-(`functions/api/subscribe.ts`, the waitlist, which is the only place
-`RESEND_API_KEY` is used). `Deploy Landing` builds and runs
+`landing/` is a Vite site plus two Cloudflare Pages Functions:
+`functions/api/subscribe.ts`, the waitlist, which is the only place
+`RESEND_API_KEY` is used, and `functions/api/contact.ts`, the support
+form, which emails the support inbox through SES as the same domain the
+relay sends feedback from. A Pages Function has no IAM role, so it signs
+each request with the key of `website-mailer`, an IAM user
+`modules/email` creates in the production account with `ses:SendEmail`
+on that one identity. The key is minted by hand (`aws iam
+create-access-key --user-name website-mailer`) and set on the Pages
+project as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, so it is in
+neither state nor the repo. `Deploy Landing` builds and runs
 `wrangler pages deploy` on every push touching `landing/**`. The site is
-on Pages rather than GitHub Pages only because of that function; once
+on Pages rather than GitHub Pages only because of those functions; once
 the app is live and the waitlist goes (`src/config.ts`, `APP_IS_LIVE`),
-a plain `actions/deploy-pages` would do. Pages serves `index.html` for
+the support form alone still needs one. Pages serves `index.html` for
 any path it has no file for, so an unbuilt route 200s with the homepage —
 `/privacy/` is a second Vite input, not a client route, for exactly that
 reason.

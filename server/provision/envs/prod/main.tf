@@ -22,6 +22,8 @@ module "email" {
   source = "../../modules/email"
   domain = "joinmimoza.com"
   inbox  = "hello@joinmimoza.com"
+  # The website's support form sends from here too — see landing/.
+  website_sender = true
 }
 
 module "lambda" {
