@@ -4,7 +4,7 @@ Everything between here and both stores. Grouped by what blocks what, not
 by store — several items gate others, and two of them cost calendar time
 rather than work.
 
-Status as of 2026-10-07. Tick items as they land; add a date when you do,
+Status as of 2026-10-13. Tick items as they land; add a date when you do,
 so a stale "done" is visible.
 
 ## Start these first — they cost waiting, not doing
@@ -16,7 +16,10 @@ so a stale "done" is visible.
       carry over; a free developer@rarekiwisoftware.com Apple ID exists
       but holds nothing — invite it as Admin after the conversion. Expect
       a new Program License Agreement to accept once it lands; TestFlight
-      uploads fail until then.
+      uploads fail until then. No word from Apple as of 2026-10-13;
+      reports in 2026 run weeks to months, and a Developer Support
+      callback request is what unstuck others — ask for one around
+      2026-10-20.
 - [x] **D-U-N-S for RareKiwi Software LLC** — 149977686, confirmed by
       D&B 2026-10-05, on Northwest's address. Apple copies this address
       to EU product pages for traders, so it must never be a home address.
@@ -24,18 +27,21 @@ so a stale "done" is visible.
       (nothing was ever created on it). A new organization account was
       registered 2026-10-06 under developer@rarekiwisoftware.com, website
       verified through a Search Console URL-prefix property matching
-      Play's string exactly; org verification pending. Create the Mimoza
-      app there once verified, link a service account for `PLAY_JSON_KEY`,
-      and close the old account afterwards.
+      Play's string exactly; org verification pending. Identity check
+      rejected the driver's license 2026-10-08, appealed the same day, no
+      answer as of 2026-10-13; a passport is the usual next document.
+      Create the Mimoza app there once verified, link a service account
+      for `PLAY_JSON_KEY`, and close the old account afterwards.
 - [ ] **Bundle id / package** moved to `com.rarekiwisoftware.mimoza`
       (staging `.staging`) on 2026-10-07, before anything reached a store.
-      Repo, Firebase apps, OAuth clients, SSM and CI secrets are done.
-      Still open: `terraform apply` per env (CI deploy), match profiles,
-      the Sign in with Apple key's Primary App ID in the portal (the
-      relay's revoke call signs `sub` = bundle id and fails as
-      `invalid_client` until it points at the new one), and deleting the
-      old App IDs, Firebase apps and OAuth clients once new builds are
-      out.
+      Repo, Firebase apps, OAuth clients, SSM and CI secrets are done,
+      and both relays verified running with the new ids on 2026-10-13
+      (`APNS_TOPIC` and `APPLE_CLIENT_ID_IOS` on each Lambda). Still
+      open: match profiles, the Sign in with Apple key's Primary App ID
+      in the portal (the relay's revoke call signs `sub` = bundle id and
+      fails as `invalid_client` until it points at the new one), and
+      deleting the old App IDs, Firebase apps and OAuth clients once new
+      builds are out.
 - [ ] **BIS notification email.** One message, no reply expected, to
       `crypt@bis.doc.gov` and `enc@nsa.gov` with the GitHub URL. Publicly
       available encryption source is not subject to the EAR once notified
@@ -107,13 +113,13 @@ Prod is 852138521113, staging 223057859233. See
 
 ## Review blockers
 
-- [ ] **Guideline 1.2 / Play UGC policy: a report path.** Photos shared
+- [x] **Guideline 1.2 / Play UGC policy: a report path.** Photos shared
       between people trigger it on both stores. Removing a member and
-      leaving a circle cover "block"; the "Report a problem" row in
-      settings is the "report" half. Landed and committed (f096ce8,
-      2026-09-28), with a fallback for a device with no mail app (alert +
-      copy the address). Still open: actually tap it on a simulator with
-      no mail account, which is what a reviewer's device looks like.
+      leaving a circle cover "block"; "report" is in-app since 2026-10-10
+      (30970e6): "Report this photo" in any other member's photo menu,
+      and "Send feedback" in settings, both posting to the relay, which
+      emails the support inbox through SES. No mail app involved, so a
+      reviewer's device is no different from anyone's.
 - [ ] **Review notes, both stores.** Apple's "App Review Information" and
       Play's "App access" section. Sign-in is Google or Apple only, so
       there is no demo account to hand over — say that any account works,
@@ -122,8 +128,8 @@ Prod is 852138521113, staging 223057859233. See
       explicitly, because "we were unable to complete the review" is the
       default outcome when an invite looks required.
 - [ ] Say in the same notes that content is end-to-end encrypted, so the
-      relay can't inspect anything and a report is submitted from the
-      reporting device.
+      relay can't inspect anything; a report names the photo and circle
+      ids, which is enough to find the entry and remove it.
 - [ ] Consider a standing invite link in the notes anyway, so a reviewer
       can see the multi-person case without a second device.
 
@@ -139,13 +145,12 @@ Prod is 852138521113, staging 223057859233. See
       `reaction_added`, no content); the policy now discloses that
       honestly. The App Privacy / Data safety answers must match this —
       see below, they don't yet.
-- [ ] Support URL (Apple requires a URL, Play takes an email) — confirmed
-      2026-09-30 this doesn't exist yet. `/support` and `/delete-account`
-      both currently 200 on joinmimoza.com, but that's Cloudflare Pages'
-      catch-all serving `index.html` for any unmatched path (any random
-      path 200s the same way) — not a real page. `SUPPORT_EMAIL` in
-      `account/index.tsx` (`hello@joinmimoza.com`) covers Play; Apple still
-      needs an actual URL.
+- [x] Support URL (Apple requires a URL, Play takes an email) —
+      `joinmimoza.com/support/` is a real page now, with a form that
+      emails the support inbox through SES (3fbe0e3, 2026-10-12). It only
+      sends once the `website-mailer` key is set as two Pages secrets;
+      until then the form answers "could not send". `hello@joinmimoza.com`
+      covers Play.
 - [ ] **Play account deletion URL**: a *web* page where someone can
       request deletion without installing the app, declared in Data
       safety. Still doesn't exist — same catch-all false positive as

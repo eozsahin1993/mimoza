@@ -1,11 +1,11 @@
 # mimoza-relay
 
 The relay server for the Mimoza app — a blind relay for encrypted circle
-content, plus account auth/recovery plumbing. It never sees plaintext
-content and is designed to infer as little as possible about circle
-membership or social structure. See [DESIGN.md](../docs/DESIGN.md) for the
-full architecture writeup and the reasoning behind each decision; this
-file is just a map to find your way around the code.
+content, plus the accounts, sessions and push around it. It never sees
+plaintext content. See [docs/RELAY_DESIGN.md](../docs/RELAY_DESIGN.md)
+for what it stores and what each route promises, and
+[docs/SYNC_DESIGN.md](../docs/SYNC_DESIGN.md) for how a device keeps in
+step with it; this file is just a map to find your way around the code.
 
 ## Layout
 
@@ -13,19 +13,18 @@ file is just a map to find your way around the code.
 cmd/
   server/     entry point for `go run` / local dev — http.ListenAndServe
   lambda/     entry point for AWS Lambda (behind a Function URL)
-  testrelay/  the same relay against LocalStack, for the integration suite
-  decryptlog/ developer-only: decrypts a circle's log to a local file
+  testrelay/  the same relay against LocalStack, for the app's integration suite
 internal/
-  api/       router.go alone — the composition root that wires everything together
-  synclog/ auth/ account/ invite/ push/ ratelimit/
-             one column per entity: domain types and store interface at the
-             root, one subpackage per endpoint under http/, one per adapter
-             (dynamodb/, s3/, cdn/) — see AGENTS.md
-  app/       builds the real AWS-backed adapters both cmd/ entries run on
+  accounts/ auth/ blobs/ circles/ feedback/ push/ ratelimit/
+             one package per entity: domain types at the root, one
+             subpackage per capability (its routes, service and store
+             together), one per adapter (dynamo/, s3/, ses/) — see AGENTS.md
+  app/       the composition root: router.go wires stores into services and
+             aggregates every route; app.go builds the real AWS adapters
   config/    reads every env var once, in one place
-  util/      httputil, dynamoutil, localstack, testsupport — cross-cutting
+  util/      httputil, dynamoutil, ids, localstack, testsupport — cross-cutting
 provision/
-  modules/   storage, lambda, cdn, certificate, alarms, github-deploy
+  modules/   storage, lambda, cdn, certificate, alarms, email, github-deploy
   envs/      one thin root per environment: local (LocalStack), staging, prod
   bootstrap/ the S3 bucket staging/prod state lives in — applied once per account
 ```
@@ -35,28 +34,25 @@ provision/
 below `internal/app` knows or cares whether it's running on Lambda or as a
 long-lived process.
 
-## Storage: six tables, six different reasons
+## Storage: four tables and a bucket
 
-- **sync-log** (`internal/synclog`) — one row per circle-log entry, keyed
-  by `syncId` + `<namespace>#<epoch>`. Never evicted: entries are retained
-  and immutable, and the only rows carrying a TTL are idempotency markers
-  and a deleted circle's leftover meta.
-- **sessions** (`internal/auth`) — one row per bearer token.
-  TTL'd (90 days from issuance). Looked up by token, and by account
-  through the `accountId` GSI when deletion revokes every session at once.
-- **accounts** (`internal/account`) — one row per account,
-  holding a single opaque `blob` the client encrypted itself. Never
-  TTL'd. The relay only ever reads/writes ciphertext here — see
-  DESIGN.md's "Account recovery" section.
-- **invites** (`internal/invite`), **rate-limit** (`internal/ratelimit`),
-  **push** (`internal/push`) — the invite/join mailbox (TTL'd,
-  `INVITE_RETENTION_DAYS`), the per-account request budget, and push
-  routing prefs plus one row per device.
+- **circles** (`internal/circles/dynamo`) — one partition per circle:
+  its meta, members, sealed content keys, invites, join requests, posts,
+  comments and reactions. The one table that changes in transactions,
+  which is why membership, keys and entries share a package.
+- **accounts** (`internal/accounts/dynamo`) — one partition per account:
+  profile, devices push reaches, linked sign-ins and device-link
+  handoffs, plus a tiny partition per sign-in that points at its account.
+- **sessions** (`internal/auth/dynamodb`) — one row per bearer token,
+  TTL'd 90 days, with an `accountId` index so deletion can revoke them all.
+- **rate-limit** (`internal/ratelimit/dynamodb`) — one fixed-window
+  budget per account and kind (write, read, feedback).
+- **blobs** (S3, `internal/blobs/s3`) — photo and cover ciphertext, and
+  plain profile pictures. The relay only ever signs URLs for it.
 
-Each table exists because its access pattern and lifecycle genuinely
-differ from the others — see each package's own doc comment for the
-specific reasoning, and `internal/util/dynamoutil` for the handful of
-attribute-encoding helpers they all share.
+Feedback from the app (`internal/feedback`) is the one thing with no
+table: it is emailed through SES and nothing is kept.
+`docs/RELAY_DESIGN.md` has the key shapes of every table.
 
 ## Auth flow, end to end
 
@@ -65,17 +61,18 @@ directly rather than just reading five files in isolation.
 
 1. **Sign-in** (`internal/auth/http/google`, `.../apple`) verifies the
    client's ID token against the provider's own public keys
-   (`internal/auth/oidcverify`), then builds an **accountId**:
-   `"google:" + sub` or `"apple:" + sub`. `sub` is the OIDC subject claim
-   — a permanent, provider-issued identifier, required on every token by
-   spec. The `provider:` prefix exists purely so Google's and Apple's
-   independently-issued `sub` values can never collide with each other;
-   it's not a lookup key for anything server-side.
+   (`internal/auth/oidcverify`), then resolves the provider and its
+   `sub` claim to an **accountId** through the accounts table
+   (`accounts/dynamo/identity.go`): a `provider#<name>:<sub>` lookup row
+   points at the account, and a first sign-in mints a fresh random id
+   and writes both in one transaction, so two racing first sign-ins
+   yield one account. `sub` is the OIDC subject, permanent and
+   provider-issued; the relay keys on it rather than email, which can
+   change, and keeps no email at all.
 
-   Identity is keyed on `sub`, not email, because email can change
-   (a person edits their account email, or an Apple private-relay
-   address gets regenerated) while `sub` can't — see DESIGN.md's
-   "Account recovery" section for the full reasoning.
+   The account id is the relay's own, so a second sign-in method can be
+   linked to the same account later without anything keyed on the id
+   changing.
 
 2. **`auth.Issue`** (`internal/auth/session.go`) mints a random
    bearer token and stores `auth.Session{AccountID: accountID,
@@ -102,73 +99,29 @@ directly rather than just reading five files in isolation.
    impossible, since no other package can construct one.
 
 4. **The handler** retrieves it with `auth.AccountID(ctx)`, which does the
-   lookup and type-asserts it back to a `string` — the same value built
-   in step 1 (`"google:<sub>"` etc.).
+   lookup and type-asserts it back to a `string` — the same id resolved
+   in step 1.
 
-(If you're reading old code, docs, or a diff and see `DeviceID` — that
-was this exact field before a rename; it was never actually
-device-specific, just the account identifier under an earlier, more
-confusing name from when it was `emailHmac`.)
+## Identity, keys and what the relay can see
 
-## Identity model: four things that are easy to conflate
+Two ids the relay mints, and one key it never holds the private half of:
 
-This spans both sides (the relay only ever touches the first one), but it
-belongs in one place — the confusing part is exactly how these relate to
-*each other*, and that's lost if each piece is documented separately next
-to its own code.
+| | What it is | Who needs it |
+|---|---|---|
+| **accountId** | Random, minted by the relay at first sign-in; a provider `sub` is a lookup onto it | The relay, for sessions, rosters and push |
+| **circleId** | Random, minted by the relay when a circle is created; its partition key | Every member, and the relay — it is the address of everything in the circle |
+| **account keypair** | X25519, per account; the public half is on the profile, the private half stays in the device's synced keychain | Members, to seal a circle's content key to you |
 
-| | What it is | Derived from | Who needs it to match |
-|---|---|---|---|
-| **accountId** | `"google:<sub>"` / `"apple:<sub>"` | Provider's OIDC `sub` claim | The relay, for session lookup. See "Auth flow" above. |
-| **masterSeed** | 128 bits of entropy behind the 12-word recovery phrase | Random, generated once at onboarding (`generateSeedPhrase()`) | Nobody but your own devices — never leaves the client, never sent to the relay in any form. |
-| **circleId** | A local UUID | `generateUUID()`, freely chosen per circle | Only your own devices, across time (see below) — never other members. |
-| **syncId** | The relay-visible address for a circle's log | `generateUUID()` once, by the founder (`createCircle`) | Every member — it's the one thing that *has* to match, and the only one a joiner is told rather than derives. |
-
-The relationship: your circle **identity keypair** is
-`deriveCircleIdentity(masterSeed, circleId)` — a pure function of your own
-seed and your own private label for the circle. Nobody else ever
-recomputes it; they only ever learn your public half by reading it out of
-the circle's roster, which syncs like any other content. So `circleId`
-only has one real job: staying *stable for your own account across a lost
-device*, which is exactly what the account-recovery manifest
-(`internal/account`) exists to guarantee — it's a durable,
-client-encrypted record of each circle's `circleId`, its `syncId` and its
-content keys, so a recovering device reproduces the *same* keypairs the
-rest of the circle already recognizes, instead of showing up as an
-unrecognized stranger.
-
-**How `circleId` and a circle's keys get paired**: not by any derivation —
-`syncId` and the content key are independently random, with no
-mathematical relationship to `circleId`. They're linked purely by local
-storage: the moment a device has them (generating them, for the founder;
-opening the sealed approval, for a joiner), the key map goes to Keychain
-under that device's own `circleId` (`saveCircleKeyMap`) and the `syncId`
-onto the circle's SQLite row. From then on `circleId` is the lookup key
-for both; the content key is what everything cryptographic (the write
-token via `deriveWriteToken`, decrypting entries) derives from.
-
-**How you actually fetch a circle's content**: read `syncId` off the
-local circle row and the key map out of Keychain — both plain local
-reads, no derivation — then `GET
-/v1/circles/{syncId}/entries?namespace=&sinceEpoch=`; see `fetchEntries`
-(app-side) / `internal/synclog/http/getlog` (this repo). The local
-`circleId` never itself talks to the relay, it only ever unlocks what's
-stored under it.
-
-**How a joiner gets those in the first place** (join-by-invite — built;
-see `docs/INVITE_FLOW.md` and `internal/invite`): the invite code itself
-carries no secret, just a lookup tag (`sha256("invite-tag" ||
-invite_code)`). The requester generates a one-time keypair and posts a
-join request to that tag; the approver seals `{keyMap, syncId,
-circleName}` to the requester's one-time public key and posts the
-response under the same tag. Only the requester's matching private key
-can open it — the relay forwards ciphertext under an opaque tag either
-side can compute, never learning what's inside or that the two messages
-belong to the same handshake beyond sharing a tag.
+Content keys are sealed to each member's public key and stored beside
+the membership; the relay holds ciphertext it cannot open, and a member
+reseals for someone whose key changed. The whole of this — the trust
+model, what is and is not encrypted, joining, a new device, deletion —
+is in `docs/RELAY_DESIGN.md`, which is the source of truth; nothing here
+should be read as a second description of it.
 
 ## Running locally
 
-The relay runs against LocalStack (DynamoDB, S3, SSM) instead of real AWS.
+The relay runs against LocalStack (DynamoDB, S3, SSM, SES) instead of real AWS.
 All commands are from `server/`.
 
 **1. Start LocalStack and provision its tables:**
@@ -188,7 +141,7 @@ That one command is exactly these two steps, run separately if you want
 to see each on its own:
 
 ```
-docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,ssm localstack/localstack:4.4.0
+docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,ssm,ses localstack/localstack:4.4.0
 (cd provision/envs/local && terraform init && terraform apply)
 ```
 
