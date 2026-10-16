@@ -4,7 +4,7 @@ jest.mock('@/data/db', () => ({
   resetAllLocalData: jest.fn(async () => undefined),
   resetDatabaseSchema: jest.fn(async () => undefined),
 }));
-jest.mock('@/ui/theme/hooks/use-own-color-seed', () => ({ clearOwnColorSeedCache: jest.fn() }));
+jest.mock('@/core/account/own-account-store', () => ({ resetOwnAccountStore: jest.fn() }));
 jest.mock('@/core/services/keystore/circle-keys', () => ({ deleteCircleKeys: jest.fn(async () => undefined) }));
 jest.mock('@/core/services/keystore/account-keypair', () => ({ forgetAccountKeypair: jest.fn(async () => undefined) }));
 jest.mock('@/core/services/keystore/auth-token', () => ({ deleteAuthToken: jest.fn(async () => undefined) }));

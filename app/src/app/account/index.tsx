@@ -1,6 +1,6 @@
 import { useLocales } from 'expo-localization';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
@@ -16,15 +16,13 @@ import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-gro
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius, Space, Spacing } from '@/ui/theme/tokens';
-import { getLocalAccount, getProfilePicture, type LocalAccount } from '@/data/db';
 import { deleteAccount } from '@/features/account/usecases/delete-account';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { signOut } from '@/features/account/usecases/sign-in';
 import { Languages, resolveLanguage, type LanguagePreference } from '@/core/i18n/languages';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
-import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTints } from '@/ui/theme/hooks/use-theme';
-import { bytesToDataUri } from '@/core/photo/image';
+import { useOwnAccount } from '@/core/account/use-own-account';
 import { appVersion, buildNumbers } from '@/core/services/build-info';
 import type { ThemePreference } from '@/core/services/settings';
 
@@ -33,9 +31,8 @@ export default function AccountScreen() {
   const { settings, updateSettings } = useAppSettings();
   const deviceLanguage = resolveLanguage('system', useLocales());
   const tints = useTints();
-  const ownColorSeed = useOwnColorSeed();
-  const [profile, setProfile] = useState<LocalAccount | null>(null);
-  const [pictureUri, setPictureUri] = useState<string | undefined>(undefined);
+  // A new name or picture shows the moment it is saved, not on the next visit.
+  const own = useOwnAccount();
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [resettingDevData, setResettingDevData] = useState(false);
@@ -43,19 +40,6 @@ export default function AccountScreen() {
   // Set once account deletion is confirmed. From here the screen only
   // ever shows the "deleting" state — there's nothing left to cancel.
   const [deletingAccount, setDeletingAccount] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      getLocalAccount().then((p) => {
-        setProfile(p);
-        if (!p) {
-          setPictureUri(undefined);
-          return;
-        }
-        getProfilePicture(p.accountId).then((picture) => setPictureUri(picture?.bytes ? bytesToDataUri(picture.bytes) : undefined));
-      });
-    }, []),
-  );
 
   const appearanceOptions: { value: ThemePreference; label: string }[] = [
     { value: 'system', label: t('settings.appearanceSystem') },
@@ -235,13 +219,13 @@ export default function AccountScreen() {
           <View style={styles.profileRow}>
             <Avatar
               size={72}
-              uri={pictureUri}
-              name={profile?.name}
-              colorSeed={ownColorSeed}
+              uri={own.pictureUri}
+              name={own.name}
+              colorSeed={own.accountId}
             />
             <View style={styles.profileText}>
               <ThemedText type="titleSmall" numberOfLines={1}>
-                {profile?.name || t('settings.addName')}
+                {own.name || t('settings.addName')}
               </ThemedText>
               <ThemedText type="labelSmall" themeColor="muted">
                 {t('settings.nameVisibility')}

@@ -40,8 +40,8 @@ import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { showAlert } from '@/core/services/alerts';
 import { showError, showMessage } from '@/core/services/messages';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
-import { onPhotoFetched } from '@/core/photo/photo-events';
 import { retryAttachment } from '@/core/photo/photo-queue';
+import { usePostPhotoUri } from '@/core/photo/use-photo-uri';
 import { formatDay, formatRelative, formatTimestamp } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
 
@@ -99,6 +99,7 @@ export default function PostDetailsScreen() {
   const [ownPost, setOwnPost] = useState(false);
   /** The circle is an archive now: the post reads as it was, and takes nothing. */
   const [readOnly, setReadOnly] = useState(false);
+  const livePhotoUri = usePostPhotoUri(circleId, postId, photoUri);
 
   const load = useCallback(async () => {
     if (!circleId || !postId) return;
@@ -180,29 +181,6 @@ export default function PostDetailsScreen() {
   useEffect(() => {
     scrollRef.current?.assureFocusedInputVisible();
   }, [comments]);
-
-  // The photo landing while its placeholder is on screen sets it directly
-  // rather than reloading everything else this screen shows.
-  useEffect(
-    () =>
-      onPhotoFetched((event) => {
-        if (event.kind !== 'post' || event.circleId !== circleId || event.postId !== postId) return;
-        setPhotoUri(event.uri);
-      }),
-    [circleId, postId],
-  );
-
-  // Same idea for a commenter's picture landing after their comment already rendered.
-  useEffect(
-    () =>
-      onPhotoFetched((event) => {
-        if (event.kind !== 'profilePicture') return;
-        setComments((current) =>
-          current.map((comment) => (comment.authorId === event.accountId ? { ...comment, authorPhotoUri: event.uri } : comment)),
-        );
-      }),
-    [],
-  );
 
   async function handleSelectReaction(emoji: string) {
     if (!circleId || !postId) return;
@@ -319,8 +297,8 @@ export default function PostDetailsScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bottomOffset={KEYBOARD_BOTTOM_OFFSET}>
-          {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />
+          {livePhotoUri ? (
+              <Image source={{ uri: livePhotoUri }} style={styles.photo} contentFit="cover" />
             ) : (
               <PhotoPlaceholder
                 style={styles.photo}
@@ -412,8 +390,8 @@ export default function PostDetailsScreen() {
                   key={comment.id}
                   size={36}
                   authorName={comment.authorName || profileName || t('post.unknownMember')}
+                  authorId={comment.authorId}
                   authorPhotoUri={comment.authorPhotoUri}
-                  authorPublicKey={comment.authorId}
                   body={comment.body}
                   timestamp={formatRelative(comment.createdAt, language)}
                 />
@@ -452,7 +430,7 @@ export default function PostDetailsScreen() {
         onClose={() => setShowActions(false)}
         title={authorName ? t('post.details.authorsPhoto', { name: authorName }) : t('post.details.thisPhoto')}
         subtitle={post ? `${formatDay(post.createdAt, language)} · ${circleName}` : undefined}
-        avatarUri={photoUri}
+        avatarUri={livePhotoUri}
         avatarRadius={Radius.input}
         options={[
           // Someone else's photo can be reported; your own can only be deleted.

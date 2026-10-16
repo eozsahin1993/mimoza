@@ -1,5 +1,5 @@
 import { getProfilePictures } from '@/data/db';
-import { cachedProfilePictureUri, writeProfilePictureFile } from '@/core/photo/photo-cache';
+import { profilePictureUri } from '@/core/photo/photo-cache';
 
 /**
  * Resolves each account's current picture to a `file://` URI, keyed by
@@ -18,9 +18,7 @@ export async function resolveMemberPictures(accountIds: string[]): Promise<Map<s
   const resolved = new Map<string, string>();
 
   for (const [accountId, picture] of pictures) {
-    const uri =
-      cachedProfilePictureUri(accountId, picture.pictureId) ??
-      (picture.bytes ? writeProfilePictureFile(accountId, picture.bytes, picture.pictureId) : null);
+    const uri = profilePictureUri(accountId, picture);
     if (uri) resolved.set(accountId, uri);
   }
 

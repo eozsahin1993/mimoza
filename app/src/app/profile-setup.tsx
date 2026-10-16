@@ -15,7 +15,6 @@ import { getLocalAccount, getProfilePicture } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 import { completeProfileSetup } from '@/features/account/usecases/onboarding';
 import { getProfile } from '@/features/account/services/account-relay';
-import { primeOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
 
@@ -53,7 +52,7 @@ export default function ProfileSetupScreen() {
   // letter.
   useEffect(() => {
     getProfile()
-      .then((profile) => setColorSeed(primeOwnColorSeed(profile.accountId)))
+      .then((profile) => setColorSeed(profile.accountId))
       .catch((err) => console.error('Failed to read the account profile', err));
   }, []);
 

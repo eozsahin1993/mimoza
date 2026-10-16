@@ -1,13 +1,12 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ScrollView, Share, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ActionSheet, type ActionSheetOption } from '@/ui/components/action-sheet';
-import { Avatar } from '@/ui/components/avatar/avatar';
-import { Icon } from '@/ui/components/icon';
+import { MemberList } from '@/features/circle/components/member-list';
 import { confirmRemoveFromPhone } from '@/features/feed/components/no-longer-member-row';
 import { InviteSheet } from '@/features/invite/components/invite-sheet';
 import { OptionSheet } from '@/ui/components/option-sheet';
@@ -16,7 +15,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
+import { Icons, Space, Spacing } from '@/ui/theme/tokens';
 import { type Member } from '@/data/db';
 import { MemberRoles, type MemberRole } from '@/features/circle/usecases/change-member-role';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
@@ -32,13 +31,10 @@ import {
   setCircleNotifyLevel,
   type NotifyLevel,
 } from '@/features/push-notifications/usecases/push-preferences';
-import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showAlert } from '@/core/services/alerts';
 import { showDone, showError } from '@/core/services/messages';
-import { onPhotoFetched } from '@/core/photo/photo-events';
+import { useCoverUri } from '@/core/photo/use-photo-uri';
 import { pickAndCompressImage } from '@/core/photo/image';
-import { formatMonth } from '@/core/utils/time';
-import { useLanguage } from '@/core/i18n/use-language';
 
 function inviteLink(code: string): string {
   return `mimoza://join/${code}`;
@@ -48,15 +44,13 @@ function daysUntil(expiresAt: number): number {
   return Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
-/** Stable identity, so `avatarUris`' memo doesn't bust on every render. */
+/** Stable identities, so nothing downstream re-renders on every pass before the details have loaded. */
 const NO_MEMBERS: Member[] = [];
+const NO_PICTURES = new Map<string, string>();
 
 
 export default function CircleDetailsScreen() {
   const { t } = useTranslation();
-  const language = useLanguage();
-  const theme = useTheme();
-  const tints = useTints();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [details, setDetails] = useState<CircleDetails | null>(null);
   const [sharing, setSharing] = useState(false);
@@ -65,6 +59,7 @@ export default function CircleDetailsScreen() {
   const [renaming, setRenaming] = useState(false);
   const [coverUri, setCoverUri] = useState<string | undefined>();
   const [levelPicker, setLevelPicker] = useState(false);
+  const liveCoverUri = useCoverUri(circleId, coverUri);
 
   const circle = details?.circle ?? null;
   const members = details?.members ?? NO_MEMBERS;
@@ -92,24 +87,6 @@ export default function CircleDetailsScreen() {
     if (!circleId) return;
     setDetails(await loadCircleDetails(circleId));
     setCoverUri(await resolveCircleCoverUri(circleId));
-  }, [circleId]);
-
-  // A cover or a member's picture landing while this screen is open
-  // patches just that piece, rather than waiting for the next focus. Not
-  // circle-scoped the way a cover is — one picture, shown wherever that
-  // account appears — so there is no circleId to check against.
-  useEffect(() => {
-    if (!circleId) return;
-    return onPhotoFetched((event) => {
-      if (event.kind === 'cover') {
-        if (event.circleId !== circleId) return;
-        resolveCircleCoverUri(circleId).then(setCoverUri).catch((err) => console.error('Failed to refresh the cover', err));
-      } else if (event.kind === 'profilePicture') {
-        setDetails((current) =>
-          current ? { ...current, avatarByAccount: new Map(current.avatarByAccount).set(event.accountId, event.uri) } : current,
-        );
-      }
-    });
   }, [circleId]);
 
   function formatExpiry(expiresAt: number): string {
@@ -432,7 +409,7 @@ export default function CircleDetailsScreen() {
           // Resolved the same way the list resolves it, newest-post
           // fallback included, so the row can't show a circle a different
           // face from the one you just tapped.
-          control: { kind: 'image', uri: coverUri },
+          control: { kind: 'image', uri: liveCoverUri },
           onPress: handleSetCoverPhoto,
         },
         admin && {
@@ -466,65 +443,6 @@ export default function CircleDetailsScreen() {
     },
   ];
 
-  function renderMemberList() {
-    return (
-      <>
-        <View style={styles.sectionHeader}>
-          <ThemedText type="labelMedium">
-            {t('circle.details.members')}
-          </ThemedText>
-          <ThemedText type="labelSmall" themeColor="muted">
-            {t('circle.details.inTheCircle', { count: members.length })}
-          </ThemedText>
-        </View>
-
-        {members.map(renderMember)}
-
-        {soleAdmin && members.length > 1 ? (
-          <ThemedText type="labelSmall" themeColor="faint" style={styles.adminNotice}>
-            {t('circle.details.soleAdminNotice')}
-          </ThemedText>
-        ) : null}
-      </>
-    );
-  }
-
-  /** One roster row. The menu is offered on everyone but the reader — nobody demotes or removes themselves here. */
-  function renderMember(member: Member) {
-    return (
-      <View key={member.accountId} style={[styles.memberRow, { borderBottomColor: tints.chipIdleBorder }]}>
-        <Avatar
-          size={44}
-          uri={details?.avatarByAccount.get(member.accountId)}
-          name={member.name}
-          colorSeed={member.accountId}
-        />
-
-        <View style={styles.memberInfo}>
-          <View style={styles.memberNameRow}>
-            <ThemedText type="titleSmall">{member.name || t('circle.details.unnamedMember')}</ThemedText>
-            {member.role === MemberRoles.ADMIN ? (
-              <View style={[styles.adminBadge, { backgroundColor: theme.accent }]}>
-                <ThemedText type="labelSmall" themeColor="accentLabel" style={styles.adminBadgeText}>
-                  {t('circle.details.admin')}
-                </ThemedText>
-              </View>
-            ) : null}
-          </View>
-          <ThemedText type="labelSmall" themeColor="muted">
-            {t('circle.details.joined', { month: formatMonth(member.joinedAt, language) })}
-          </ThemedText>
-        </View>
-
-        {admin && member.accountId !== ownPublicKey ? (
-          <Pressable hitSlop={12} style={styles.memberMenuButton} onPress={() => setMemberMenu(member)}>
-            <Icon icon={Icons.more} size={20} color={theme.muted} />
-          </Pressable>
-        ) : null}
-      </View>
-    );
-  }
-
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -538,7 +456,14 @@ export default function CircleDetailsScreen() {
 
           {admin ? <SettingsGroups groups={[inviteGroup]} /> : null}
 
-          {renderMemberList()}
+          <MemberList
+            members={members}
+            avatarByAccount={details?.avatarByAccount ?? NO_PICTURES}
+            admin={admin}
+            ownAccountId={ownPublicKey}
+            soleAdmin={soleAdmin}
+            onMemberMenu={setMemberMenu}
+          />
 
           {readOnly ? <SettingsGroups groups={[archiveGroup]} /> : <SettingsGroups groups={settingsGroups} />}
 
@@ -602,44 +527,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: Spacing.cardListGap,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.cardListGap,
-    marginBottom: Space.s100,
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.s300,
-    paddingVertical: Space.s300,
-    borderBottomWidth: 1,
-  },
-  memberInfo: {
-    flex: 1,
-    gap: Space.s100,
-  },
-  memberMenuButton: {
-    padding: Space.s100,
-  },
-  memberNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.s200,
-  },
-  adminBadge: {
-    borderRadius: Radius.pill,
-    paddingHorizontal: Space.s200,
-    paddingVertical: Space.s100,
-  },
-  adminBadgeText: {
-    fontFamily: Fonts.sansSemiBold,
-    fontSize: 10.5,
-  },
-  adminNotice: {
-    marginTop: Space.s300,
   },
   debugZone: {
     marginTop: Spacing.cardListGap,

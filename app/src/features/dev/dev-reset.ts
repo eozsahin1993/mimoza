@@ -1,7 +1,8 @@
 import { getAllCircleIds, getLocalAccount, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
-import { clearOwnColorSeedCache } from '@/ui/theme/hooks/use-own-color-seed';
+import { resetOwnAccountStore } from '@/core/account/own-account-store';
 import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
 import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
+import { resetPhotoStore } from '@/core/photo/photo-store';
 import { forgetAccountKeypair } from '@/core/services/keystore/account-keypair';
 import { deleteAuthToken } from '@/core/services/keystore/auth-token';
 
@@ -37,9 +38,11 @@ export async function resetLocalDataForTesting(): Promise<void> {
   if (profile) await forgetAccountKeypair(profile.accountId);
   await deleteAuthToken();
   await resetAllLocalData();
-  // The next sign-in's own avatar colour would otherwise keep showing this
-  // account's, cached in memory since ordinary sign-out never clears it.
-  clearOwnColorSeedCache();
+  // The next sign-in would otherwise keep showing this account's name,
+  // avatar colour and pictures, held in memory since ordinary sign-out
+  // never clears them.
+  resetOwnAccountStore();
+  resetPhotoStore();
 }
 
 /**

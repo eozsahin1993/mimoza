@@ -1,12 +1,11 @@
-import { Image } from 'expo-image';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { missingPhotoFor, PhotoPlaceholder } from '@/ui/components/photo-placeholder';
+import { AlbumCell, type AlbumCellPhoto } from '@/features/circle/components/album-cell';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
@@ -22,7 +21,7 @@ const COLUMNS = 4;
 /** Just enough of a post to lay the grid out — see getAlbum. */
 type AlbumPhoto = { id: string; createdAt: number };
 
-type AlbumItem = AlbumPhoto & { uri: string | null; photoStatus?: string };
+type AlbumItem = AlbumPhoto & AlbumCellPhoto;
 
 /**
  * A month header, then that month's photos in rows of `COLUMNS`.
@@ -153,18 +152,7 @@ export default function AlbumScreen() {
             ) : (
               <View style={styles.photoRow}>
                 {item.photos.map((photo) => (
-                  <Pressable
-                    key={photo.id}
-                    style={styles.cell}
-                    onPress={() => router.push({ pathname: '/post/[id]', params: { id: photo.id, circleId } })}>
-                    {photo.uri ? (
-                      <Image source={{ uri: photo.uri }} style={styles.photo} contentFit="cover" />
-                    ) : (
-                      // Icon only: a cell this size has no room for the
-                      // label the feed's placeholder carries.
-                      <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(photo.photoStatus, archived)} compact />
-                    )}
-                  </Pressable>
+                  <AlbumCell key={photo.id} circleId={circleId} photo={photo} archived={archived} />
                 ))}
                 {/* Keeps a short last row left-aligned rather than stretching its photos. */}
                 {Array.from({ length: COLUMNS - item.photos.length }, (_, index) => (
@@ -219,13 +207,10 @@ const styles = StyleSheet.create({
     gap: GAP,
     marginBottom: GAP,
   },
+  // Same footprint as an AlbumCell, so a short last row stays on the grid.
   cell: {
     flex: 1,
     aspectRatio: 1,
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
   },
   empty: {
     flex: 1,

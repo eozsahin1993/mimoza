@@ -15,7 +15,7 @@ import { decrypt, hashBytes } from '@/core/crypto/primitives';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { writeCoverFile, writePhotoFile, writeProfilePictureFile } from '@/core/photo/photo-cache';
-import { notifyPhotoFetched } from '@/core/photo/photo-events';
+import { setCoverUri, setPostPhotoUri, setProfilePictureUri } from '@/core/photo/photo-store';
 import { BlobPaths, getBlob } from '@/core/services/blob-relay';
 import { timed, timedSync } from '@/core/utils/timing';
 
@@ -72,14 +72,12 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
     if (attachment.kind === AttachmentKinds.CIRCLE_COVER) {
       // Keyed by the cover's own id, which is the last path segment and
       // is already content-addressed — a new cover is a new key.
-      const uri = writeCoverFile(circleId, bytes, entryId.split('/').pop() ?? entryId);
-      notifyPhotoFetched({ kind: 'cover', circleId, uri });
+      setCoverUri(circleId, writeCoverFile(circleId, bytes, entryId.split('/').pop() ?? entryId));
     } else {
-      // Whatever screen is showing this post's placeholder patches just
-      // this row rather than reloading — a backlog of many photos landing
-      // one by one must not mean a feed reload apiece.
-      const uri = writePhotoFile(circleId, entryId, bytes);
-      notifyPhotoFetched({ kind: 'post', circleId, postId: entryId, uri });
+      // Whatever screen is showing this post's placeholder re-renders just
+      // that row — a backlog of many photos landing one by one must not
+      // mean a feed reload apiece.
+      setPostPhotoUri(circleId, entryId, writePhotoFile(circleId, entryId, bytes));
     }
   } catch (err) {
     const attempts = fetchAttempts + 1;
@@ -106,8 +104,7 @@ async function fetchProfilePicture(picture: ProfilePicture): Promise<void> {
     if (!bytes) throw new Error('blob not found');
 
     await markProfilePictureFetched(accountId, pictureId, bytes);
-    const uri = writeProfilePictureFile(accountId, bytes, pictureId);
-    notifyPhotoFetched({ kind: 'profilePicture', accountId, uri });
+    setProfilePictureUri(accountId, writeProfilePictureFile(accountId, bytes, pictureId));
   } catch (err) {
     const attempts = fetchAttempts + 1;
     console.error(`Failed to fetch profile picture for ${accountId} (attempt ${attempts})`, err);
@@ -195,8 +192,8 @@ export async function drainPhotoQueue(budget: DrainBudget = {}): Promise<void> {
  * enough times — for the schedule to come back around on its own.
  *
  * Awaits only the backoff clearing and the nudge, not the fetch itself —
- * a caller that wants to know the outcome watches for onPhotoFetched, the
- * same signal an ordinary background fetch reports through.
+ * the outcome lands in the photo store, the same way an ordinary
+ * background fetch reports, and whatever shows the photo re-renders.
  */
 export async function retryAttachment(circleId: string, entryId: string): Promise<void> {
   try {

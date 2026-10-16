@@ -1,13 +1,13 @@
 /**
  * A sync pass writes straight to SQLite with nothing watching for it —
  * a screen already mounted (not just focused) has no way to know its
- * data just moved. This is that notice, the same shape as
- * photo-events.ts's for the same reason: something finished in the
+ * data just moved. This is that notice: something finished in the
  * background, and a listener re-reads rather than waiting on a refocus
  * that might not come for a while.
  *
- * No payload: unlike a single photo landing, a sync pass can touch any
- * number of circles at once, and every listener so far just wants
+ * A plain emitter rather than a store like photo-store.ts: a single photo
+ * landing is one keyed value a row can select, but a sync pass can touch
+ * any number of circles at once, and every listener so far just wants
  * "something may have changed" to re-read its own slice whole.
  */
 type Listener = () => void;

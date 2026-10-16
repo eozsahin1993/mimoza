@@ -29,7 +29,7 @@ import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
 import { BlobPaths, getBlob } from '@/core/services/blob-relay';
 import { drainPhotoQueue, retryAttachment } from '@/core/photo/photo-queue';
-import { onPhotoFetched, type PhotoFetched } from '@/core/photo/photo-events';
+import { getPhotoStoreState, postPhotoKey, resetPhotoStore } from '@/core/photo/photo-store';
 
 const NOW = 1_700_000_000_000;
 const KEY = new Uint8Array(32).fill(1);
@@ -52,6 +52,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetPhotoStore();
 });
 
 /** A pulled post: row present, photo not downloaded yet — what the post handler writes. */
@@ -116,10 +117,7 @@ test('downloads, decrypts, and stores a pending photo', async () => {
   const postId = await makePendingPost(circleId, photo, 1000);
   (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
 
-  const events: PhotoFetched[] = [];
-  const unsubscribe = onPhotoFetched((event) => events.push(event));
   await drainPhotoQueue();
-  unsubscribe();
 
   const attachment = await getAttachment(circleId, postId);
   expect(attachment?.bytes).toEqual(photo);
@@ -127,21 +125,20 @@ test('downloads, decrypts, and stores a pending photo', async () => {
   expect(attachment?.fetchAttempts).toBe(0);
   // Addressed as (circle, the rest of the key) — no syncId any more.
   expect(getBlob).toHaveBeenCalledWith(circleId, postId);
-  expect(events).toEqual([{ kind: 'post', circleId, postId, uri: expect.any(String) }]);
+  // What a screen showing this post's placeholder re-renders from.
+  expect(getPhotoStoreState().postPhotos).toEqual({ [postPhotoKey(circleId, postId)]: expect.any(String) });
 });
 
-test('notifies with kind "cover" when a circle cover finishes downloading', async () => {
+test('a circle cover that finishes downloading lands in the store under its circle', async () => {
   const circleId = await makeCircle();
   const photo = new Uint8Array([1, 2, 3]);
   await makePendingCover(circleId, photo, 1000);
   (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, KEY));
 
-  const events: PhotoFetched[] = [];
-  const unsubscribe = onPhotoFetched((event) => events.push(event));
   await drainPhotoQueue();
-  unsubscribe();
 
-  expect(events).toEqual([{ kind: 'cover', circleId, uri: expect.any(String) }]);
+  expect(getPhotoStoreState().covers).toEqual({ [circleId]: expect.any(String) });
+  expect(getPhotoStoreState().postPhotos).toEqual({});
 });
 
 // Not an attachment at all any more: no circle/entryId address, no
@@ -151,24 +148,21 @@ test('notifies with kind "cover" when a circle cover finishes downloading', asyn
 // and cover helpers above use — profile_pictures is keyed by accountId
 // alone, with no circleId to scope it, so two tests reusing the same one
 // would read back whatever the earlier test left, not a fresh row.
-test('fetches a pending profile picture: plain bytes, no decrypt, notifies kind "profilePicture"', async () => {
+test('fetches a pending profile picture: plain bytes, no decrypt, lands in the store under the account', async () => {
   const circleId = await makeCircle();
   const accountId = `account-${circleId}`;
   const photo = new Uint8Array([1, 2, 3]);
   await makePendingProfilePicture(circleId, accountId, 'pic-1', 1000);
   (getBlob as jest.Mock).mockResolvedValue(photo);
 
-  const events: PhotoFetched[] = [];
-  const unsubscribe = onPhotoFetched((event) => events.push(event));
   await drainPhotoQueue();
-  unsubscribe();
 
   expect(getBlob).toHaveBeenCalledWith(circleId, BlobPaths.picture(accountId, 'pic-1'));
   const picture = await getProfilePicture(accountId);
   expect(picture?.bytes).toEqual(photo);
   expect(picture?.status).toBe('fetched');
   expect(picture?.fetchAttempts).toBe(0);
-  expect(events).toEqual([{ kind: 'profilePicture', accountId, uri: expect.any(String) }]);
+  expect(getPhotoStoreState().profilePictures).toEqual({ [accountId]: expect.any(String) });
 });
 
 // Faces before posts: every pending picture is drained to exhaustion

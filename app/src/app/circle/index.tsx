@@ -22,7 +22,6 @@ import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import {
   countMembers,
   getLocalAccount,
-  getProfilePicture,
   getUnreadCount,
   listCircles,
   listLeftCircles,
@@ -32,13 +31,11 @@ import {
 } from '@/data/db';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
-import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { takePendingInviteCode } from '@/features/invite/services/pending-invite';
-import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative } from '@/core/utils/time';
 import { upperCase } from '@/core/i18n/text';
-import { onPhotoFetched } from '@/core/photo/photo-events';
+import { useOwnAccount } from '@/core/account/use-own-account';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
 import { onSyncCompleted } from '@/core/sync/sync-events';
 import { showAlert } from '@/core/services/alerts';
@@ -79,15 +76,13 @@ async function resolveUnreadCount(circle: Circle, myAccountId: string): Promise<
   return getUnreadCount(circle.id, myAccountId);
 }
 
+
 export default function CircleListScreen() {
   const { t } = useTranslation();
   const language = useLanguage();
   const theme = useTheme();
   const tints = useTints();
-  const [avatarUri, setAvatarUri] = useState<string | undefined>();
-  // Only for the header avatar's initials — the name isn't shown here.
-  const [profileName, setProfileName] = useState<string | undefined>();
-  const ownColorSeed = useOwnColorSeed();
+  const own = useOwnAccount();
   const [circles, setCircles] = useState<CircleListItem[]>([]);
   // A locked circle is one this device has no keys for yet, waiting on a
   // member to reseal them. It stays in the list, apart, because "where did
@@ -118,9 +113,6 @@ export default function CircleListScreen() {
    */
   const loadFromDatabase = useCallback(async () => {
     const profile = await getLocalAccount();
-    const picture = profile ? await getProfilePicture(profile.accountId) : null;
-    setAvatarUri(picture?.bytes ? bytesToDataUri(picture.bytes) : undefined);
-    setProfileName(profile?.name);
     // Empty rather than skipping the load: every current path into this
     // screen saves a local profile first, so this never actually matches
     // an authorId/actorId, but the list still has to render if it somehow
@@ -193,21 +185,6 @@ export default function CircleListScreen() {
   useEffect(() => onSyncCompleted(() => loadFromDatabase().catch((err) => console.error('Failed to load circles', err))), [
     loadFromDatabase,
   ]);
-
-  // A cover landing while this list is open patches just that row,
-  // rather than waiting for the next full reload.
-  useEffect(
-    () =>
-      onPhotoFetched((event) => {
-        if (event.kind !== 'cover') return;
-        resolveCircleCoverUri(event.circleId)
-          .then((photoUri) =>
-            setCircles((current) => current.map((circle) => (circle.id === event.circleId ? { ...circle, photoUri } : circle))),
-          )
-          .catch((err) => console.error('Failed to refresh a circle cover', err));
-      }),
-    [],
-  );
 
   const handleNotificationAnswer = useCallback((turnOn: boolean) => {
     setOfferNotifications(false);
@@ -306,7 +283,7 @@ export default function CircleListScreen() {
               </ThemedText>
             </Pressable>
             <Pressable onPress={() => router.push('/account')}>
-              <Avatar size={44} uri={avatarUri} name={profileName} colorSeed={ownColorSeed} />
+              <Avatar size={44} uri={own.pictureUri} name={own.name} colorSeed={own.accountId} />
             </Pressable>
           </View>
         </View>
@@ -346,6 +323,7 @@ export default function CircleListScreen() {
               case 'circle':
                 return (
                   <CircleCard
+                    circleId={item.circle.id}
                     name={item.circle.name}
                     memberCount={item.circle.memberCount}
                     photoUri={item.circle.photoUri}
@@ -361,6 +339,7 @@ export default function CircleListScreen() {
               case 'archived':
                 return (
                   <CircleCard
+                    circleId={item.circle.id}
                     archived
                     name={item.circle.name}
                     photoUri={item.circle.photoUri}

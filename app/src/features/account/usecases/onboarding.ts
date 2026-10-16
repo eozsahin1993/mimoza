@@ -1,3 +1,4 @@
+import { setOwnAccount } from '@/core/account/own-account-store';
 import { generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { getLocalAccount, getProfilePicture, saveLocalAccount } from '@/data/db';
 import { setName } from '@/features/account/services/account-relay';
@@ -32,6 +33,7 @@ export async function completeProfileSetup(profile: ProfileInput): Promise<void>
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   });
+  setOwnAccount({ accountId: relayProfile.accountId, name: profile.name });
 
   // Guarded on an actual change, not just re-sent on every edit: this app
   // preloads the existing picture into the edit screen, so an unrelated

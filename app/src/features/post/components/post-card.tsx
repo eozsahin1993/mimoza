@@ -13,6 +13,7 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, PhotoAspect, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
+import { usePostPhotoUri, useProfilePictureUri } from '@/core/photo/use-photo-uri';
 
 export type Reaction = {
   emoji: string;
@@ -23,12 +24,12 @@ export type Reaction = {
 export type Post = {
   id: string;
   authorName: string;
-  /** Data URI of the author's profile picture, when it's known — otherwise their initials show. */
+  /** The author's account: the avatar's colour seed, and whose picture to follow once one lands. */
+  authorId?: string;
+  /** The author's picture as of the cold read, when it's known — otherwise their initials show. */
   authorPhotoUri?: string;
-  /** Stabler than `authorName` for the avatar's colour — see `Avatar`'s `colorSeed` prop. */
-  authorPublicKey?: string;
   timestamp: string;
-  /** Data URI of the actual photo, when it's known — otherwise the hatch placeholder shows. */
+  /** The photo as of the cold read, when it's known — otherwise the hatch placeholder shows until it lands. */
   photoUri?: string;
   /** Why there's no photo yet, when there isn't one — see `PhotoPlaceholder`. */
   missingPhoto?: MissingPhoto;
@@ -52,6 +53,8 @@ export type Post = {
 };
 
 export type PostCardProps = {
+  /** Which circle the post is in — the photo store keys post photos by circle and post. */
+  circleId: string;
   post: Post;
   onToggleReaction?: (emoji: string) => void;
   onAddComment?: (body: string) => void;
@@ -60,10 +63,6 @@ export type PostCardProps = {
   onPressComments?: () => void;
   /** Fires the moment comments are expanded — this is genuinely seeing them, same as opening the post itself. */
   onExpandComments?: () => void;
-  /** The reader's own picture, for the composer — the same on every card, so it rides on the card rather than each post. */
-  selfPhotoUri?: string;
-  /** Pairs with `selfPhotoUri` — the composer avatar's initials before a picture is set. */
-  selfName?: string;
   /** Adds or removes the photo from the circle's album. */
   onToggleAlbum?: () => void;
   /**
@@ -84,14 +83,13 @@ const TOP_EMOJI = 3;
 const BAND_GAP = 16;
 
 export function PostCard({
+  circleId,
   post,
   onToggleReaction,
   onAddComment,
   onPressPhoto,
   onPressComments,
   onExpandComments,
-  selfPhotoUri,
-  selfName,
   onToggleAlbum,
   readOnly = false,
 }: PostCardProps) {
@@ -99,6 +97,8 @@ export function PostCard({
   const theme = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const photoUri = usePostPhotoUri(circleId, post.id, post.photoUri);
+  const authorPhotoUri = useProfilePictureUri(post.authorId, post.authorPhotoUri);
 
   const totalReactions = post.reactionsTotal;
   const reactedByMe = post.reactions.some((reaction) => reaction.reactedByMe);
@@ -138,7 +138,7 @@ export function PostCard({
   return (
     <ThemedView style={styles.card}>
       <View style={styles.header}>
-        <Avatar uri={post.authorPhotoUri} name={post.authorName} colorSeed={post.authorPublicKey} />
+        <Avatar uri={authorPhotoUri} name={post.authorName} colorSeed={post.authorId} />
         <View style={styles.byline}>
           <ThemedText type="titleSmall">{post.authorName}</ThemedText>
           {/* Everyone can see that a photo is kept; only its author or an
@@ -163,8 +163,8 @@ export function PostCard({
       </View>
 
       <Pressable style={styles.photoWrap} onPress={onPressPhoto} disabled={!onPressPhoto}>
-        {post.photoUri ? (
-          <Image source={{ uri: post.photoUri }} style={styles.photo} contentFit="cover" />
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />
         ) : (
           <PhotoPlaceholder style={styles.photo} missing={post.missingPhoto} />
         )}
@@ -237,8 +237,6 @@ export function PostCard({
           onPressShowAll={onPressComments ? handleShowAll : undefined}
           composerOpen={composerOpen}
           onSubmit={handleAddComment}
-          selfPhotoUri={selfPhotoUri}
-          selfName={selfName}
         />
       </View>
     </ThemedView>

@@ -7,6 +7,7 @@ import {
 } from '@/data/db';
 import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { writeCoverFile } from '@/core/photo/photo-cache';
+import { setCoverUri } from '@/core/photo/photo-store';
 import { BlobPaths, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { setCover } from '@/features/circle/services/circle-relay';
@@ -50,7 +51,7 @@ export async function setCoverPhoto(circleId: string, photo: Uint8Array): Promis
     createdAt: Date.now(),
   });
   await setCoverLocally(circleId, coverId);
-  writeCoverFile(circleId, photo, coverId);
+  setCoverUri(circleId, writeCoverFile(circleId, photo, coverId));
 
   return coverId;
 }

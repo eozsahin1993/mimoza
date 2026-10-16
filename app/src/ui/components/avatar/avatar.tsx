@@ -20,7 +20,7 @@ export type AvatarProps = {
   name?: string;
   /**
    * What the initials' background colour is derived from, if not `name` —
-   * a member's `identityPublicKey`, or `useOwnColorSeed()` for this
+   * a member's account id, or `useOwnAccount().accountId` for this
    * device's own avatar. Pass this whenever a stabler id than the (possibly
    * still-being-typed, or later renamed) name is in scope; see
    * `avatarTintFor`'s doc comment for why that matters.

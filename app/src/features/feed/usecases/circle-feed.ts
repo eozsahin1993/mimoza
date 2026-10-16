@@ -50,8 +50,6 @@ export type CircleFeedMeta = {
   circleName: string;
   memberCount: number;
   profile: LocalAccount | null;
-  /** This device's own current picture — resolved the same way any other member's is, through profilePictures. */
-  selfPhotoUri?: string;
   /**
    * The reader's own account id. Named ownPublicKey for the row kinds
    * that already compare against it (roster changes, posts) — it is an
@@ -83,13 +81,11 @@ export const FEED_PAGE_SIZE = 10;
 export async function loadCircleFeedMeta(circleId: string): Promise<CircleFeedMeta> {
   const [circle, memberCount, profile] = await Promise.all([getCircle(circleId), countMembers(circleId), getLocalAccount()]);
   const ownMember = profile ? await getMember(circleId, profile.accountId) : null;
-  const selfPhotoUri = profile ? (await resolveMemberPictures([profile.accountId])).get(profile.accountId) : undefined;
 
   return {
     circleName: circle?.name ?? '',
     memberCount,
     profile,
-    selfPhotoUri,
     ownPublicKey: profile?.accountId ?? null,
     ownIsAdmin: ownMember?.role === 'admin',
     circleCreatedAt: circle?.createdAt ?? 0,

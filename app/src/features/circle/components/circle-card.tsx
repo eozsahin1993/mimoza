@@ -8,12 +8,14 @@ import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { Colors, Icons, Petal, Radius, Space } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
+import { useCoverUri } from '@/core/photo/use-photo-uri';
 
 export type CircleCardProps = {
+  circleId: string;
   name: string;
   /** Left off an archived circle: its roster is as of the day the account left, so the number would only mislead. */
   memberCount?: number;
-  /** Data URI of the actual cover photo, when it's known — otherwise the hatch placeholder shows. */
+  /** The cover as of the list read, when it's known — otherwise the hatch placeholder shows until one lands. */
   photoUri?: string;
   /** Unread count shown as a "3 new" pill in the corner — omitted entirely once there's nothing new. */
   newCount?: number;
@@ -47,13 +49,14 @@ const ARCHIVED_LABEL = 'rgba(20,16,12,0.72)';
  * matter laid over its bottom edge. What's new sits in the opposite
  * corner so it never crowds the name.
  */
-export function CircleCard({ name, memberCount, photoUri, newCount, latestActivity, archived, onPress }: CircleCardProps) {
+export function CircleCard({ circleId, name, memberCount, photoUri, newCount, latestActivity, archived, onPress }: CircleCardProps) {
   const { t } = useTranslation();
   const tints = useTints();
+  const coverUri = useCoverUri(circleId, photoUri);
   return (
     <Pressable style={[styles.card, { borderColor: tints.cardEdge }]} onPress={onPress}>
       <PhotoPlaceholder style={StyleSheet.absoluteFill} />
-      {photoUri ? <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+      {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
       <LinearGradient colors={SCRIM} locations={[0.4, 1]} style={StyleSheet.absoluteFill} />
       {archived ? <View style={[StyleSheet.absoluteFill, { backgroundColor: ARCHIVED_VEIL }]} pointerEvents="none" /> : null}
 

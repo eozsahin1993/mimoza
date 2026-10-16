@@ -1,6 +1,7 @@
 import { AttachmentKinds, AttachmentStatuses, getLocalAccount, queuePost } from '@/data/db';
 import { generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { writePhotoFile } from '@/core/photo/photo-cache';
+import { setPostPhotoUri } from '@/core/photo/photo-store';
 import { logEvent } from '@/core/services/analytics';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { drainOutbox } from '@/core/sync/drain-outbox';
@@ -76,7 +77,7 @@ export async function createPost(input: CreatePostInput): Promise<string> {
       createdAt,
     }
   );
-  writePhotoFile(input.circleId, postId, input.photo);
+  setPostPhotoUri(input.circleId, postId, writePhotoFile(input.circleId, postId, input.photo));
 
   void logEvent('post_created');
   drainOutbox(input.circleId).catch((err) => console.error('Failed to drain outbox', err));

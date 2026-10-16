@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Avatar } from '@/ui/components/avatar/avatar';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { Space } from '@/ui/theme/tokens';
+import { useProfilePictureUri } from '@/core/photo/use-photo-uri';
 import type { CommentItem } from '@/features/post/components/post-comments';
 
 export type CommentRowProps = Omit<CommentItem, 'id'> & {
@@ -17,10 +18,11 @@ const DEFAULT_AVATAR_SIZE = 30;
  * byline, the comment itself on its own line below — a reply reads as a
  * small message, not a caption with a name run into it.
  */
-export function CommentRow({ authorName, authorPhotoUri, authorPublicKey, body, timestamp, size = DEFAULT_AVATAR_SIZE }: CommentRowProps) {
+export function CommentRow({ authorId, authorName, authorPhotoUri, body, timestamp, size = DEFAULT_AVATAR_SIZE }: CommentRowProps) {
+  const uri = useProfilePictureUri(authorId, authorPhotoUri);
   return (
     <View style={styles.row}>
-      <Avatar size={size} uri={authorPhotoUri} name={authorName} colorSeed={authorPublicKey} />
+      <Avatar size={size} uri={uri} name={authorName} colorSeed={authorId} />
       <View style={styles.body}>
         <View style={styles.byline}>
           <ThemedText type="titleSmall" numberOfLines={1} style={[styles.authorName, styles.bylineText]}>

@@ -1,6 +1,7 @@
 import { generateUUID } from '@/core/crypto/primitives';
 import { deleteProfilePicture, storeProfilePicture } from '@/data/db';
 import { deleteProfilePictureFiles, writeProfilePictureFile } from '@/core/photo/photo-cache';
+import { clearProfilePictureUri, setProfilePictureUri } from '@/core/photo/photo-store';
 import { getProfilePictureUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import { BlobAlreadyExistsError } from '@/core/services/relay-errors';
 import { clearPicture, setPicture } from '@/features/account/services/account-relay';
@@ -29,7 +30,7 @@ export async function publishProfilePicture(accountId: string, photo: Uint8Array
   await setPicture(pictureId);
 
   await storeProfilePicture(accountId, pictureId, photo);
-  writeProfilePictureFile(accountId, photo, pictureId);
+  setProfilePictureUri(accountId, writeProfilePictureFile(accountId, photo, pictureId));
 
   return pictureId;
 }
@@ -40,4 +41,5 @@ export async function removeProfilePicture(accountId: string): Promise<void> {
 
   await deleteProfilePicture(accountId);
   deleteProfilePictureFiles(accountId);
+  clearProfilePictureUri(accountId);
 }

@@ -9,6 +9,7 @@ jest.mock('@/features/account/services/account-relay', () => ({
 
 import { initDatabase } from '@/data/db';
 import { deleteProfilePicture, getProfilePicture } from '@/data/db/profile-pictures';
+import { getPhotoStoreState, resetPhotoStore } from '@/core/photo/photo-store';
 import { getProfilePictureUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import { clearPicture, setPicture } from '@/features/account/services/account-relay';
 import { BlobAlreadyExistsError } from '@/core/services/relay-errors';
@@ -25,6 +26,7 @@ beforeEach(async () => {
   (getProfilePictureUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3/target', fields: {} });
   (uploadBlob as jest.Mock).mockResolvedValue(undefined);
   await deleteProfilePicture(ACCOUNT_ID);
+  resetPhotoStore();
 });
 
 describe('publishProfilePicture', () => {
@@ -40,6 +42,8 @@ describe('publishProfilePicture', () => {
     expect(stored?.pictureId).toBe(pictureId);
     expect(stored?.status).toBe('fetched');
     expect(stored?.bytes).toEqual(photo);
+    // Every avatar of this account on screen picks it up from here, with no refocus.
+    expect(getPhotoStoreState().profilePictures[ACCOUNT_ID]).toEqual(expect.any(String));
   });
 
   test('a fresh id every call, even for the same bytes', async () => {
@@ -79,5 +83,7 @@ describe('removeProfilePicture', () => {
 
     expect(clearPicture).toHaveBeenCalledTimes(1);
     expect(await getProfilePicture(ACCOUNT_ID)).toBeNull();
+    // A removal, not an absence: it has to beat whatever a screen read before.
+    expect(getPhotoStoreState().profilePictures[ACCOUNT_ID]).toBeNull();
   });
 });

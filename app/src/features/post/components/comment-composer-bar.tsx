@@ -5,15 +5,11 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Avatar } from '@/ui/components/avatar/avatar';
 import { Icon } from '@/ui/components/icon';
 import { Icons, Radius, Space, Type } from '@/ui/theme/tokens';
-import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
+import { useOwnAccount } from '@/core/account/use-own-account';
 
 export type CommentComposerBarProps = {
   onSubmit: (body: string) => void;
-  /** The reader's own picture, shown beside the field — it's their comment. */
-  selfPhotoUri?: string;
-  /** Pairs with `selfPhotoUri` — initials before a picture is set. */
-  selfName?: string;
 };
 
 /** Matches the one line of 14pt comment text this sits beside, not a form field's usual height. */
@@ -26,11 +22,13 @@ const COMPOSER_HEIGHT = 42;
  * this one gets scrolled above the keyboard rather than needing to float
  * itself there.
  */
-export function CommentComposerBar({ onSubmit, selfPhotoUri, selfName }: CommentComposerBarProps) {
+export function CommentComposerBar({ onSubmit }: CommentComposerBarProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
-  const ownColorSeed = useOwnColorSeed();
+  // It's their comment, so their face sits beside it — read here rather
+  // than threaded down from the feed, since every card wants the same one.
+  const own = useOwnAccount();
   const [text, setText] = useState('');
 
   function handleSubmit() {
@@ -44,7 +42,7 @@ export function CommentComposerBar({ onSubmit, selfPhotoUri, selfName }: Comment
       {/* Full composer height, unlike the comment rows' smaller avatar —
           here it's one of three controls on a line, and a short circle
           beside a tall box reads as misaligned however it's centred. */}
-      <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} name={selfName} colorSeed={ownColorSeed} />
+      <Avatar size={COMPOSER_HEIGHT} uri={own.pictureUri} name={own.name} colorSeed={own.accountId} />
       <TextInput
         value={text}
         onChangeText={setText}

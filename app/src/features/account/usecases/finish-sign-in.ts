@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 
+import { setOwnAccount } from '@/core/account/own-account-store';
 import { generateUUID } from '@/core/crypto/primitives';
 import { getLocalAccount, saveLocalAccount } from '@/data/db';
 import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
@@ -45,6 +46,7 @@ export async function finishSignIn({ accountId, name, suggestedName, suggestedPi
       createdAt: now,
       updatedAt: now,
     });
+    setOwnAccount({ accountId, name });
     await goPostAuth(router);
     return;
   }

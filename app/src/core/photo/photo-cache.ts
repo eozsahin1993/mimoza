@@ -143,6 +143,16 @@ export function cachedProfilePictureUri(accountId: string, pictureId: string): s
   return file.exists ? file.uri : null;
 }
 
+/**
+ * A profile_pictures row to a `file://` URI: the cached file for its id,
+ * else written now from the bytes, else null while the bytes haven't
+ * arrived. One resolver for the reader's own picture and everyone else's,
+ * so the two can never come to differ.
+ */
+export function profilePictureUri(accountId: string, picture: { pictureId: string; bytes: Uint8Array | null }): string | null {
+  return cachedProfilePictureUri(accountId, picture.pictureId) ?? (picture.bytes ? writeProfilePictureFile(accountId, picture.bytes, picture.pictureId) : null);
+}
+
 /** Drops every cached file for one account's picture, under whatever id it was last written — removing a picture outright, not replacing it with a new one. */
 export function deleteProfilePictureFiles(accountId: string): void {
   const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);

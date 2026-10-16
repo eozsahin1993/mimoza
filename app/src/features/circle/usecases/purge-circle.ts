@@ -1,5 +1,6 @@
 import { deleteCircle, dropOutbox } from '@/data/db';
 import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
+import { clearCirclePhotos } from '@/core/photo/photo-store';
 import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
 
 /**
@@ -20,5 +21,6 @@ export async function purgeCircleLocally(circleId: string): Promise<void> {
   await dropOutbox(circleId);
   await deleteCircle(circleId);
   deleteCirclePhotoFiles(circleId);
+  clearCirclePhotos(circleId);
   await deleteCircleKeys(circleId);
 }

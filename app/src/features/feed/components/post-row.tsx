@@ -30,8 +30,6 @@ export type PostRowsInput = {
   posts: FeedPostView[];
   /** This device's own profile — the name fallback for a post whose author has no roster row yet. */
   profile: LocalAccount | null;
-  /** This device's own current picture, for the composer avatar beside the comment box. */
-  selfPhotoUri?: string;
   /** The reader's own account id, and whether they may re-file any photo — see set-album-visibility.ts. */
   ownPublicKey: string | null;
   ownIsAdmin: boolean;
@@ -62,7 +60,6 @@ export function usePostRows({
   patchPost,
   posts,
   profile,
-  selfPhotoUri,
   ownPublicKey,
   ownIsAdmin,
   readOnly,
@@ -124,17 +121,17 @@ export function usePostRows({
   return useMemo(
     () => ({
       rows: posts.map((view) =>
-        postRow(view, profile, selfPhotoUri, actions, ownIsAdmin || view.post.authorId === ownPublicKey, readOnly, language),
+        postRow(circleId, view, profile, actions, ownIsAdmin || view.post.authorId === ownPublicKey, readOnly, language),
       ),
     }),
-    [posts, profile, selfPhotoUri, actions, ownPublicKey, ownIsAdmin, readOnly, language],
+    [circleId, posts, profile, actions, ownPublicKey, ownIsAdmin, readOnly, language],
   );
 }
 
 function postRow(
+  circleId: string,
   view: FeedPostView,
   profile: LocalAccount | null,
-  selfPhotoUri: string | undefined,
   actions: PostRowActions,
   canEditAlbum: boolean,
   readOnly: boolean,
@@ -149,9 +146,8 @@ function postRow(
     onSeen: () => actions.onSeen(post.id),
     render: () => (
       <PostCard
+        circleId={circleId}
         post={post}
-        selfPhotoUri={selfPhotoUri}
-        selfName={profile?.name}
         onToggleReaction={(emoji) => actions.onToggleReaction(post.id, emoji)}
         onAddComment={(body) => actions.onAddComment(post.id, body)}
         onPressPhoto={() => actions.onOpenPost(post.id)}
@@ -185,8 +181,8 @@ function toPostCard(view: FeedPostView, profile: LocalAccount | null, readOnly: 
   return {
     id: post.id,
     authorName: view.authorName || (isOwn ? profile.name : '') || i18n.getFixedT(language)('post.unknownMember'),
+    authorId: post.authorId,
     authorPhotoUri: view.authorPhotoUri,
-    authorPublicKey: post.authorId,
     timestamp: formatTimestamp(post.createdAt, language),
     photoUri: view.photoUri,
     missingPhoto: view.photoUri ? undefined : missingPhotoFor(view.photoStatus, readOnly),
@@ -203,8 +199,8 @@ function toCommentItem(comment: CommentWithAuthor & { authorPhotoUri?: string },
   return {
     id: comment.id,
     authorName: comment.authorName || i18n.getFixedT(language)('post.unknownMember'),
+    authorId: comment.authorId,
     authorPhotoUri: comment.authorPhotoUri,
-    authorPublicKey: comment.authorId,
     body: comment.body,
     timestamp: formatRelative(comment.createdAt, language),
   };

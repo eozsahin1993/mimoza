@@ -9,10 +9,10 @@ import { Space } from '@/ui/theme/tokens';
 export type CommentItem = {
   id: string;
   authorName: string;
-  /** Data URI of the author's picture, when known — otherwise their initials show. */
+  /** The author's account: the avatar's colour seed, and whose picture to follow once one lands. */
+  authorId?: string;
+  /** The author's picture as of the cold read, when known — otherwise their initials show. */
   authorPhotoUri?: string;
-  /** Stabler than `authorName` for the avatar's colour — see `Avatar`'s `colorSeed` prop. */
-  authorPublicKey?: string;
   body: string;
   /** Relative and short — "3d", "6h" — since the post's own timestamp already gives the absolute anchor. */
   timestamp: string;
@@ -28,10 +28,6 @@ export type PostCommentsProps = {
   onSubmit: (body: string) => void;
   /** Opens the post's own screen, where the whole thread lives. */
   onPressShowAll?: () => void;
-  /** The reader's own picture — shown beside the composer, addressed to them. */
-  selfPhotoUri?: string;
-  /** Pairs with `selfPhotoUri` — the composer avatar's initials before a picture is set. */
-  selfName?: string;
 };
 
 const AVATAR_SIZE = 30;
@@ -52,8 +48,6 @@ export function PostComments({
   composerOpen,
   onSubmit,
   onPressShowAll,
-  selfPhotoUri,
-  selfName,
 }: PostCommentsProps) {
   const { t } = useTranslation();
 
@@ -70,7 +64,7 @@ export function PostComments({
       ) : null}
 
       {composerOpen ? (
-        <CommentComposerBar onSubmit={onSubmit} selfPhotoUri={selfPhotoUri} selfName={selfName} />
+        <CommentComposerBar onSubmit={onSubmit} />
       ) : null}
     </View>
   );

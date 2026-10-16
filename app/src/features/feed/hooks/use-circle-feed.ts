@@ -16,7 +16,6 @@ import {
   type FeedPostView,
 } from '@/features/feed/usecases/circle-feed';
 import type { MemberEvent } from '@/features/feed/usecases/group-member-events';
-import { onPhotoFetched } from '@/core/photo/photo-events';
 import { showError } from '@/core/services/messages';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
 import { syncCircles } from '@/core/sync/sync-circles';
@@ -164,18 +163,6 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     }
   }, [circleId, meta, feed, loadingMore]);
 
-  // A photo landing while its placeholder is on screen patches that one
-  // row rather than reloading — a backlog of many photos landing one by
-  // one must not mean a feed reload apiece.
-  useEffect(
-    () =>
-      onPhotoFetched((event) => {
-        if (event.kind !== 'post' || event.circleId !== circleId) return;
-        patchPost(event.postId, { photoUri: event.uri });
-      }),
-    [circleId, patchPost],
-  );
-
   // An archived circle's own row may still say admin; the relay would refuse the listing either way.
   const requests = usePendingRequestRows({
     circleId,
@@ -190,7 +177,6 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     patchPost,
     posts: feed?.posts ?? [],
     profile: meta?.profile ?? null,
-    selfPhotoUri: meta?.selfPhotoUri,
     ownPublicKey: meta?.ownPublicKey ?? null,
     ownIsAdmin: meta?.ownIsAdmin ?? false,
     readOnly: meta?.readOnly ?? false,
