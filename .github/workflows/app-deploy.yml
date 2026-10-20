@@ -161,6 +161,17 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 
+      # Only production has a Play listing; staging goes to App Distribution.
+      # Exported through GITHUB_ENV rather than set to '' on staging: the
+      # lane checks for the variable's absence, and an empty path is present.
+      - name: Write the Play service account key
+        if: needs.context.outputs.environment == 'production'
+        run: |
+          echo "$PLAY_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/play.json"
+          echo "PLAY_JSON_KEY=$RUNNER_TEMP/play.json" >> "$GITHUB_ENV"
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
       - name: Ship
         run: bundle exec fastlane android ${{ needs.context.outputs.environment }}
         env:
