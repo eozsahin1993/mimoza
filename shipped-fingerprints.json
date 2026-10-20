@@ -1,4 +1,8 @@
 {
-  "ios": "b479ab5b31e0b7d077b17c1762cf48d0d73c2fef",
-  "android": "ed0a2be0f7470ab6e51fb94bed49e4851fc20a21"
+  "staging": {
+    "version": "0.1.0",
+    "ios": "b479ab5b31e0b7d077b17c1762cf48d0d73c2fef",
+    "android": "ed0a2be0f7470ab6e51fb94bed49e4851fc20a21"
+  },
+  "production": {}
 }

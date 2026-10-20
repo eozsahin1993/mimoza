@@ -27,6 +27,16 @@ jobs:
       channel: ${{ steps.pick.outputs.channel }}
       eas-environment: ${{ steps.pick.outputs.eas-environment }}
     steps:
+      # Production is tagged on main after staging has run the same commit,
+      # so a tag anywhere else is a mistake, not a release.
+      - uses: actions/checkout@v4
+        if: startsWith(github.ref, 'refs/tags/app-v')
+        with:
+          fetch-depth: 0
+      - name: The tag is on main
+        if: startsWith(github.ref, 'refs/tags/app-v')
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+
       - id: pick
         run: |
           if [[ "$GITHUB_REF" == refs/tags/app-v* ]]; then
@@ -65,8 +75,9 @@ jobs:
 
   # What decides build vs update. The fingerprint hashes everything that
   # affects the native build, so an unchanged one means the installed
-  # binaries can run this JS and only an update is needed. Per platform:
-  # an Android-only native change leaves iOS alone.
+  # binaries can run this JS and only an update is needed. A tag takes
+  # the same gate: a production hotfix that changes no native code is an
+  # update to the production channel, not a new binary and a new review.
   fingerprint:
     name: Native change?
     needs: [context, test]
@@ -79,6 +90,7 @@ jobs:
       native-build: ${{ steps.check.outputs.native-build }}
       ios-fingerprint: ${{ steps.check.outputs.ios-fingerprint }}
       android-fingerprint: ${{ steps.check.outputs.android-fingerprint }}
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,8 +109,8 @@ jobs:
       - id: check
         run: ../.github/scripts/decide-build.sh
         env:
+          ENVIRONMENT: ${{ needs.context.outputs.environment }}
           FORCE: ${{ inputs.force || 'none' }}
-          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/app-v') }}
           APP_ENV: ${{ secrets.APP_ENV }}
           EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
           EAS_PROJECT_OWNER: ${{ secrets.EAS_PROJECT_OWNER }}
@@ -330,7 +342,7 @@ jobs:
   # claiming a build that failed would suppress the retry.
   record:
     name: Record the shipped fingerprints
-    needs: [fingerprint, ios, android]
+    needs: [context, fingerprint, ios, android]
     if: always() && !cancelled() && !failure()
     runs-on: ubuntu-latest
     permissions:
@@ -342,5 +354,7 @@ jobs:
 
       - run: >
           .github/scripts/record-fingerprints.sh
+          "${{ needs.context.outputs.environment }}"
           "${{ needs.fingerprint.outputs.ios-fingerprint }}"
           "${{ needs.fingerprint.outputs.android-fingerprint }}"
+          "${{ needs.fingerprint.outputs.version }}"

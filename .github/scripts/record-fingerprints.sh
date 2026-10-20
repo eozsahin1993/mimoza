@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
-# Records what the binaries just built from, so the next push can tell
-# whether its JavaScript fits them.
+# Records what the binaries just built from, so the next push to the same
+# environment can tell whether its JavaScript fits them.
 #
-# Takes the two fingerprints as arguments; an empty one leaves that
-# platform's record alone, which is what happens when only one platform
-# needed a build.
+# Takes the environment, the two fingerprints and the version; an empty
+# fingerprint leaves that platform's record alone, which is what happens
+# when only one platform needed a build.
 set -euo pipefail
 
-ios=${1:-}
-android=${2:-}
+environment=${1:?}
+ios=${2:-}
+android=${3:-}
+version=${4:-}
 
 node -e '
   const fs = require("fs");
   const file = "shipped-fingerprints.json";
-  const [ios, android] = process.argv.slice(1);
+  const [environment, ios, android, version] = process.argv.slice(1);
   const shipped = JSON.parse(fs.readFileSync(file, "utf8"));
-  fs.writeFileSync(file, JSON.stringify({
-    ...shipped,
+  shipped[environment] = {
+    ...shipped[environment],
+    ...(version ? { version } : {}),
     ...(ios ? { ios } : {}),
     ...(android ? { android } : {}),
-  }, null, 2) + "\n");
-' "$ios" "$android"
+  };
+  fs.writeFileSync(file, JSON.stringify(shipped, null, 2) + "\n");
+' "$environment" "$ios" "$android" "$version"
 
 git diff --quiet && { echo "unchanged"; exit 0; }
 

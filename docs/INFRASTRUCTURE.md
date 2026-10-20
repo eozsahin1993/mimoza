@@ -337,7 +337,7 @@ JavaScript, and ships one of two things — never both:
 ```
 test (lint + jest, Ubuntu)
   └─ fingerprint: expo-updates fingerprint per platform
-       vs shipped-fingerprints.json (repo root)
+       vs shipped-fingerprints.json (repo root, per environment)
          ├─ unchanged ──→ eas update --channel <staging|production>
          └─ changed   ──→ fastlane ios      → TestFlight
                           fastlane android  → staging: Firebase App Distribution (APK)
@@ -345,8 +345,11 @@ test (lint + jest, Ubuntu)
                           then record the new fingerprints (a commit, [skip ci])
 ```
 
-- A release tag, `[build]` in the commit message, or the `force` input
-  on a manual run makes it a native build regardless.
+- `[build]` in the commit message or the `force` input on a manual run
+  makes it a native build regardless. So does a changed `version` in
+  `app.json`: the fingerprint ignores it, and a store release needs a
+  binary that carries the new one. A tag with neither is a JS-only
+  update to the production channel.
 - Signing: iOS certificates and profiles through `match`; the Android
   upload keystore lives in the same certificates repo, its password in
   `ANDROID_KEYSTORE_PASSWORD`. `prebuild --clean` regenerates `ios/` and
