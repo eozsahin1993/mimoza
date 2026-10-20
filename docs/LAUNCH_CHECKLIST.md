@@ -12,7 +12,7 @@ so a stale "done" is visible.
 - [ ] **Apple Developer Program** — paid 2026-10-01 as an individual
       membership. Conversion to organization requested 2026-10-06 via
       Contact Us → Membership and Account, with the legal name, D-U-N-S,
-      Northwest address and the business phone. Same Apple ID and Team ID
+      registered address and the business phone. Same Apple ID and Team ID
       carry over; a free developer@rarekiwisoftware.com Apple ID exists
       but holds nothing — invite it as Admin after the conversion. Expect
       a new Program License Agreement to accept once it lands; TestFlight
@@ -20,17 +20,16 @@ so a stale "done" is visible.
       reports in 2026 run weeks to months, and a Developer Support
       callback request is what unstuck others — ask for one around
       2026-10-20.
-- [x] **D-U-N-S for RareKiwi Software LLC** — 149977686, confirmed by
-      D&B 2026-10-05, on Northwest's address. Apple copies this address
-      to EU product pages for traders, so it must never be a home address.
+- [x] **D-U-N-S for the LLC** — confirmed by D&B 2026-10-05, on the
+      registered agent's address. Apple copies this address to EU product
+      pages for traders, so it must never be a home address.
 - [ ] **Google Play Console** — the personal account is abandoned
       (nothing was ever created on it). A new organization account was
       registered 2026-10-06 under developer@rarekiwisoftware.com, website
       verified through a Search Console URL-prefix property matching
-      Play's string exactly; org verification pending. Identity check
-      rejected the driver's license 2026-10-08, appealed the same day, no
-      answer as of 2026-10-13; a passport is the usual next document.
-      Create the Mimoza app there once verified, link a service account
+      Play's string exactly; org and identity verification cleared by
+      2026-10-20.
+      Create the Mimoza app there, link a service account
       for `PLAY_JSON_KEY`, and close the old account afterwards.
 - [ ] **Bundle id / package** moved to `com.rarekiwisoftware.mimoza`
       (staging `.staging`) on 2026-10-07, before anything reached a store.
@@ -51,8 +50,8 @@ so a stale "done" is visible.
 
 ## Production environment
 
-Prod is 852138521113, staging 223057859233. See
-[INFRASTRUCTURE.md](INFRASTRUCTURE.md).
+Two AWS accounts, prod and staging; the ids live in the GitHub
+environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 - [x] AWS account for prod, `mimoza-prod-admin` IAM user, and two local
       profiles: `mimoza-prod-admin` via `aws login`, and `mimoza-prod-tf`
@@ -68,8 +67,8 @@ Prod is 852138521113, staging 223057859233. See
       so prod reuses staging's — what differs is `APNS_TOPIC`. The Sign in
       with Apple key does not: it belongs to a primary App ID, so prod has
       its own.
-- [x] FCM key in SSM, from the prod Firebase project (`mimozaapp-1587f`).
-- [x] Google OAuth clients for the prod bundle id, in `mimozaapp-1587f`.
+- [x] FCM key in SSM, from the prod Firebase project.
+- [x] Google OAuth clients for the prod bundle id, in the prod Google project.
       Dev shares the bundle id but since 2026-10-07 has its own clients in
       `mimoza-dev`, so prod's can be deleted without touching dev. No
       Apple Services ID: that's for web and Android Apple sign-in, and a
