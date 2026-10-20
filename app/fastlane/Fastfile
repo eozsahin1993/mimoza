@@ -198,8 +198,11 @@ def ship_android(name)
   return distribute_to_testers(config) if config[:firebase_app]
 
   aab = lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH]
+  # R8's rename table, so Play vitals show real stack frames. Crashlytics
+  # gets its own copy from the gradle plugin during the build.
+  mapping = lane_context[SharedValues::GRADLE_MAPPING_TXT_OUTPUT_PATH]
   if ENV['PLAY_JSON_KEY'].nil?
-    UI.important("No PLAY_JSON_KEY — built #{aab}, upload it by hand.")
+    UI.important("No PLAY_JSON_KEY — built #{aab} (mapping #{mapping}), upload both by hand.")
     return
   end
 
@@ -207,6 +210,7 @@ def ship_android(name)
     package_name: config[:package_name],
     track: 'internal',
     aab: aab,
+    mapping: mapping,
     json_key: ENV.fetch('PLAY_JSON_KEY'),
     # The listing has its own lane (`android listing`); a build never touches it.
     skip_upload_metadata: true,

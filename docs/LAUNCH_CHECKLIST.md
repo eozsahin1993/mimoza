@@ -100,6 +100,12 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       removes it and blocks any other package from adding it back. What
       remains: `CAMERA` (device-transfer QR), `INTERNET`, and the legacy
       storage pair capped at API 32.
+- [x] R8 on for Android release builds (`expo-build-properties`,
+      `enableMinifyInReleaseBuilds`) — 2026-10-20. The mapping file goes
+      to Play with the bundle and to Crashlytics from the gradle plugin.
+      Resource shrinking stays off: push strings are resolved by a name
+      that arrives in the payload, so the shrinker would drop them all.
+      Verify on a Play-installed build: sign-in, a push, a photo post.
 - [ ] `npx expo prebuild --clean` before either release build. `android/`
       is gitignored and the one on disk predates the permission change.
 - [ ] Play upload key generated and backed up somewhere you'd still have

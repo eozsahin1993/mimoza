@@ -37,6 +37,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true
+          }
+        }
+      ],
       "./plugins/with-splash-wordmark",
       "./plugins/with-android-default-push-strings",
       [

@@ -63,6 +63,9 @@ private class LocalizingDelegate(
 
   // Already underscored by the relay (androidResourceName in
   // fcm/sender.go), since aapt2 rejects a "." in a resource name.
+  // Looked up by a name that only ever exists in the payload, so Gradle's
+  // resource shrinker would see no reference and drop every push string:
+  // keep enableShrinkResourcesInReleaseBuilds off (app.json).
   private fun resolve(key: String?, args: Array<String>?): String? {
     if (key.isNullOrEmpty()) return null
     val resId = context.resources.getIdentifier(key, "string", context.packageName)
