@@ -1,1 +1,1 @@
-family,photos,private,album,friends,circle,group,encrypted,sharing,memories,baby,kids
+family,photos,album,friends,group,encrypted,sharing,memories,baby,kids,grandparents,secure
