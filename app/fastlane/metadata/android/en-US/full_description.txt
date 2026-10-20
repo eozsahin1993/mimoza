@@ -1,9 +1,17 @@
-Mimoza is for sharing photos with the people closest to you. You make a circle for your family or a few close friends, and everyone in it shares one feed.
+Mimoza is a private photo album for your family and close friends. You make a circle, invite the people who belong in it, and everyone in the circle shares one feed and one album. Nobody else can see it.
 
-Post a photo with a caption, comment on what others share, and react with emoji. Each circle also has a shared photo album that everyone adds to, with photos grouped by month, so the ones worth keeping are easy to find later. To add someone, send them an invite link and approve their request to join.
+Post a photo with a caption, comment on what other people post, and react with emoji. Each circle has its own album, grouped by month, so an old photo is easy to find again.
 
-What you share stays inside the circle. Photos, captions, comments and reactions are encrypted on your phone, and only the members of a circle can open them. Our servers store that content but can't read it. We don't sell your information or use it for ads.
+END TO END ENCRYPTED
+Photos, captions, comments and reactions are encrypted on your phone with keys that only the members of the circle have. Mimoza stores the encrypted content and cannot read it.
 
-You sign in with Google. Mimoza keeps your name, and a profile picture if you add one, and never stores your email address. If you get a new phone, sign in again and your circles come with you, or scan a code from your old phone to move over directly.
+INVITE ONLY
+A circle is the people you invited. To add someone, send them an invite link and approve their request to join. There are no public profiles and no way to find a circle you were not invited to, so a family album stays within the family.
 
-You choose what notifies you, circle by circle. Mimoza is available in English, Turkish, Spanish, French and German. If you ever want out, you can delete your account from inside the app, which also removes the photos, comments and reactions you posted.
+LESS TO COLLECT
+Mimoza keeps your name and, if you add one, a profile picture, so the people you invite can see who is asking. It does not store your email address. Your information is not sold and not used for ads.
+
+YOUR ACCOUNT FOLLOWS YOU
+Sign in with Google on a new phone and your circles come with you, keys included. You can also scan a code from your old phone to move over directly. You can delete your account from inside the app at any time, which also removes the photos, comments and reactions you posted.
+
+You choose which circles notify you. Mimoza is available in English, Turkish, Spanish, French and German.
