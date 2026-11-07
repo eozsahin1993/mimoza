@@ -55,7 +55,9 @@ export const onRequestPost = async ({ request, env }: Context): Promise<Response
       text: message,
       html: `<p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>`,
     });
-  } catch {
+  } catch (err) {
+    // SES's reason goes to the Functions log only; the visitor gets the generic line.
+    console.error("contact: send failed", err);
     return json({ error: "Could not send your message." }, 502);
   }
 

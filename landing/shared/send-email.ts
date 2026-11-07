@@ -62,6 +62,6 @@ export async function sendEmail(env: EmailEnv, message: EmailMessage): Promise<v
   });
 
   if (!response.ok) {
-    throw new Error(`SES responded ${response.status}`);
+    throw new Error(`SES responded ${response.status}: ${await response.text()}`);
   }
 }
