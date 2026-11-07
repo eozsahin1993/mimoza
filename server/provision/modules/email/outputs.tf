@@ -1,3 +1,8 @@
+output "recipients" {
+  description = "The only recipients the relay's policy allows."
+  value       = var.recipients
+}
+
 output "identity_arns" {
   description = "The domain and inbox identities, for the relay's IAM policy. Both: in the sandbox SES authorizes a send against the recipient's identity as well as the sender's."
   value       = [aws_sesv2_email_identity.domain.arn, aws_sesv2_email_identity.inbox.arn]

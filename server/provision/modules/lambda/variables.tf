@@ -47,6 +47,11 @@ variable "feedback_identity_arns" {
   type        = list(string)
 }
 
+variable "feedback_recipients" {
+  description = "The only addresses feedback may go to — modules/email's output."
+  type        = list(string)
+}
+
 variable "log_retention_days" {
   description = "How long the relay's logs are kept. Long enough to investigate something reported late, short enough that nothing accumulates."
   type        = number

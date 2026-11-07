@@ -8,6 +8,11 @@ variable "inbox" {
   type        = string
 }
 
+variable "recipients" {
+  description = "Every address mail may go to. The IAM policies refuse a send with any other recipient, so a leaked key or a compromised relay can only mail us, sandbox or not. Must include internal/feedback's SupportInbox and the website's TO_ADDRESS."
+  type        = list(string)
+}
+
 variable "website_sender" {
   description = "Also create an IAM user the website's support form signs SES requests with (landing/shared/send-email.ts). Its access key is created by hand and set as a Pages secret, so the secret never enters state. Production only: the website is one site."
   type        = bool

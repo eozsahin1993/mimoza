@@ -16,6 +16,8 @@ type Env = EmailEnv;
 type Context = { request: Request; env: Env };
 
 const FROM_ADDRESS = "support@joinmimoza.com";
+// The website-mailer policy only allows modules/email's recipients; any other
+// address here is refused by SES with a 403.
 const TO_ADDRESS = "hello@joinmimoza.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_MESSAGE_LENGTH = 4000;

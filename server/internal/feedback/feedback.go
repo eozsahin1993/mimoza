@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+// The relay's IAM policy only lets mail go to modules/email's recipients, so
+// SupportInbox must stay one of them or SES answers 403.
 const (
 	SupportInbox  = "hello@joinmimoza.com"
 	SenderAddress = "support@joinmimoza.com"

@@ -19,9 +19,10 @@ module "storage" {
 # Feedback from the app is emailed as the support domain, which is the
 # same for every environment: the subject line says which one sent.
 module "email" {
-  source = "../../modules/email"
-  domain = "joinmimoza.com"
-  inbox  = "hello@joinmimoza.com"
+  source     = "../../modules/email"
+  domain     = "joinmimoza.com"
+  inbox      = "hello@joinmimoza.com"
+  recipients = ["hello@joinmimoza.com", "support@joinmimoza.com"]
   # The website's support form sends from here too — see landing/.
   website_sender = true
 }
@@ -34,6 +35,7 @@ module "lambda" {
   storage     = module.storage
 
   feedback_identity_arns = module.email.identity_arns
+  feedback_recipients    = module.email.recipients
 
   # Permanent, not pending: locking the URL makes Lambda demand a body hash
   # on every write, and only the app is in a position to add it.

@@ -31,11 +31,19 @@ data "aws_iam_policy_document" "website_sender" {
   count = var.website_sender ? 1 : 0
 
   # The inbox too, not just the domain: in the sandbox SES checks the
-  # recipient's identity as well, and refuses with a 403 without it.
+  # recipient's identity as well, and refuses with a 403 without it. The
+  # recipients condition is what keeps a leaked key harmless outside the
+  # sandbox: it can only ever mail us.
   statement {
     sid       = "SendAsSupportDomain"
     actions   = ["ses:SendEmail"]
     resources = [aws_sesv2_email_identity.domain.arn, aws_sesv2_email_identity.inbox.arn]
+
+    condition {
+      test     = "ForAllValues:StringEquals"
+      variable = "ses:Recipients"
+      values   = var.recipients
+    }
   }
 }
 
