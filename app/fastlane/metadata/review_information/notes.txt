@@ -8,6 +8,10 @@ Everything is reachable from one fresh account with no invite and no second devi
 
 Invites and joining: the circle's details screen (top right of the feed) has an invite link. Opening it on another signed-in account joins that circle after the admin approves the request.
 
-Content is end to end encrypted. Photos, captions, comments and reactions are encrypted on the device with keys held only by the circle's members; our servers store the ciphertext and cannot read it. Because of that, reporting is done from the reporting device: Settings, "Report a problem" reaches us by email, and a circle admin can remove any member, which also rotates the circle's keys so the removed member can read nothing new. Anyone can leave a circle at any time.
+Content is end to end encrypted. Photos, captions, comments and reactions are encrypted on the device with keys held only by the circle's members; our servers store the ciphertext and cannot read it.
+
+Reporting objectionable content: open any photo someone else posted, tap the menu (top right), and choose "Report this photo". It is also in Settings, "Send feedback", "Report a post". Both are sent from inside the app; no mail app is needed. A report identifies the photo and its circle, which is enough for us to find the entry and remove it.
+
+Blocking: a circle admin can remove any member, which also rotates the circle's keys so the removed member can read nothing new. Anyone can leave a circle at any time.
 
 Account deletion is in Settings and erases the account and everything it shared, server side.

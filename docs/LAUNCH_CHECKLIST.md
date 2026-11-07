@@ -4,22 +4,17 @@ Everything between here and both stores. Grouped by what blocks what, not
 by store — several items gate others, and two of them cost calendar time
 rather than work.
 
-Status as of 2026-10-13. Tick items as they land; add a date when you do,
+Status as of 2026-11-07. Tick items as they land; add a date when you do,
 so a stale "done" is visible.
 
 ## Start these first — they cost waiting, not doing
 
-- [ ] **Apple Developer Program** — paid 2026-10-01 as an individual
-      membership. Conversion to organization requested 2026-10-06 via
-      Contact Us → Membership and Account, with the legal name, D-U-N-S,
-      registered address and the business phone. Same Apple ID and Team ID
-      carry over; a free developer@rarekiwisoftware.com Apple ID exists
-      but holds nothing — invite it as Admin after the conversion. Expect
-      a new Program License Agreement to accept once it lands; TestFlight
-      uploads fail until then. No word from Apple as of 2026-10-13;
-      reports in 2026 run weeks to months, and a Developer Support
-      callback request is what unstuck others — ask for one around
-      2026-10-20.
+- [x] **Apple Developer Program** — converted from the individual
+      membership to the LLC, confirmed 2026-11-07. Same Apple ID and Team
+      ID. developer@rarekiwisoftware.com added as Admin 2026-11-07. Still
+      to do: accept the new Program License Agreement if App Store Connect
+      shows one, from the Account Holder (TestFlight uploads fail until
+      then).
 - [x] **D-U-N-S for the LLC** — confirmed by D&B 2026-10-05, on the
       registered agent's address. Apple copies this address to EU product
       pages for traders, so it must never be a home address.
@@ -35,8 +30,11 @@ so a stale "done" is visible.
       (staging `.staging`) on 2026-10-07, before anything reached a store.
       Repo, Firebase apps, OAuth clients, SSM and CI secrets are done,
       and both relays verified running with the new ids on 2026-10-13
-      (`APNS_TOPIC` and `APPLE_CLIENT_ID_IOS` on each Lambda). Still
-      open: match profiles, the Sign in with Apple key's Primary App ID
+      (`APNS_TOPIC` and `APPLE_CLIENT_ID_IOS` on each Lambda; prod's
+      re-read from SSM 2026-11-07, both team ids matching `appleTeamId`).
+      Production App Store Connect record created 2026-11-07, named to
+      match `metadata/en-US/name.txt`. Still open: the Sign in with Apple
+      key's Primary App ID
       in the portal (the relay's revoke call signs `sub` = bundle id and
       fails as `invalid_client` until it points at the new one), and
       deleting the old App IDs, Firebase apps and OAuth clients once new
@@ -126,7 +124,9 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       emails the support inbox through SES. No mail app involved, so a
       reviewer's device is no different from anyone's.
 - [ ] **Review notes, both stores.** Apple's "App Review Information" and
-      Play's "App access" section. Sign-in is Google or Apple only, so
+      Play's "App access" section. Apple's are written and ship with
+      `fastlane ios listing` from `metadata/review_information/notes.txt`
+      (reporting path corrected 2026-11-07); Play's still need pasting. Sign-in is Google or Apple only, so
       there is no demo account to hand over — say that any account works,
       and walk them fresh account → create a circle → post a photo.
       Confirmed solo-reachable, so no invite and no second device — say it
@@ -167,7 +167,32 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       screen views and the three named events above. This wasn't true
       when this line was first written; it is now. Content is E2EE and
       unreadable by you — state it, it's the product.
-- [ ] Age rating questionnaires — IARC for Play, Apple's own.
+
+      Apple's answers, checked against the code 2026-11-07. Apple counts
+      data as collected when it is stored "in a readable form", so circle
+      photos, captions, comments and reactions are not collected. No
+      tracking anywhere.
+
+      | Data type | Linked to user | Purpose | Why |
+      |---|---|---|---|
+      | Contact Info → Name | Yes | App Functionality | the profile name, stored as typed so admins can see who asks to join |
+      | Contact Info → Email Address | Yes | App Functionality | only if typed into Send feedback, for a reply |
+      | User Content → Photos or Videos | Yes | App Functionality | the profile picture, stored unsealed like the name |
+      | User Content → Customer Support | Yes | App Functionality | Send feedback and Report this photo messages |
+      | Identifiers → User ID | Yes | App Functionality | the account id, from the Apple or Google `sub` |
+      | Identifiers → Device ID | Yes | App Functionality | the push token; Apple doesn't say tokens count, so declared to be safe |
+      | Usage Data → Product Interaction | No | Analytics | Firebase screen views and four events (`circle_created` joined the three above); no user id is set |
+      | Diagnostics → Crash Data | No | App Functionality | Crashlytics crash reports; no user id is set, and nothing calls `recordError`, so no other diagnostics |
+
+      The feedback form doesn't qualify for Apple's optional-disclosure
+      exemption (the account's name isn't shown on the form), so its two
+      rows stay.
+- [ ] Age rating questionnaires — IARC for Play, Apple's own. Apple: none
+      for every content category; user-generated content yes, since
+      members share photos and comments; messaging yes (comments within a
+      circle); unrestricted web access, gambling, contests, ads no. The
+      result should be 13+, matching the privacy policy's minimum age; if
+      Apple computes higher, check which answer pushed it.
 - [ ] Availability: every territory on both stores. Apple defaults to all;
       Play makes you tick them ("add all countries"). The listing stays
       English everywhere, like Threads' Turkish page does — the store
