@@ -7,12 +7,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // Separate pages rather than client-side routes: the stores fetch
-      // /privacy and /support as plain documents, and a static host serves
-      // them without an SPA fallback.
+      // /privacy, /support and /delete-account as plain documents, and a
+      // static host serves them without an SPA fallback.
       input: {
         main: "index.html",
         privacy: "privacy/index.html",
         support: "support/index.html",
+        deleteAccount: "delete-account/index.html",
       },
     },
   },

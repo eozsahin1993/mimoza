@@ -82,10 +82,9 @@ export function Support() {
           <summary>How do I delete my account?</summary>
           <p>
             In the app, open <strong>Account</strong> and tap <strong>Delete account</strong>. It's immediate and
-            can't be undone. If you no longer have access to the app, email{" "}
-            <a href={`mailto:${SUPPORT_EMAIL}?subject=Delete%20my%20Mimoza%20account`}>{SUPPORT_EMAIL}</a> with the
-            subject "Delete my account" and we'll take care of it. The full details of what gets deleted are in{" "}
-            <a href="/privacy/#delete-account">the privacy policy</a>.
+            can't be undone. If you no longer have access to the app,{" "}
+            <a href="/delete-account/">request deletion here</a> and we'll take care of it. The full details of
+            what gets deleted are in <a href="/privacy/#delete-account">the privacy policy</a>.
           </p>
         </details>
 

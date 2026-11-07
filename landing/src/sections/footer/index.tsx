@@ -12,6 +12,7 @@ export function Footer() {
       <span className="footer-links">
         <a href="/privacy/">Privacy policy</a>
         <a href="/support/">Support</a>
+        <a href="/delete-account/">Delete account</a>
       </span>
       <span>© 2026 RareKiwi Software LLC</span>
     </footer>

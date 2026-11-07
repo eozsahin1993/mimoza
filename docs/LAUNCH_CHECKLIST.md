@@ -158,10 +158,12 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       covers Play.
 - [ ] **Play account deletion URL**: a *web* page where someone can
       request deletion without installing the app, declared in Data
-      safety. Still doesn't exist — same catch-all false positive as
-      above. The privacy page's deletion section (`#delete-account`) is
-      in-app-first with a mailto fallback, which isn't the same thing.
-      Add a page beside `privacy/` in `landing/vite.config.ts`'s inputs.
+      safety. `joinmimoza.com/delete-account/` exists as of 2026-11-07:
+      in-app steps first, then a request form that emails the support
+      inbox through the same Pages Function as `/support`, with a mailto
+      fallback. Identity is confirmed by reply, since the relay holds no
+      email or phone. Still to do: paste the URL into Data safety →
+      Data deletion in Play Console once the site is deployed.
 - [ ] App Privacy (Apple) and Data safety (Play): account identifier from
       Apple/Google, push token, **and now Analytics / Usage Data** —
       screen views and the three named events above. This wasn't true

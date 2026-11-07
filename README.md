@@ -8,7 +8,8 @@ that never sees plaintext content.
 
 - [`app/`](app/README.md) — the Expo/React Native client.
 - [`server/`](server/README.md) — the Go relay.
-- [`landing/`](landing/) — the website, `joinmimoza.com`: a Vite site
-  plus the privacy policy, deployed to Cloudflare Pages.
+- [`landing/`](landing/README.md) — the website, `joinmimoza.com`: a Vite
+  site with the privacy, support and account deletion pages, deployed to
+  Cloudflare Pages.
 - [`docs/`](docs/README.md) — architecture, infrastructure and the
   launch checklist, for all three.

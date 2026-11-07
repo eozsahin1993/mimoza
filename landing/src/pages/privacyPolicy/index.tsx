@@ -370,7 +370,7 @@ export function PrivacyPolicy() {
           mention your account identifier age out on the schedule above.
         </p>
         <p>
-          If you can no longer use the app, email{" "}
+          If you can no longer use the app, <a href="/delete-account/">request deletion on our website</a> or email{" "}
           <a href={`mailto:${SUPPORT_EMAIL}?subject=Delete%20my%20Mimoza%20account`}>{SUPPORT_EMAIL}</a> with the
           subject "Delete my account". Because we hold no email address or phone number for you, we'll need to
           confirm the request is yours before acting on it, and we'll explain how in our reply. We aim to complete

@@ -1,5 +1,6 @@
 /**
- * The support form on /support. Needs AWS_ACCESS_KEY_ID and
+ * The support form on /support and the deletion request form on
+ * /delete-account. Needs AWS_ACCESS_KEY_ID and
  * AWS_SECRET_ACCESS_KEY set as Pages secrets: the key of the IAM user
  * server/provision/modules/email creates in the production account,
  * allowed to send as joinmimoza.com and nothing else. The recipient is
@@ -35,7 +36,7 @@ export const onRequestPost = async ({ request, env }: Context): Promise<Response
     return json({ error: "Bad request." }, 400);
   }
 
-  const { email, message } = (body ?? {}) as { email?: unknown; message?: unknown };
+  const { email, message, topic } = (body ?? {}) as { email?: unknown; message?: unknown; topic?: unknown };
   if (typeof email !== "string" || !EMAIL_RE.test(email) || email.length > 254) {
     return json({ error: "That doesn't look like an email address." }, 400);
   }
@@ -43,12 +44,14 @@ export const onRequestPost = async ({ request, env }: Context): Promise<Response
     return json({ error: `Message must be 1-${MAX_MESSAGE_LENGTH} characters.` }, 400);
   }
 
+  const subject = topic === "deletion" ? `Mimoza account deletion request: ${email}` : `Mimoza support: ${email}`;
+
   try {
     await sendEmail(env, {
       to: TO_ADDRESS,
       from: FROM_ADDRESS,
       replyTo: email,
-      subject: `Mimoza support: ${email}`,
+      subject,
       text: message,
       html: `<p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>`,
     });

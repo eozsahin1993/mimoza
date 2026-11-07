@@ -9,7 +9,13 @@ type Status = "idle" | "loading" | "done" | "error";
  * message arrives as a real support request with a Reply-To the owner
  * can answer directly, not whatever's left to a visitor's own mail app.
  */
-export function ContactForm() {
+export function ContactForm({
+  topic = "support",
+  messagePlaceholder = "How can we help?",
+}: {
+  topic?: "support" | "deletion";
+  messagePlaceholder?: string;
+}) {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -22,7 +28,7 @@ export function ContactForm() {
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, message }),
+        body: JSON.stringify({ email, message, topic }),
       });
       if (!response.ok) throw new Error("request failed");
       setStatus("done");
@@ -49,7 +55,7 @@ export function ContactForm() {
         />
         <textarea
           required
-          placeholder="How can we help?"
+          placeholder={messagePlaceholder}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           disabled={status === "loading"}
