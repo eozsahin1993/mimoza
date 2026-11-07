@@ -66,7 +66,7 @@ function NoLongerMemberBanner({ circleId }: { circleId: string }) {
 
   return (
     <ThemedView style={[styles.banner, { borderColor: tints.chipIdleBorder }]} type="surface">
-      <Icon icon={Icons.archived} size={22} color={theme.muted} />
+      <Icon icon={Icons.archive} size={22} color={theme.muted} />
       <View style={styles.text}>
         <ThemedText type="titleMedium">{t('circle.archived.title')}</ThemedText>
         <ThemedText type="labelSmall" themeColor="muted">

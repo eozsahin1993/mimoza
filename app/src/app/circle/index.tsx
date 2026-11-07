@@ -277,7 +277,7 @@ export default function CircleListScreen() {
               onPress={() => setShowPrivacyInfo(true)}
               accessibilityRole="button"
               accessibilityLabel={`${t('account.privacyNotice.encrypted')} ${t('account.privacyNotice.details')}`}>
-              <Icon icon={Icons.locked} size={12} color={theme.accentBright} />
+              <Icon icon={Icons.lock} size={12} color={theme.accentBright} />
               <ThemedText type="labelSmall" themeColor="accentBright">
                 {t('account.privacyNotice.badge')}
               </ThemedText>
@@ -312,7 +312,7 @@ export default function CircleListScreen() {
               case 'pending':
                 return (
                   <CircleStatusRow
-                    icon={Icons.waiting}
+                    icon={Icons.time}
                     name={item.request.circleName}
                     status={t('circle.list.pendingStatus')}
                     actionLabel={t('common.cancel')}
@@ -335,7 +335,7 @@ export default function CircleListScreen() {
                   />
                 );
               case 'locked':
-                return <CircleStatusRow icon={Icons.locked} name={item.circle.name} status={t('circle.list.lockedStatus')} />;
+                return <CircleStatusRow icon={Icons.lock} name={item.circle.name} status={t('circle.list.lockedStatus')} />;
               case 'archived':
                 return (
                   <CircleCard

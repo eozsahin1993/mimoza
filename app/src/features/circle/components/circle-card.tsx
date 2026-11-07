@@ -62,7 +62,7 @@ export function CircleCard({ circleId, name, memberCount, photoUri, newCount, la
 
       {archived ? (
         <View style={styles.archivedLabel}>
-          <Icon icon={Icons.archived} size={12} color={ON_PHOTO} />
+          <Icon icon={Icons.archive} size={12} color={ON_PHOTO} />
           <ThemedText type="labelSmall" style={{ color: ON_PHOTO }}>
             {t('circle.list.archivedBadge')}
           </ThemedText>
@@ -85,7 +85,7 @@ export function CircleCard({ circleId, name, memberCount, photoUri, newCount, la
         <View style={styles.stats}>
           {memberCount !== undefined ? (
             <View style={styles.stat} accessibilityLabel={t('circle.peopleCount', { count: memberCount })}>
-              <Icon icon={Icons.members} size={14} color={ON_PHOTO} />
+              <Icon icon={Icons.people} size={14} color={ON_PHOTO} />
               <ThemedText type="labelMedium" style={{ color: ON_PHOTO }}>
                 {memberCount}
               </ThemedText>
@@ -93,7 +93,7 @@ export function CircleCard({ circleId, name, memberCount, photoUri, newCount, la
           ) : null}
           {latestActivity ? (
             <View style={styles.stat}>
-              <Icon icon={Icons.waiting} size={14} color={ON_PHOTO} />
+              <Icon icon={Icons.time} size={14} color={ON_PHOTO} />
               <ThemedText type="labelMedium" style={{ color: ON_PHOTO }}>
                 {latestActivity}
               </ThemedText>

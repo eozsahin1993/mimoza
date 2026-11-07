@@ -152,7 +152,7 @@ export function PostCard({
                 <ThemedText type="labelSmall" themeColor="muted">
                   ·
                 </ThemedText>
-                <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
+                <Icon icon={Icons.save} size={12} color={theme.accent} filled />
                 <ThemedText type="labelSmall" themeColor="accent">
                   {t('post.album')}
                 </ThemedText>
@@ -215,7 +215,7 @@ export function PostCard({
 
         {onToggleAlbum && !readOnly ? (
           <ReactionChip
-            icon={Icons.inAlbum}
+            icon={Icons.save}
             label={t('post.album')}
             reacted={post.inAlbum}
             accessibilityLabel={post.inAlbum ? t('post.removeFromAlbum') : t('post.addToAlbum')}

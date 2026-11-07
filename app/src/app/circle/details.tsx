@@ -159,7 +159,7 @@ export default function CircleDetailsScreen() {
             },
         {
           label: t('circle.details.removeFromCircle'),
-          icon: Icons.removeMember,
+          icon: Icons.removePerson,
           destructive: true,
           onPress: () => handleRemoveMember(memberMenu),
         },
@@ -332,7 +332,7 @@ export default function CircleDetailsScreen() {
       {
         label: t('circle.details.shareLink'),
         description: t('circle.details.shareLinkDescription'),
-        icon: Icons.inviteLink,
+        icon: Icons.link,
         // No chevron: this hands off to the OS share sheet rather than
         // opening a view of ours to come back from.
         disabled: sharing,
@@ -341,7 +341,7 @@ export default function CircleDetailsScreen() {
       {
         label: t('circle.details.showCode'),
         description: t('circle.details.showCodeDescription'),
-        icon: Icons.inviteCode,
+        icon: Icons.qrCode,
         control: { kind: 'navigate' },
         disabled: sharing,
         onPress: handleShowCode,
@@ -349,7 +349,7 @@ export default function CircleDetailsScreen() {
       {
         label: t('circle.details.replaceKey'),
         description: t('circle.details.replaceKeyDescription'),
-        icon: Icons.replaceKey,
+        icon: Icons.refresh,
         // The code sits on the row that retires it, so what "the old code"
         // means is the thing you're looking at.
         control: invite ? { kind: 'value', text: invite.code } : undefined,

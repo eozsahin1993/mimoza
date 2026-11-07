@@ -41,8 +41,8 @@ function hatchStarts({ width, height }: { width: number; height: number }): numb
 }
 
 const NOTES = {
-  arriving: { icon: Icons.photoArriving, label: 'ui.photoArriving' },
-  unavailable: { icon: Icons.photoUnavailable, label: 'ui.photoUnavailable' },
+  arriving: { icon: Icons.downloading, label: 'ui.photoArriving' },
+  unavailable: { icon: Icons.unavailable, label: 'ui.photoUnavailable' },
 } as const satisfies Record<MissingPhoto, { icon: IconGlyph; label: string }>;
 
 export type PhotoPlaceholderProps = ViewProps & {
@@ -105,7 +105,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, onRetry, .
           disabled={!retryable}
           onPress={onRetry}
           hitSlop={12}>
-          <Icon icon={retryable ? Icons.retryPhoto : NOTES[missing].icon} size={compact ? 15 : 18} color={theme.muted} />
+          <Icon icon={retryable ? Icons.refresh : NOTES[missing].icon} size={compact ? 15 : 18} color={theme.muted} />
           {compact ? null : (
             <ThemedText type="labelSmall" themeColor="muted">
               {t(retryable ? 'ui.photoUnavailableRetry' : NOTES[missing].label)}

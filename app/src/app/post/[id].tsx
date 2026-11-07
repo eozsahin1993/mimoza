@@ -241,7 +241,7 @@ export default function PostDetailsScreen() {
     deletePost(circleId, postId)
       .then(() => {
         router.back();
-        showMessage(t('post.details.deleted'), { icon: Icons.deletePost });
+        showMessage(t('post.details.deleted'), { icon: Icons.delete });
       })
       .catch((err) => {
         console.error('Failed to delete the post', err);
@@ -273,7 +273,7 @@ export default function PostDetailsScreen() {
                 <>
                   {canEditPost ? (
                     <HeaderIconButton
-                      icon={Icons.inAlbum}
+                      icon={Icons.save}
                       active={post.inAlbum}
                       accessibilityLabel={post.inAlbum ? t('post.removeFromAlbum') : t('post.addToAlbum')}
                       onPress={handleToggleAlbum}
@@ -327,7 +327,7 @@ export default function PostDetailsScreen() {
                       <ThemedText type="labelSmall" themeColor="muted">
                         ·
                       </ThemedText>
-                      <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
+                      <Icon icon={Icons.save} size={12} color={theme.accent} filled />
                       <ThemedText type="labelSmall" themeColor="accent">
                         {t('post.album')}
                       </ThemedText>
@@ -449,7 +449,7 @@ export default function PostDetailsScreen() {
                 {
                   label: t('post.details.deleteThisPhoto'),
                   description: ownPost ? t('post.details.deleteBecauseYours') : t('post.details.deleteBecauseAdmin'),
-                  icon: Icons.deletePost,
+                  icon: Icons.delete,
                   destructive: true,
                   onPress: handleDelete,
                 },

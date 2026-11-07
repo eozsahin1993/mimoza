@@ -174,7 +174,7 @@ export default function FeedScreen() {
         {readOnly ? null : (
           <SafeAreaView edges={['bottom']} style={styles.fabAnchor} pointerEvents="box-none">
             <FabButton
-              icon={Icons.composePost}
+              icon={Icons.compose}
               onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
               style={styles.fab}
             />

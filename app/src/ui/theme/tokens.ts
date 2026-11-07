@@ -243,72 +243,44 @@ export const Type = {
 } as const;
 
 /**
- * Named by what the icon means, not which glyph draws it — so the same
- * affordance can't end up drawn two different ways in two places, and
- * changing one is a single edit here. `satisfies` keeps a typo a compile
- * error instead of a silently missing icon.
- *
- * Imported one deep path at a time rather than from lucide's barrel; see
- * `IconGlyph` for why that matters.
+ * Every icon the app draws, named for the job it does rather than the glyph
+ * or the library that draws it, so swapping a glyph or the whole set changes
+ * the values here and nothing at the call sites. Imported one deep path at a
+ * time rather than from lucide's barrel; see `IconGlyph` for why that matters.
  */
 export const Icons = {
   back: ArrowLeft,
   close: X,
-  /** Opens a menu of options for the thing it sits on. */
   more: Ellipsis,
-  /** Trailing affordance on a row that navigates somewhere. */
   disclosure: ChevronRight,
-  /** Leaves the app for a web page. */
   external: ArrowUpRight,
   add: Plus,
-  /** Starts a new post — writing something into the circle, not adding a row to a list. */
-  composePost: SquarePen,
-  /** Opens the emoji picker on a post nobody has reacted to yet — outline, since it's an invitation rather than a reaction you left. */
+  compose: SquarePen,
+  send: SendHorizontal,
+  delete: Trash,
+  refresh: RefreshCw,
+  report: Flag,
   react: Heart,
   comment: MessageCircle,
-  send: SendHorizontal,
-  locked: Lock,
-  /** A circle this account is no longer in: kept on the phone, taking nothing new. */
-  archived: Archive,
+  save: Bookmark,
+  addPhoto: ImagePlus,
+  link: Link,
+  qrCode: QrCode,
+  people: Users,
   promote: ShieldCheck,
   demote: ShieldOff,
-  removeMember: UserX,
-  /** Deletes a photo from the circle for everyone — not "remove me from it". */
-  deletePost: Trash,
-  /** Tells us about a photo that should not be here. */
-  report: Flag,
-  /** A photo whose entry has landed but whose bytes haven't yet. */
-  photoArriving: CloudDownload,
-  /** A photo whose download has failed enough times to stop looking temporary. Also what a failed message is marked with — see `SnackbarHost`. */
-  photoUnavailable: CircleAlert,
-  /** A failed photo's manual retry, in the post screen. */
-  retryPhoto: RefreshCw,
-  /** A message about the app rather than about something that just happened. */
-  notice: Info,
-  /** Something asked for has happened — the message confirming a delete, a copy. */
+  removePerson: UserX,
+  lock: Lock,
+  archive: Archive,
+  time: Clock,
+  downloading: CloudDownload,
+  unavailable: CircleAlert,
+  error: TriangleAlert,
+  info: Info,
   done: Check,
-  /** Something asked for didn't happen, and won't without help. */
-  failed: TriangleAlert,
-  /** The circle's album — every photo it holds, not just what's in the feed. */
-  album: Album,
-  /** Whether one post is kept in that album — the album seen from a single photo. Solid when it is; see `Icon`'s `filled`. */
-  inAlbum: Bookmark,
-  /** A circle asked to join but not yet let into — waiting on someone else, not on the network. */
-  waiting: Clock,
-  /** Sends a circle's key to someone who isn't in the room. */
-  inviteLink: Link,
-  /** Shows that key as a code to scan, for someone who is. */
-  inviteCode: QrCode,
-  /** Retires the key in circulation and mints a fresh one. */
-  replaceKey: RefreshCw,
-  /** Centered over an empty photo/cover picker — a plain `add` reads as "add a row," not "add a photo." */
-  addPhoto: ImagePlus,
-  /** How many people are in a circle — next to the count on its card row. */
-  members: Users,
-  /** Asks for camera access before a scanner can open. */
   camera: Camera,
-  /** Camera access denied — points at Settings instead of a blank preview. */
   cameraOff: CameraOff,
+  album: Album,
 } as const satisfies Record<string, IconGlyph>;
 
 export const Radius = {

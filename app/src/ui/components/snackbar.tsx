@@ -14,8 +14,8 @@ import type { Message } from '@/core/services/messages';
 function tonesFor(tints: ReturnType<typeof useTints>) {
   return {
     done: { icon: Icons.done, color: 'accentBright', border: tints.raisedAccentBorder },
-    neutral: { icon: Icons.notice, color: 'muted', border: tints.raisedBorder },
-    error: { icon: Icons.failed, color: 'danger', border: tints.raisedDangerBorder },
+    neutral: { icon: Icons.info, color: 'muted', border: tints.raisedBorder },
+    error: { icon: Icons.error, color: 'danger', border: tints.raisedDangerBorder },
   } as const satisfies Record<Message['tone'], { icon: IconGlyph; color: ThemeColor; border: string }>;
 }
 
