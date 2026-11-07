@@ -33,7 +33,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.prod.json",
-      "versionCode": 1
+      "versionCode": 1,
+      "blockedPermissions": [
+        "com.google.android.gms.permission.AD_ID",
+        "android.permission.ACCESS_ADSERVICES_AD_ID",
+        "android.permission.ACCESS_ADSERVICES_ATTRIBUTION",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "plugins": [
       "expo-router",
