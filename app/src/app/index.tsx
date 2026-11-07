@@ -8,15 +8,18 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
+import { ActionSheet } from '@/ui/components/action-sheet';
 import { AppleSignInButton, GoogleSignInButton } from '@/features/account/components/social-sign-in-button';
 import { LoadingModal } from '@/ui/components/loading-modal';
 import { Wordmark } from '@/ui/components/wordmark';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Colors, Space, Spacing } from '@/ui/theme/tokens';
+import { Colors, Icons, Space, Spacing } from '@/ui/theme/tokens';
 import { getLocalAccount } from '@/data/db';
-import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
+import { type SignInResult, signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
+import { DEV_ACCOUNTS, type DevAccount, devSignInEnabled, signInWithDevAccount } from '@/features/dev/dev-sign-in';
+import { setName as setRelayName } from '@/features/account/services/account-relay';
 import {
   KeypairStatuses,
   checkAccountKeypairStatus,
@@ -27,7 +30,7 @@ import { finishSignIn } from '@/features/account/usecases/finish-sign-in';
 import { showAlert } from '@/core/services/alerts';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 
-type Provider = 'apple' | 'google';
+type Provider = 'apple' | 'google' | 'dev';
 
 export default function WelcomeScreen() {
   const { t } = useTranslation();
@@ -45,6 +48,7 @@ export default function WelcomeScreen() {
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
   const [isRecovering, setIsRecovering] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
+  const [devSheetVisible, setDevSheetVisible] = useState(false);
 
   // Re-checked on focus, not just mount, so navigating back here post-sign-in still redirects away.
   useFocusEffect(
@@ -61,14 +65,17 @@ export default function WelcomeScreen() {
     AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
   }, []);
 
-  async function handleSignIn(provider: Provider) {
+  async function handleSignIn(provider: Provider, devAccount?: DevAccount) {
     setBusyProvider(provider);
     try {
-      const result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+      let result: SignInResult;
+      if (provider === 'dev' && devAccount) result = await signInWithDevAccount(devAccount);
+      else result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
       if (result.outcome !== 'success') return;
 
       if (!result.relayProfile) return;
-      const { accountId, name } = result.relayProfile;
+      const { accountId } = result.relayProfile;
+      let { name } = result.relayProfile;
 
       // The keypair is its own concern, run after sign-in rather than
       // inside it. The spinner goes up before the check, not from inside
@@ -94,6 +101,10 @@ export default function WelcomeScreen() {
         await publishAccountKeypairOrDegrade(accountId, status.keypair, false);
       }
 
+      // Named only after the keypair check: a name on the relay with no key
+      // on this device reads as a returning account needing recovery.
+      if (provider === 'dev' && !name && devAccount) name = (await setRelayName(devAccount.name)).name;
+
       await finishSignIn({
         accountId,
         name,
@@ -102,6 +113,10 @@ export default function WelcomeScreen() {
       });
     } catch (err) {
       console.error(`${provider} sign-in failed`, err);
+      if (provider === 'dev') {
+        showAlert('Dev sign-in failed', err instanceof Error ? err.message : String(err), [{ text: t('common.ok') }]);
+        return;
+      }
       const providerLabel = provider === 'apple' ? 'Apple' : 'Google';
       // Only suggest the other provider if it's actually on offer — Apple
       // isn't available at all on this device (see appleAvailable above),
@@ -166,6 +181,14 @@ export default function WelcomeScreen() {
           <GoogleSignInButton disabled={busyProvider !== null} onPress={() => handleSignIn('google')} />
         </View>
 
+        {devSignInEnabled ? (
+          <Pressable style={styles.devLink} disabled={busyProvider !== null} onPress={() => setDevSheetVisible(true)}>
+            <ThemedText type="labelSmall" themeColor="secondary">
+              Sign in as a test account
+            </ThemedText>
+          </Pressable>
+        ) : null}
+
         <Pressable style={styles.footer} onPress={() => setPrivacyVisible(true)}>
           <ThemedText type="labelSmall" themeColor="muted">
             {t('onboarding.privacyLink')}
@@ -174,6 +197,18 @@ export default function WelcomeScreen() {
       </ThemedSafeAreaView>
 
       <PrivacyInfoModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
+
+      {devSignInEnabled ? (
+        <ActionSheet
+          visible={devSheetVisible}
+          onClose={() => setDevSheetVisible(false)}
+          options={DEV_ACCOUNTS.map((account) => ({
+            label: account.name,
+            icon: Icons.people,
+            onPress: () => handleSignIn('dev', account),
+          }))}
+        />
+      ) : null}
 
       <LoadingModal visible={isRecovering} label={t('onboarding.recoveringTitle')} sublabel={t('onboarding.recoveringMessage')} />
     </ThemedView>
@@ -212,6 +247,10 @@ const styles = StyleSheet.create({
   actions: {
     gap: Space.s300,
     marginTop: Space.s400,
+  },
+  devLink: {
+    alignSelf: 'center',
+    paddingVertical: Space.s200,
   },
   footer: {
     alignSelf: 'center',

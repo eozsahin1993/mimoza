@@ -192,6 +192,15 @@ when it's loopback, cmd/server signs each URL for the host the device used to
 reach the relay (a LAN IP, or `10.0.2.2` from the Android emulator), so they
 work from a phone, emulator or simulator alike.
 
+### Dummy accounts for testing on several simulators
+
+`DEV_SESSIONS=true` in `local.env` mounts `POST /testonly/session`, which
+signs in as any subject with no Google or Apple token. A dev build with
+`EXPO_PUBLIC_DEV_SIGN_IN=true` then shows Alice, Bob, Carol and Dave on the
+welcome screen, so you can sign in as a different person on each simulator.
+The relay refuses to start with it unless `AWS_ENDPOINT_URL` is loopback,
+because the route lets anyone sign in as anyone.
+
 ### Rebuild on change, or you will chase phantom bugs
 
 `go run` builds once and keeps serving that binary, so a route edited

@@ -12,10 +12,14 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+
 	"mimoza-relay/internal/app"
+	"mimoza-relay/internal/auth/http/devsession"
 	blobstore "mimoza-relay/internal/blobs/s3"
 	"mimoza-relay/internal/config"
 )
@@ -24,14 +28,32 @@ func main() {
 	cfg := config.Load()
 	app.SetUpLogging(cfg.LogLevel)
 
-	handler, err := app.New(context.Background(), cfg)
+	ctx := context.Background()
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
-		log.Fatalf("failed to build the relay: %v", err)
+		log.Fatalf("failed to load AWS config: %v", err)
+	}
+	deps := app.AWSDeps(cfg, awsCfg)
+	handler := app.NewRouter(deps)
+	if os.Getenv("DEV_SESSIONS") == "true" {
+		mountDevSessions(handler, deps, cfg.AWSEndpointURL)
 	}
 
 	addr := ":" + cfg.Port
 	slog.Info("listening", "address", addr)
 	log.Fatal(http.ListenAndServe(addr, logRequests(presignForRequestHost(cfg.AWSEndpointURL, handler))))
+}
+
+// mountDevSessions lets a dev build sign in as a dummy account. Refused
+// unless the relay is on LocalStack: the route signs in as anyone with no
+// credential at all, so on real AWS it would be an open door.
+func mountDevSessions(mux *http.ServeMux, deps app.Deps, endpoint string) {
+	parsed, err := url.Parse(endpoint)
+	if endpoint == "" || err != nil || !isLoopback(parsed.Hostname()) {
+		log.Fatalf("DEV_SESSIONS needs AWS_ENDPOINT_URL on loopback (LocalStack), got %q", endpoint)
+	}
+	devsession.Register(mux, &devsession.Service{AuthStore: deps.Auth, Accounts: deps.Accounts})
+	slog.Warn("dev sessions on: POST /testonly/session signs in as any subject")
 }
 
 // presignForRequestHost signs S3 URLs for the host each request arrived on,

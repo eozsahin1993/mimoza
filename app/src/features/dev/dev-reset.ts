@@ -20,7 +20,7 @@ import { deleteAuthToken } from '@/core/services/keystore/auth-token';
  * reinstalling — deliberately kept out of sign-in.ts's signOut(), which
  * touches none of this.
  */
-export async function resetLocalDataForTesting(): Promise<void> {
+export async function resetLocalDataForTesting({ keepKeypair = false } = {}): Promise<void> {
   // Read before resetAllLocalData below removes the row the account id
   // comes from — the keypair is scoped per account, so forgetting it
   // needs to happen first, or not at all if this device never got as
@@ -35,7 +35,7 @@ export async function resetLocalDataForTesting(): Promise<void> {
     await deleteCircleKeys(circleId);
     deleteCirclePhotoFiles(circleId);
   }
-  if (profile) await forgetAccountKeypair(profile.accountId);
+  if (profile && !keepKeypair) await forgetAccountKeypair(profile.accountId);
   await deleteAuthToken();
   await resetAllLocalData();
   // The next sign-in would otherwise keep showing this account's name,

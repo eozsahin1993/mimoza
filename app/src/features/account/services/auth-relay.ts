@@ -42,3 +42,20 @@ export async function logout(token: string): Promise<void> {
     throw new Error(await describeError(response, 'Logout failed'));
   }
 }
+
+/**
+ * Signs in as a dummy account with no provider at all — POST
+ * /testonly/session, which only a local relay started with DEV_SESSIONS
+ * (or cmd/testrelay) serves. See server/internal/auth/http/devsession.
+ */
+export async function signInAsDevAccount(subject: string): Promise<{ token: string; accountId: string }> {
+  const response = await fetch(`${baseUrl()}/testonly/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject }),
+  });
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Dev sign-in failed (is the relay running with DEV_SESSIONS=true?)'));
+  }
+  return response.json();
+}
