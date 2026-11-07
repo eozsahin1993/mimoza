@@ -10,7 +10,6 @@ import { showError } from '@/core/services/messages';
 import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
@@ -65,20 +64,27 @@ function NoLongerMemberBanner({ circleId }: { circleId: string }) {
   const tints = useTints();
 
   return (
-    <ThemedView style={[styles.banner, { borderColor: tints.chipIdleBorder }]} type="surface">
-      <Icon icon={Icons.archive} size={22} color={theme.muted} />
-      <View style={styles.text}>
-        <ThemedText type="titleMedium">{t('circle.archived.title')}</ThemedText>
-        <ThemedText type="labelSmall" themeColor="muted">
-          {t('circle.archived.body')}
-        </ThemedText>
+    <View style={[styles.banner, { backgroundColor: tints.privacyWashBg, borderColor: tints.privacyWashBorder }]}>
+      <View style={styles.notice}>
+        <View style={[styles.iconDisc, { backgroundColor: tints.chipIdleBg }]}>
+          <Icon icon={Icons.archive} size={18} color={theme.muted} />
+        </View>
+        <View style={styles.text}>
+          <ThemedText type="titleSmall">{t('circle.archived.title')}</ThemedText>
+          <ThemedText type="bodySmall">{t('circle.archived.body')}</ThemedText>
+        </View>
       </View>
-      <Pressable onPress={() => confirmRemoveFromPhone(circleId, t)} hitSlop={8}>
-        <ThemedText type="labelSmall" themeColor="accent">
+      <View style={[styles.divider, { backgroundColor: tints.privacyWashBorder }]} />
+      <Pressable
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.remove, pressed && styles.pressed]}
+        onPress={() => confirmRemoveFromPhone(circleId, t)}>
+        <Icon icon={Icons.delete} size={18} color={theme.danger} />
+        <ThemedText type="labelMedium" themeColor="danger">
           {t('circle.archived.removeRow')}
         </ThemedText>
       </Pressable>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -86,14 +92,36 @@ const styles = StyleSheet.create({
   banner: {
     marginHorizontal: Spacing.feedTextPadding,
     marginTop: Spacing.gapBetweenPosts,
-    padding: Space.s400,
     borderRadius: Radius.panel,
     borderWidth: 1,
+  },
+  notice: {
+    flexDirection: 'row',
+    padding: Space.s400,
+    gap: Space.s300,
+  },
+  iconDisc: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.pill,
     alignItems: 'center',
-    gap: Space.s200,
+    justifyContent: 'center',
   },
   text: {
-    alignItems: 'center',
+    flex: 1,
     gap: Space.s100,
+  },
+  divider: {
+    height: 1,
+  },
+  remove: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Space.s300,
+    paddingHorizontal: Space.s400,
+    gap: Space.s200,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

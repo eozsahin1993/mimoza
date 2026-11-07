@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
+import { Bloom } from '@/ui/components/wordmark';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 
@@ -41,12 +41,13 @@ function JustJoinedBanner() {
   const tints = useTints();
 
   return (
-    <ThemedView style={[styles.banner, { borderColor: tints.chipIdleBorder }]} type="surface">
-      <ThemedText type="titleMedium">{t('feed.justJoinedTitle')}</ThemedText>
-      <ThemedText type="labelSmall" themeColor="muted">
-        {t('feed.justJoinedBody')}
-      </ThemedText>
-    </ThemedView>
+    <View style={[styles.banner, { backgroundColor: tints.privacyWashBg, borderColor: tints.privacyWashBorder }]}>
+      <Bloom size={36} />
+      <View style={styles.text}>
+        <ThemedText type="titleMedium">{t('feed.justJoinedTitle')}</ThemedText>
+        <ThemedText type="bodySmall">{t('feed.justJoinedBody')}</ThemedText>
+      </View>
+    </View>
   );
 }
 
@@ -57,7 +58,12 @@ const styles = StyleSheet.create({
     padding: Space.s400,
     borderRadius: Radius.panel,
     borderWidth: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: Space.s300,
+  },
+  text: {
+    flex: 1,
     gap: Space.s100,
   },
 });

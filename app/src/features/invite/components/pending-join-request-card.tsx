@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Avatar } from '@/ui/components/avatar/avatar';
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Radius, Space } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import type { JoinRequest } from '@/features/invite/services/invite-relay';
@@ -31,7 +30,7 @@ export function PendingJoinRequestCard({ request, pictureUri, busy, onApprove, o
   const theme = useTheme();
   const tints = useTints();
   return (
-    <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipIdleBorder }]}>
+    <View style={[styles.card, { backgroundColor: tints.privacyWashBg, borderColor: tints.privacyWashBorder }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('invite.request.notNow')}
@@ -60,7 +59,7 @@ export function PendingJoinRequestCard({ request, pictureUri, busy, onApprove, o
           {t('invite.request.letIn')}
         </ThemedText>
       </Pressable>
-    </ThemedView>
+    </View>
   );
 }
 
