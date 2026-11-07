@@ -4,7 +4,7 @@ import { Footer } from "../../sections/footer";
 import "../../styles/staticPage.css";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
-const LAST_UPDATED = "2 October 2026";
+const LAST_UPDATED = "7 November 2026";
 
 const SECTIONS = [
   ["can't-see", "What we can't see"],
@@ -98,7 +98,7 @@ export function PrivacyPolicy() {
         <h2 id="collect">What we do collect</h2>
         <p>
           Everything below is collected because the app can't work without it, except the anonymous usage analytics
-          noted at the bottom of the table. Nothing is collected for marketing.
+          and crash reports noted at the bottom of the table. Nothing is collected for marketing.
         </p>
         <table>
           <thead>
@@ -195,6 +195,14 @@ export function PrivacyPolicy() {
               </td>
             </tr>
             <tr>
+              <td>Crash reports</td>
+              <td>
+                If the app crashes, a report of where in the app's code it happened, with the app version, your device
+                model and operating system version. It carries no account identifier and nothing you've written or
+                shared.
+              </td>
+            </tr>
+            <tr>
               <td>Feedback you send</td>
               <td>
                 Only if you use "Send feedback" in the app. We receive what you write, the kind of report, your
@@ -261,8 +269,8 @@ export function PrivacyPolicy() {
             <tr>
               <td>Google</td>
               <td>
-                Google Sign-In, and Firebase Cloud Messaging, which carries the same notifications to Android
-                devices.
+                Google Sign-In; Firebase Cloud Messaging, which carries the same notifications to Android devices;
+                Firebase Analytics for the anonymous usage analytics; and Firebase Crashlytics for crash reports.
               </td>
             </tr>
             <tr>
@@ -403,8 +411,8 @@ export function PrivacyPolicy() {
 
         <h2 id="contact">Contact</h2>
         <p>
-          Mimoza is published by its developer under the name "Mimoza" on the App Store and Google Play. For any
-          question about this policy or your data, including deletion requests, email{" "}
+          Mimoza is published by RareKiwi Software LLC on the App Store and Google Play. For any question about this
+          policy or your data, including deletion requests, email{" "}
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
         </p>
       </article>
