@@ -1,6 +1,6 @@
-output "identity_arn" {
-  description = "The domain identity, for the relay's IAM policy."
-  value       = aws_sesv2_email_identity.domain.arn
+output "identity_arns" {
+  description = "The domain and inbox identities, for the relay's IAM policy. Both: in the sandbox SES authorizes a send against the recipient's identity as well as the sender's."
+  value       = [aws_sesv2_email_identity.domain.arn, aws_sesv2_email_identity.inbox.arn]
 }
 
 # The DNS side is manual, same as the certificate's validation record.

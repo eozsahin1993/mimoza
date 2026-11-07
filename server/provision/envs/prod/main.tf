@@ -33,7 +33,7 @@ module "lambda" {
   binary_path = "${path.root}/../../build/bootstrap"
   storage     = module.storage
 
-  feedback_identity_arn = module.email.identity_arn
+  feedback_identity_arns = module.email.identity_arns
 
   # Permanent, not pending: locking the URL makes Lambda demand a body hash
   # on every write, and only the app is in a position to add it.
@@ -49,7 +49,7 @@ module "lambda" {
     RATE_LIMIT_PUSH_MAX_REQUESTS  = "500"
     # Every accepted report is an email to the inbox.
     RATE_LIMIT_FEEDBACK_MAX_REQUESTS = "5"
-    RATE_LIMIT_WINDOW_MINUTES     = "10"
+    RATE_LIMIT_WINDOW_MINUTES        = "10"
   }
   # -1 leaves it unset, which a new account needs: the default limit is 10
   # concurrent executions, and AWS refuses a reservation that drops the

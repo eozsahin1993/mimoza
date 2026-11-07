@@ -122,13 +122,13 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     ]
   }
 
-  # Feedback from the app is emailed as the support domain — see
-  # internal/feedback/ses and modules/email. Scoped to that one identity,
-  # so a compromised relay can send as nothing else.
+  # Feedback from the app is emailed as the support domain to the inbox —
+  # see internal/feedback/ses and modules/email. Scoped to those two
+  # identities, so a compromised relay can send as nothing else.
   statement {
     sid       = "FeedbackEmail"
     actions   = ["ses:SendEmail"]
-    resources = [var.feedback_identity_arn]
+    resources = var.feedback_identity_arns
   }
 
   # Where the blob CDN is, written by modules/cdn because it knows and the

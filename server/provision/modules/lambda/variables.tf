@@ -42,9 +42,9 @@ variable "settings" {
   default     = {}
 }
 
-variable "feedback_identity_arn" {
-  description = "The SES domain identity feedback is emailed as — modules/email's output — so the relay may send as that and nothing else."
-  type        = string
+variable "feedback_identity_arns" {
+  description = "The SES identities a feedback email touches, the sending domain and the inbox — modules/email's output — so the relay may send between those and nothing else."
+  type        = list(string)
 }
 
 variable "log_retention_days" {

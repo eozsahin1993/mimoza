@@ -30,10 +30,12 @@ resource "aws_iam_user" "website_sender" {
 data "aws_iam_policy_document" "website_sender" {
   count = var.website_sender ? 1 : 0
 
+  # The inbox too, not just the domain: in the sandbox SES checks the
+  # recipient's identity as well, and refuses with a 403 without it.
   statement {
     sid       = "SendAsSupportDomain"
     actions   = ["ses:SendEmail"]
-    resources = [aws_sesv2_email_identity.domain.arn]
+    resources = [aws_sesv2_email_identity.domain.arn, aws_sesv2_email_identity.inbox.arn]
   }
 }
 
