@@ -27,6 +27,8 @@
     "notifyMeAbout": "Notificaciones",
     "privacy": "Cómo funciona la privacidad",
     "privacyDescription": "Qué significa aquí el cifrado de extremo a extremo",
+    "terms": "Condiciones de uso",
+    "termsDescription": "Reglas para compartir en Mimoza",
     "about": "Acerca de",
     "credits": "Créditos",
     "feedback": "Enviar comentarios",
@@ -168,6 +170,7 @@
       "namePlaceholder": "p. ej., Lucía Fernández",
       "continue": "Continuar",
       "addNameToContinue": "Añade tu nombre para continuar",
+      "termsNotice": "Al continuar aceptas las Condiciones de uso",
       "saveFailed": "No se ha podido guardar tu perfil. Inténtalo de nuevo."
     }
   },

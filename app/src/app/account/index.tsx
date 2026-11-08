@@ -2,7 +2,7 @@ import { useLocales } from 'expo-localization';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -10,6 +10,7 @@ import { showAlert } from '@/core/services/alerts';
 import { LoadingModal } from '@/ui/components/loading-modal';
 import { OptionSheet } from '@/ui/components/option-sheet';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
+import { TERMS_OF_USE_URL } from '@/features/account/site-urls';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
@@ -85,6 +86,14 @@ export default function AccountScreen() {
           description: t('settings.privacyDescription'),
           control: { kind: 'navigate' },
           onPress: () => setPrivacyVisible(true),
+        },
+        {
+          label: t('settings.terms'),
+          description: t('settings.termsDescription'),
+          control: { kind: 'navigate' },
+          onPress: () => {
+            Linking.openURL(TERMS_OF_USE_URL).catch((err) => console.error('Failed to open the terms of use', err));
+          },
         },
         {
           label: t('settings.feedback'),

@@ -27,6 +27,8 @@
     "notifyMeAbout": "Notifications",
     "privacy": "Comment fonctionne la confidentialité",
     "privacyDescription": "Ce que « chiffré de bout en bout » veut dire ici",
+    "terms": "Conditions d'utilisation",
+    "termsDescription": "Règles de partage de Mimoza",
     "about": "À propos",
     "credits": "Crédits",
     "feedback": "Envoyer un retour",
@@ -168,6 +170,7 @@
       "namePlaceholder": "ex. : Camille Martin",
       "continue": "Continuer",
       "addNameToContinue": "Ajoute ton nom pour continuer",
+      "termsNotice": "En continuant, tu acceptes les Conditions d'utilisation",
       "saveFailed": "Impossible d’enregistrer ton profil. Réessaie."
     }
   },

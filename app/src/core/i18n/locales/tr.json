@@ -27,6 +27,8 @@
     "notifyMeAbout": "Bildirim tercihleri",
     "privacy": "Gizlilik nasıl çalışır?",
     "privacyDescription": "Uçtan uca şifreleme burada ne demek",
+    "terms": "Kullanım koşulları",
+    "termsDescription": "Mimoza paylaşım kuralları",
     "about": "Hakkında",
     "credits": "Emeği geçenler",
     "feedback": "Geri bildirim gönder",
@@ -168,6 +170,7 @@
       "namePlaceholder": "ör. Ahmet Yılmaz",
       "continue": "Devam et",
       "addNameToContinue": "Devam etmek için adını gir",
+      "termsNotice": "Devam ederek Kullanım Koşulları'nı kabul ediyorsun",
       "saveFailed": "Profil kaydedilemedi. Lütfen tekrar dene."
     }
   },

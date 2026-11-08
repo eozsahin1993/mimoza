@@ -27,6 +27,8 @@
     "notifyMeAbout": "Benachrichtigungen",
     "privacy": "So funktioniert der Datenschutz",
     "privacyDescription": "Was Ende-zu-Ende-verschlüsselt hier bedeutet",
+    "terms": "Nutzungsbedingungen",
+    "termsDescription": "Mimoza-Regeln fürs Teilen",
     "about": "Über",
     "credits": "Danksagungen",
     "feedback": "Feedback senden",
@@ -168,6 +170,7 @@
       "namePlaceholder": "z. B. Lena Schmidt",
       "continue": "Weiter",
       "addNameToContinue": "Gib deinen Namen ein, um fortzufahren",
+      "termsNotice": "Wenn du fortfährst, akzeptierst du die Nutzungsbedingungen",
       "saveFailed": "Dein Profil konnte nicht gespeichert werden. Versuch es noch mal."
     }
   },

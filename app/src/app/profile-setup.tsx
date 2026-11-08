@@ -1,20 +1,22 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
 import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
 import { PrimaryButton } from '@/ui/components/buttons/primary-button';
+import { Icon } from '@/ui/components/icon';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, Radius, Space, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { getLocalAccount, getProfilePicture } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 import { completeProfileSetup } from '@/features/account/usecases/onboarding';
 import { getProfile } from '@/features/account/services/account-relay';
+import { TERMS_OF_USE_URL } from '@/features/account/site-urls';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
 
@@ -152,6 +154,24 @@ export default function ProfileSetupScreen() {
             {error}
           </ThemedText>
         ) : null}
+        {/* Play's UGC policy wants the terms accepted before anything can
+            be posted; Continue here is the first step that makes posting
+            possible, so this is the acceptance. Editing later doesn't
+            re-ask. */}
+        {isOnboarding ? (
+          <Pressable
+            style={styles.terms}
+            hitSlop={8}
+            accessibilityRole="link"
+            onPress={() => {
+              Linking.openURL(TERMS_OF_USE_URL).catch((err) => console.error('Failed to open the terms of use', err));
+            }}>
+            <ThemedText type="labelMedium" themeColor="accentBright" style={styles.termsText}>
+              {t('onboarding.profile.termsNotice')}
+            </ThemedText>
+            <Icon icon={Icons.external} size={14} color={theme.accentBright} />
+          </Pressable>
+        ) : null}
         <PrimaryButton
           label={name.trim() ? t('onboarding.profile.continue') : t('onboarding.profile.addNameToContinue')}
           disabled={!name.trim() || saving}
@@ -214,6 +234,17 @@ const styles = StyleSheet.create({
   error: {
     textAlign: 'center',
     marginBottom: Space.s300,
+  },
+  terms: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.s100,
+    marginBottom: Space.s300,
+  },
+  termsText: {
+    textAlign: 'center',
+    flexShrink: 1,
   },
   footer: {
     position: 'absolute',

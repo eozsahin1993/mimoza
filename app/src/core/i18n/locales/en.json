@@ -27,6 +27,8 @@
     "notifyMeAbout": "Notify me about",
     "privacy": "How the privacy works",
     "privacyDescription": "What end-to-end encrypted means here",
+    "terms": "Terms of use",
+    "termsDescription": "Mimoza sharing rules",
     "about": "About",
     "credits": "Credits & attribution",
     "feedback": "Send feedback",
@@ -168,6 +170,7 @@
       "namePlaceholder": "e.g. Marcus Adeyemi",
       "continue": "Continue",
       "addNameToContinue": "Add your name to continue",
+      "termsNotice": "By continuing you agree to the Terms of Use",
       "saveFailed": "Couldn't save your profile. Try again."
     }
   },

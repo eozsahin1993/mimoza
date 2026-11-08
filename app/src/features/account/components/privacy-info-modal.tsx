@@ -12,6 +12,7 @@ import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { upperCase } from '@/core/i18n/text';
 import { useLanguage } from '@/core/i18n/use-language';
+import { PRIVACY_POLICY_URL } from '@/features/account/site-urls';
 
 export type PrivacyInfoModalProps = {
   visible: boolean;
@@ -25,8 +26,6 @@ export type PrivacyInfoModalProps = {
 const POINTS = ['content', 'account', 'sharing'] as const;
 
 const BLOOM_SIZE = 14;
-/** The policy the store listings declare; the same page, so the two can't drift. */
-const PRIVACY_POLICY_URL = 'https://joinmimoza.com/privacy/';
 /** The circle list's section titles, at the same size: `code` is sized for an invite code standing on its own. */
 const LABEL_SIZE = 12;
 const LABEL_LINE_HEIGHT = LABEL_SIZE * 1.3;
