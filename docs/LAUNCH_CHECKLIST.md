@@ -267,10 +267,11 @@ Both stores, same shot list in the same order.
 
 **Google Play**
 
-- [x] Phone screenshots: 2 to 8. PNG or JPEG, each side 320 to 3840 px,
-      long side at most twice the short. A raw phone capture is taller
-      than 2:1 and gets rejected, so these are composed at 1440 × 2880
-      around the Android captures. — 2026-09-30
+- [x] Phone screenshots: 2 to 8. PNG or JPEG up to 8 MB, each side 320
+      to 3840 px, 16:9 or 9:16. A raw phone capture is taller than that,
+      so these are composed at 1620 × 2880 around the Android captures
+      (1440 × 2880 until 2026-11-08, when the console's rule tightened
+      from at most 2:1 to 9:16). — 2026-09-30
 - [x] Feature graphic: 1024 × 500 PNG or JPEG, required. No transparency,
       nothing important near the edges — it's cropped in some placements.
       — 2026-11-08
