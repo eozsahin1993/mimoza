@@ -1,6 +1,6 @@
 # mimoza-landing
 
-The website, `joinmimoza.com`: a Vite + React site with four pages and
+The website, `joinmimoza.com`: a Vite + React site with five pages and
 two Cloudflare Pages Functions. How it fits into the rest of the
 infrastructure is in
 [docs/INFRASTRUCTURE.md](../docs/INFRASTRUCTURE.md#the-website); this
@@ -11,11 +11,12 @@ file is just how to run and change it.
 ```
 index.html            /              the marketing page
 privacy/index.html    /privacy/      privacy policy
+terms/index.html      /terms/        terms of use, with the prohibited-content clause the stores ask for
 support/index.html    /support/      support page with a contact form
 delete-account/       /delete-account/  account deletion steps and request form
 src/
-  main.tsx, privacy.tsx, support.tsx, delete-account.tsx   one entry per page
-  pages/              the three static pages
+  main.tsx, privacy.tsx, terms.tsx, support.tsx, delete-account.tsx   one entry per page
+  pages/              the four static pages
   sections/           the marketing page, one folder per section
   components/         shared pieces: forms, wordmark, phone mockup, icons
   styles/             base.css (tokens, reset), staticPage.css (policy pages)

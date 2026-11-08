@@ -123,6 +123,12 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       and "Send feedback" in settings, both posting to the relay, which
       emails the support inbox through SES. No mail app involved, so a
       reviewer's device is no different from anyone's.
+- [x] **UGC policy: objectionable content defined and prohibited.** Both
+      stores want this in terms a user can read, separate from the report
+      path. `joinmimoza.com/terms/` since 2026-11-07, with a
+      prohibited-content list and what a report leads to. Accepted on the
+      first-run profile screen ("By continuing you agree", above Continue,
+      onboarding only) and linked from Settings → About.
 - [ ] **Review notes, both stores.** Apple's "App Review Information" and
       Play's "App access" section. Apple's are written and ship with
       `fastlane ios listing` from `metadata/review_information/notes.txt`

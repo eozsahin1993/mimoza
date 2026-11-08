@@ -11,6 +11,7 @@ export function Footer() {
       </a>
       <span className="footer-links">
         <a href="/privacy/">Privacy policy</a>
+        <a href="/terms/">Terms of use</a>
         <a href="/support/">Support</a>
         <a href="/delete-account/">Delete account</a>
       </span>
