@@ -84,14 +84,14 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 - [x] `aps-environment` production-only for `APP_ENV=production` — commit
       a356a70.
-- [x] Non-exempt encryption declared at upload, not in Info.plist — the
-      app carries its own ciphers, so the HTTPS exemption doesn't apply,
-      but a static `ITSAppUsesNonExemptEncryption: true` asserts a
-      compliance code is already on file and gets every CI upload
-      rejected (90592) until one exists, which nothing can generate while
-      uploads keep failing. Fixed 2026-10-02: the key is gone from
-      `app.json`, and `upload_to_testflight`'s `uses_non_exempt_encryption:
-      true` (Fastfile) answers it per upload instead.
+- [x] Export compliance answered in `app.json`:
+      `ITSAppUsesNonExemptEncryption: false` (2026-11-08). The app carries
+      its own standard ciphers, and App Store Connect's questionnaire,
+      answered without France, found no documents needed, which is what
+      Apple's docs mean by `NO`. Adding France needs ANSSI's declaration
+      uploaded and approved; the key then becomes `true` with the
+      `ITSEncryptionExportComplianceCode` Apple issues. `true` without a
+      code got every CI upload rejected (90592) in October.
 - [x] `ios.buildNumber` and `android.versionCode` set, both `1` —
       2026-09-28. Still open: whether CI bumps them or you do. Each store
       rejects a repeat upload of the same number.
