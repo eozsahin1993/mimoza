@@ -1,0 +1,38 @@
+name: Play Listing
+
+# `fastlane android listing`, run by hand. Here rather than on a laptop
+# because there is no Play key to hold: Google only trusts this repo's
+# production environment, the same as the Android build in app-deploy.yml.
+# The App Store listing has a key and still runs locally.
+on:
+  workflow_dispatch:
+
+jobs:
+  listing:
+    name: Upload the Play listing
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: app
+          bundler-cache: true
+
+      - id: google
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
+
+      - name: Upload
+        run: bundle exec fastlane android listing
+        env:
+          PLAY_JSON_KEY: ${{ steps.google.outputs.credentials_file_path }}

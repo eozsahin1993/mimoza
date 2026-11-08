@@ -128,6 +128,9 @@ jobs:
     concurrency:
       group: ship-android-${{ needs.context.outputs.environment }}
       cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
     defaults:
       run:
         working-directory: app
@@ -174,15 +177,23 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 
       # Only production has a Play listing; staging goes to App Distribution.
+      # No key is stored: Google trades this job's GitHub token for a
+      # short-lived one, and trusts only this repo's production environment.
+      - name: Sign in to Google Play
+        id: google
+        if: needs.context.outputs.environment == 'production'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
+
       # Exported through GITHUB_ENV rather than set to '' on staging: the
       # lane checks for the variable's absence, and an empty path is present.
-      - name: Write the Play service account key
+      - name: Hand the credentials to the lane
         if: needs.context.outputs.environment == 'production'
-        run: |
-          echo "$PLAY_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/play.json"
-          echo "PLAY_JSON_KEY=$RUNNER_TEMP/play.json" >> "$GITHUB_ENV"
+        run: echo "PLAY_JSON_KEY=$CREDENTIALS" >> "$GITHUB_ENV"
         env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          CREDENTIALS: ${{ steps.google.outputs.credentials_file_path }}
 
       - name: Ship
         run: bundle exec fastlane android ${{ needs.context.outputs.environment }}

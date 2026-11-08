@@ -24,8 +24,11 @@ so a stale "done" is visible.
       verified through a Search Console URL-prefix property matching
       Play's string exactly; org and identity verification cleared by
       2026-10-20.
-      Create the Mimoza app there, link a service account
-      for `PLAY_JSON_KEY`, and close the old account afterwards.
+      Mimoza created there, first bundle on internal testing. CI reaches
+      Play as `fastlane-play` in the prod Google Cloud project through
+      Workload Identity Federation, with no key: only this repo's
+      `production` environment is trusted, and the account can't release
+      to production (2026-11-08). Still to do: close the old account.
 - [ ] **Bundle id / package** moved to `com.rarekiwisoftware.mimoza`
       (staging `.staging`) on 2026-10-07, before anything reached a store.
       Repo, Firebase apps, OAuth clients, SSM and CI secrets are done,
