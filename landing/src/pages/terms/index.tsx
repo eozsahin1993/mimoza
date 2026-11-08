@@ -27,9 +27,8 @@ export function Terms() {
 
         <div className="policy-lede">
           <p>
-            Mimoza is made by RareKiwi Software LLC. By creating an account or using the app you agree to these
-            terms. They are short on purpose: Mimoza is for sharing photos with people you know, and the rules are
-            the ones you'd expect among them.
+            By creating an account or using the app you agree to these terms. They are short on purpose: Mimoza is
+            for sharing photos with people you know, and the rules are the ones you'd expect among them.
           </p>
         </div>
 
@@ -99,9 +98,10 @@ export function Terms() {
 
         <h2 id="contact">Contact</h2>
         <p>
-          Questions about these terms go to <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, or use the
-          form on the <a href="/support/">support page</a>. These terms are governed by the laws of the State of
-          Georgia, United States.
+          Mimoza is made by RareKiwi Software LLC. Questions about these terms go to{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, or use the form on the{" "}
+          <a href="/support/">support page</a>. These terms are governed by the laws of the State of Georgia,
+          United States.
         </p>
 
         <p className="support-footnote">
