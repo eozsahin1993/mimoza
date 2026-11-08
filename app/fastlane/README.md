@@ -45,7 +45,7 @@ Fetch or create signing certificates and profiles for every bundle id
 [bundle exec] fastlane ios listing
 ```
 
-Upload the App Store listing: copy and review notes
+Upload the App Store listing: copy, review notes and screenshots
 
 ----
 
@@ -74,7 +74,7 @@ Build production and upload it to Play internal testing
 [bundle exec] fastlane android listing
 ```
 
-Upload the Play listing: copy only
+Upload the Play listing: copy, icon, feature graphic and screenshots
 
 ----
 

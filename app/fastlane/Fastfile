@@ -67,8 +67,8 @@ platform :ios do
     upload_to_app_store(
       app_identifier: ENVIRONMENTS['production'][:app_identifier],
       app_version: version,
-      metadata_path: File.join(__dir__, 'metadata'),
-      screenshots_path: File.join(__dir__, 'screenshots'),
+      metadata_path: fastlane_path('metadata'),
+      screenshots_path: fastlane_path('screenshots'),
       # deliver appends to what is already uploaded otherwise, so every
       # run would add another copy of the set.
       overwrite_screenshots: true,
@@ -101,7 +101,7 @@ platform :android do
     upload_to_play_store(
       package_name: ENVIRONMENTS['production'][:package_name],
       json_key: ENV.fetch('PLAY_JSON_KEY'),
-      metadata_path: File.join(__dir__, 'metadata', 'android'),
+      metadata_path: fastlane_path('metadata', 'android'),
       skip_upload_apk: true,
       skip_upload_aab: true,
       skip_upload_changelogs: true,
@@ -111,6 +111,12 @@ end
 
 def app_root
   File.expand_path('..', __dir__)
+end
+
+# Absolute, because __dir__ is "." here and actions run from app/, so a
+# relative path finds nothing and deliver and supply upload nothing.
+def fastlane_path(*parts)
+  File.expand_path(File.join(*parts), __dir__)
 end
 
 def ship(name)
