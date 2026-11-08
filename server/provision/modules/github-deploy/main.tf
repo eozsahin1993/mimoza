@@ -32,10 +32,14 @@ data "aws_iam_policy_document" "assume" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # This repo's tokens carry immutable ids in the subject
+    # (repo:<owner>@<owner id>/<repo>@<repo id>:…). Match them exactly: the
+    # ids are what stop a lookalike account or repo name, and a wildcard in
+    # their place let any GitHub user named eozsahin1993… assume this role.
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${split("/", var.repository)[0]}*/${split("/", var.repository)[1]}*:environment:${var.environment}"]
+      values   = ["repo:${split("/", var.repository)[0]}@${var.owner_id}/${split("/", var.repository)[1]}@${var.repository_id}:environment:${var.environment}"]
     }
   }
 }

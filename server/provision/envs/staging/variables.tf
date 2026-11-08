@@ -27,3 +27,15 @@ variable "github_repository" {
   type        = string
   default     = ""
 }
+
+variable "github_owner_id" {
+  description = "Numeric GitHub id of github_repository's owner. CI passes github.repository_owner_id; `gh api repos/<owner>/<repo> --jq .owner.id` locally."
+  type        = string
+  default     = ""
+}
+
+variable "github_repository_id" {
+  description = "Numeric GitHub id of github_repository. CI passes github.repository_id; `gh api repos/<owner>/<repo> --jq .id` locally."
+  type        = string
+  default     = ""
+}

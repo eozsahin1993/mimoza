@@ -117,7 +117,9 @@ module "alarms" {
 module "github_deploy" {
   source = "../../modules/github-deploy"
 
-  name_prefix = local.name_prefix
-  repository  = var.github_repository
-  environment = "production"
+  name_prefix   = local.name_prefix
+  repository    = var.github_repository
+  owner_id      = var.github_owner_id
+  repository_id = var.github_repository_id
+  environment   = "production"
 }

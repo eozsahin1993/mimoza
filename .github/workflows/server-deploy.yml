@@ -83,6 +83,8 @@ jobs:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_env_domain: ${{ secrets.ENV_DOMAIN }}
           TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_github_owner_id: ${{ github.repository_owner_id }}
+          TF_VAR_github_repository_id: ${{ github.repository_id }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: |
           terraform init -input=false
@@ -144,6 +146,8 @@ jobs:
           TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_env_domain: ${{ secrets.ENV_DOMAIN }}
           TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_github_owner_id: ${{ github.repository_owner_id }}
+          TF_VAR_github_repository_id: ${{ github.repository_id }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: |
           terraform init -input=false
