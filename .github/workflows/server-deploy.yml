@@ -30,8 +30,11 @@ jobs:
       group: deploy-staging
       cancel-in-progress: false
     # workflow_dispatch has no triggering run to inspect, so deploying by
-    # hand stays possible.
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # hand stays possible. Only a push: `branches: [main]` matches the
+    # triggering run's branch name, which a fork's pull request can also
+    # call main, and this job would then apply the fork's code with
+    # staging's credentials.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     defaults:
       run:
         working-directory: server
