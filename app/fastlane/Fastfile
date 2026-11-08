@@ -101,6 +101,10 @@ platform :android do
     upload_to_play_store(
       package_name: ENVIRONMENTS['production'][:package_name],
       json_key: ENV.fetch('PLAY_JSON_KEY'),
+      # The listing belongs to no track, but supply refuses to upload it
+      # without a release to hang changelogs on, and looks in production
+      # by default, which is empty until the first launch.
+      track: 'internal',
       metadata_path: fastlane_path('metadata', 'android'),
       skip_upload_apk: true,
       skip_upload_aab: true,
