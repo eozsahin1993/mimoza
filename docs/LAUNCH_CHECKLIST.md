@@ -266,13 +266,18 @@ Both stores, same shot list in the same order.
 
 - [x] Phone screenshots: 2 to 8. PNG or JPEG, each side 320 to 3840 px,
       long side at most twice the short. A raw phone capture is taller
-      than 2:1 and gets rejected, so these are composed: the 1080 × 1920
-      templates in the Figma file "Mimoza store screenshots" take the
-      same 1320 × 2868 capture as the App Store set. — 2026-09-30
-- [ ] Feature graphic: 1024 × 500 PNG or JPEG, required. No transparency,
+      than 2:1 and gets rejected, so these are composed at 1440 × 2880
+      around the Android captures. — 2026-09-30
+- [x] Feature graphic: 1024 × 500 PNG or JPEG, required. No transparency,
       nothing important near the edges — it's cropped in some placements.
-- [ ] App icon: 512 × 512 PNG, under 1 MB, from the same source as the
-      adaptive icon.
+      — 2026-11-08
+- [x] App icon: 512 × 512 PNG, under 1 MB, from the same source as the
+      adaptive icon. — 2026-11-08
+
+Every image above, and the App Store set, is designed in the Paper file
+("Store screenshots" and "Brand & store" pages), exported into
+`app/fastlane/screenshots/en-US/` and `app/fastlane/metadata/android/en-US/images/`,
+and uploaded by `fastlane ios listing` and `fastlane android listing`.
 - [ ] 7" and 10" tablet shots are optional. The app isn't restricted from
       tablets, so the console warns without one set; it doesn't block.
 - [ ] Promo video optional, a YouTube URL.

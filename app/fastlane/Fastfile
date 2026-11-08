@@ -58,16 +58,20 @@ platform :ios do
   # reviewed like code and a resubmit is one command. Only en-US exists;
   # another market is a copy of that folder under the store's own code —
   # App Store: tr, es-ES, fr-FR, de-DE; Play: tr-TR, es-ES, fr-FR, de-DE.
-  # Screenshots are exported from Figma and uploaded in the store consoles
-  # by hand; neither listing lane touches them.
-  desc 'Upload the App Store listing: copy and review notes'
+  # Screenshots and Play's images are designed in Paper and exported into
+  # fastlane/screenshots (App Store) and metadata/android/<locale>/images
+  # (Play); the store sorts them by file name.
+  desc 'Upload the App Store listing: copy, review notes and screenshots'
   lane :listing do
     version = JSON.parse(File.read(File.join(app_root, 'app.json')))['expo']['version']
     upload_to_app_store(
       app_identifier: ENVIRONMENTS['production'][:app_identifier],
       app_version: version,
       metadata_path: File.join(__dir__, 'metadata'),
-      skip_screenshots: true,
+      screenshots_path: File.join(__dir__, 'screenshots'),
+      # deliver appends to what is already uploaded otherwise, so every
+      # run would add another copy of the set.
+      overwrite_screenshots: true,
       skip_binary_upload: true,
       submit_for_review: false,
       run_precheck_before_submit: false,
@@ -92,7 +96,7 @@ platform :android do
   # See the iOS listing lane for the folder layout. The privacy policy URL,
   # support email, Data safety and "App access" answers are console-only;
   # supply has no field for them.
-  desc 'Upload the Play listing: copy only'
+  desc 'Upload the Play listing: copy, icon, feature graphic and screenshots'
   lane :listing do
     upload_to_play_store(
       package_name: ENVIRONMENTS['production'][:package_name],
@@ -101,8 +105,6 @@ platform :android do
       skip_upload_apk: true,
       skip_upload_aab: true,
       skip_upload_changelogs: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
     )
   end
 end
