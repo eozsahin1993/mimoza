@@ -359,7 +359,8 @@ test (lint + jest, Ubuntu)
   a device. Worth remembering when deciding who may hold it.
 - Production lands in TestFlight and Play internal; submitting to the
   stores is a hand step from there. The listings have their own lanes
-  (`fastlane ios listing`, `fastlane android listing`).
+  (`fastlane ios listing`, `fastlane android listing`), run by hand from
+  the Store Listing workflow.
 
 **Build numbers come from CI, never from `app.json`.** The run number,
 floored at the store's latest plus one (TestFlight for iOS, the Play

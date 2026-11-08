@@ -1,0 +1,73 @@
+name: Store Listing
+
+# The listing lanes, run by hand when the copy or images in app/fastlane
+# change. Builds never touch the listings, so a release tag doesn't either.
+# Behind the production environment's approval like a release: this is
+# what the stores show.
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: Which store's listing to upload
+        type: choice
+        default: both
+        options: [both, ios, android]
+
+jobs:
+  ios:
+    name: App Store listing
+    if: inputs.store != 'android'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: app
+          bundler-cache: true
+
+      - name: Upload
+        run: bundle exec fastlane ios listing
+        env:
+          FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+          FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_IS_KEY_CONTENT_BASE64: true
+
+  android:
+    name: Play listing
+    if: inputs.store != 'ios'
+    runs-on: ubuntu-latest
+    environment: production
+    # Play has no key to hold: Google trusts this repo's production
+    # environment instead, the same as the Android build in app-deploy.yml.
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: app
+          bundler-cache: true
+
+      - id: google
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
+
+      - name: Upload
+        run: bundle exec fastlane android listing
+        env:
+          PLAY_JSON_KEY: ${{ steps.google.outputs.credentials_file_path }}
