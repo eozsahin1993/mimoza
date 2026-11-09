@@ -3,8 +3,8 @@ import { Icon } from "../Icon";
 import "./style.css";
 
 const STORE_URLS = {
-  Apple: "https://www.apple.com/app-store/",
-  Google: "https://play.google.com/store",
+  Apple: "https://apps.apple.com/app/id6832096518",
+  Google: "https://play.google.com/store/apps/details?id=com.rarekiwisoftware.mimoza",
 } as const;
 
 export function StoreBadge({ store }: { store: "Apple" | "Google" }) {
