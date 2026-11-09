@@ -12,8 +12,9 @@ import { i18n } from '@/core/i18n/i18n';
 import { discoverPendingRequests } from '@/features/invite/usecases/invite-to-circle';
 
 /**
- * Routes a tapped notification to its content. Call once from the root
- * layout — a tap can also be what launched the app, which is what the
+ * Routes a tapped notification to its content. Call once, after the root
+ * navigator has mounted: a navigation sent before then is dropped. A tap
+ * can also be what launched the app, which is what the
  * getLastNotificationResponse check below covers.
  */
 let started = false;
@@ -39,13 +40,18 @@ export function startPushTapRouting(): void {
   }
 }
 
-/** The push's data fields, from wherever each platform puts them for a delivered, OS-rendered alert. */
+/**
+ * The push's data fields. Android hands them over as the content's data.
+ * iOS fills that only from a remote push's `body` key, an Expo push
+ * service convention the relay doesn't follow, so there they're found
+ * under `data` in the raw payload (server/internal/push/apns/sender.go).
+ */
 function tapData(
   response: NotificationResponse
 ): { circleId?: string; entryId?: string; parentEntryId?: string; requestId?: string } {
   const content = response.notification.request.content;
-  const trigger = response.notification.request.trigger as { payload?: Record<string, unknown> } | null;
-  const data = (content.data ?? trigger?.payload ?? {}) as Record<string, unknown>;
+  const trigger = response.notification.request.trigger as { payload?: { data?: Record<string, unknown> } } | null;
+  const data = (content.data ?? trigger?.payload?.data ?? {}) as Record<string, unknown>;
   return {
     circleId: typeof data.circleId === 'string' ? data.circleId : undefined,
     entryId: typeof data.entryId === 'string' ? data.entryId : undefined,

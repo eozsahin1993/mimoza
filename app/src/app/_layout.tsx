@@ -101,6 +101,9 @@ function AppShell() {
   const alert = useAlerts();
   useSessionExpiry();
   useScreenViewTracking();
+  // Here, not in RootLayout: that renders no navigator until fonts, the
+  // database and settings are in, and a tap routed before then is dropped.
+  useEffect(() => startPushTapRouting(), []);
 
   return (
     <ThemeProvider value={scheme === 'dark' ? MimozaDarkTheme : MimozaLightTheme}>
@@ -160,7 +163,6 @@ export default function RootLayout() {
         enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
       })
       .catch((error) => console.error('Failed to initialize database', error));
-    startPushTapRouting();
     followLanguageInChannelNames();
     ensureLocalizedChannels().catch((error) => console.error('Failed to set up notification channels', error));
     getAppSettings()

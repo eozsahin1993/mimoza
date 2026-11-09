@@ -42,6 +42,7 @@ import { showError, showMessage } from '@/core/services/messages';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { retryAttachment } from '@/core/photo/photo-queue';
 import { usePostPhotoUri } from '@/core/photo/use-photo-uri';
+import { onSyncCompleted } from '@/core/sync/sync-events';
 import { formatDay, formatRelative, formatTimestamp } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
 
@@ -147,17 +148,32 @@ export default function PostDetailsScreen() {
     } else {
       setPhotoUri(undefined);
     }
-
-    // Marks it seen and refreshes the comments and reactions behind what
-    // is already on screen, if the relay has touched the post since they
-    // were last fetched.
-    openPost(circleId, postId).catch((err) => console.error('Failed to open the post', err));
   }, [circleId, postId]);
+
+  // Marks it seen and fetches the comments and reactions behind what is
+  // already on screen, if the relay has touched the post since they were
+  // last fetched. Not part of load itself: a device clock behind the
+  // relay's keeps the post stale, and reloading would fetch again forever.
+  const refresh = useCallback(async () => {
+    await load();
+    const fetched = await openPost(circleId, postId).catch((err) => {
+      console.error('Failed to open the post', err);
+      return false;
+    });
+    if (fetched) await load();
+  }, [load, circleId, postId]);
 
   useFocusEffect(
     useCallback(() => {
-      load().catch((err) => console.error('Failed to load post details', err));
-    }, [load]),
+      refresh().catch((err) => console.error('Failed to load post details', err));
+    }, [refresh]),
+  );
+
+  // A sync pass can bring new activity while this screen is up, and one
+  // opened from a notification usually beats the pass carrying it.
+  useEffect(
+    () => onSyncCompleted(() => refresh().catch((err) => console.error('Failed to load post details', err))),
+    [refresh],
   );
 
   const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);

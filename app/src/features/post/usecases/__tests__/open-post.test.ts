@@ -41,7 +41,7 @@ describe('opening a post', () => {
   test('asks the relay for a post whose comments were never fetched', async () => {
     await seed(`circle-${next}`, `post-${next}`);
 
-    await openPost(`circle-${next}`, `post-${next}`);
+    expect(await openPost(`circle-${next}`, `post-${next}`)).toBe(true);
 
     expect(children).toHaveBeenCalledTimes(1);
   });
@@ -53,7 +53,7 @@ describe('opening a post', () => {
     await seed(`circle-${next}`, `post-${next}`);
     await markCircleLeft(`circle-${next}`, NOW + 1);
 
-    await openPost(`circle-${next}`, `post-${next}`);
+    expect(await openPost(`circle-${next}`, `post-${next}`)).toBe(false);
 
     expect(children).not.toHaveBeenCalled();
   });
