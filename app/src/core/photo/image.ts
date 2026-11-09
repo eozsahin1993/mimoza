@@ -65,13 +65,14 @@ export function parsePictureThumbnail(value: unknown): Uint8Array | null {
   return bytes;
 }
 
-/** Opens the system image picker. Returns the picked file's local URI, or null if cancelled. */
+/**
+ * Opens the system image picker. Returns the picked file's local URI, or null if cancelled.
+ *
+ * No library permission is asked for: both platforms' pickers run outside the
+ * app and hand back only the chosen photo. Asking anyway made iOS offer
+ * "Limit Access", whose multi-select sheet looked like a broken picker.
+ */
 export async function pickImage(): Promise<string | null> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) {
-    return null;
-  }
-
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     quality: 1,

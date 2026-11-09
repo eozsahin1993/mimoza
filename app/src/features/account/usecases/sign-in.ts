@@ -62,7 +62,7 @@ function ensureGoogleConfigured(): void {
  * (a plain async function, not a React hook the way expo-auth-session's
  * Google prompt was) makes that possible.
  */
-export async function signInWithGoogle(): Promise<SignInResult> {
+export async function signInWithGoogle(onAuthorized?: () => void): Promise<SignInResult> {
   ensureGoogleConfigured();
 
   try {
@@ -78,6 +78,7 @@ export async function signInWithGoogle(): Promise<SignInResult> {
     if (!idToken) {
       throw new Error("Google didn't return an ID token — try again.");
     }
+    onAuthorized?.();
     const token = await relaySignInWithGoogle(idToken);
     await saveAuthToken(token);
     const { accountId, name } = await getRelayProfile();
@@ -104,8 +105,12 @@ export async function signInWithGoogle(): Promise<SignInResult> {
  * callers get a plain pass/cancelled outcome, never
  * AppleAuthenticationCredential's shape or expo-apple-authentication's
  * own cancel error code. Same keypair-is-separate note as signInWithGoogle.
+ *
+ * `onAuthorized` fires once the provider's sheet has closed with a
+ * credential, before the relay round trip, so a caller can cover the wait
+ * that follows without drawing over the sheet itself. Same in signInWithGoogle.
  */
-export async function signInWithApple(): Promise<SignInResult> {
+export async function signInWithApple(onAuthorized?: () => void): Promise<SignInResult> {
   let credential;
   try {
     credential = await AppleAuthentication.signInAsync({
@@ -125,6 +130,7 @@ export async function signInWithApple(): Promise<SignInResult> {
   if (!credential.authorizationCode) {
     throw new Error("Apple didn't return an authorization code — try again.");
   }
+  onAuthorized?.();
   const token = await relaySignInWithApple(credential.identityToken, credential.authorizationCode);
   await saveAuthToken(token);
   const { accountId, name } = await getRelayProfile();

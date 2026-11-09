@@ -46,7 +46,7 @@ export default function WelcomeScreen() {
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
-  const [isRecovering, setIsRecovering] = useState(false);
+  const [overlay, setOverlay] = useState<'signingIn' | 'recovering' | null>(null);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [devSheetVisible, setDevSheetVisible] = useState(false);
 
@@ -69,8 +69,14 @@ export default function WelcomeScreen() {
     setBusyProvider(provider);
     try {
       let result: SignInResult;
-      if (provider === 'dev' && devAccount) result = await signInWithDevAccount(devAccount);
-      else result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+      const showSigningIn = () => setOverlay('signingIn');
+      if (provider === 'dev' && devAccount) {
+        result = await signInWithDevAccount(devAccount);
+      } else if (provider === 'google') {
+        result = await signInWithGoogle(showSigningIn);
+      } else {
+        result = await signInWithApple(showSigningIn);
+      }
       if (result.outcome !== 'success') return;
 
       if (!result.relayProfile) return;
@@ -81,7 +87,7 @@ export default function WelcomeScreen() {
       // inside it. The spinner goes up before the check, not from inside
       // it: the local/synced lookup is the slow part, so anything fired
       // after it resolves would appear only once the wait was over.
-      if (name) setIsRecovering(true);
+      if (name) setOverlay('recovering');
       const status = await checkAccountKeypairStatus(accountId);
 
       // Only worth asking when there's an account to bring over: a name on
@@ -131,7 +137,7 @@ export default function WelcomeScreen() {
       );
     } finally {
       setBusyProvider(null);
-      setIsRecovering(false);
+      setOverlay(null);
     }
   }
 
@@ -210,7 +216,11 @@ export default function WelcomeScreen() {
         />
       ) : null}
 
-      <LoadingModal visible={isRecovering} label={t('onboarding.recoveringTitle')} sublabel={t('onboarding.recoveringMessage')} />
+      <LoadingModal
+        visible={overlay !== null}
+        label={overlay === 'recovering' ? t('onboarding.recoveringTitle') : t('onboarding.signingIn')}
+        sublabel={overlay === 'recovering' ? t('onboarding.recoveringMessage') : undefined}
+      />
     </ThemedView>
   );
 }

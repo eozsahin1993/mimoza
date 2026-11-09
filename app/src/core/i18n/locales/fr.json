@@ -160,6 +160,7 @@
     "signInFailedTryOther": "Impossible de te connecter avec {{provider}}. Réessaie, ou essaie plutôt avec {{other}}.",
     "recoveringTitle": "Récupération de ton compte",
     "recoveringMessage": "Cela peut prendre quelques secondes.",
+    "signingIn": "Connexion…",
     "profile": {
       "header": "Ton profil",
       "title": "Comment veux-tu apparaître dans tes cercles ?",
