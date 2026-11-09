@@ -25,7 +25,7 @@ The `ios` scripts pin `--device "iPhone 17"`, so they fail outright
 without that simulator.
 
 `npm run prebuild` (same suffixes) regenerates `ios/` and `android/` after
-a change to `app.config.js`, `app.json` or a config plugin.
+a change to `app.config.ts`, `app.json` or a config plugin.
 
 ## Other commands
 

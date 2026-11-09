@@ -1,7 +1,7 @@
 // Hands Xcode the environment the npm scripts run under.
 //
 // Xcode's script phases don't inherit the shell that ran prebuild, and the
-// bundling phase re-evaluates app.config.js from scratch. Without these it
+// bundling phase re-evaluates app.config.ts from scratch. Without these it
 // resolves with everything unset — `iosUrlScheme()` returns undefined and
 // the Google Sign-In plugin throws `Missing iosUrlScheme`, which only
 // happens on Archive, never on `npm run ios:*` where the CLI passes its own
@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 
-/** Everything app.config.js reads. A value missing here fails the archive, not the script. */
+/** Everything app.config.ts reads. A value missing here fails the archive, not the script. */
 const KEYS = [
   'APP_ENV',
   'APNS_PRODUCTION',

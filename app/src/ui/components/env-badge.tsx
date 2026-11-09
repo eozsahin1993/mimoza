@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { StyleSheet, Text, View } from 'react-native';
 import { Space } from '@/ui/theme/tokens';
 
-/** Set by app.config.js; absent in tests and in a bare `expo start`. */
+/** Set by app.config.ts; absent in tests and in a bare `expo start`. */
 const APP_ENV = (Constants.expoConfig?.extra as { appEnv?: string } | undefined)?.appEnv;
 
 /**

@@ -1,7 +1,7 @@
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 
-/** Set by app.config.js; absent in tests and in a bare `expo start`. */
+/** Set by app.config.ts; absent in tests and in a bare `expo start`. */
 type Extra = { appEnv?: string; jsBuild?: unknown };
 
 const extra = Constants.expoConfig?.extra as Extra | undefined;

@@ -401,7 +401,7 @@ ID. The APNs `.p8` key is shared.
 
 **Push has two environments, and a build registers against one.** The
 `aps-environment` entitlement is keyed on `APNS_PRODUCTION`
-(`app.config.js`), which CI sets for every TestFlight build and a local
+(`app.config.ts`), which CI sets for every TestFlight build and a local
 Xcode run does not — only a distribution profile may carry the production
 entitlement. A sandbox token sent to production APNs is rejected as
 unregistered, silently: the build registers, the relay accepts the token,

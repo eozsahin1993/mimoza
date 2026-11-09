@@ -84,7 +84,7 @@ of, which answers the only question that matters before shipping: does
 this change need a new binary, or will the JS bundle carry it?
 
 The three are not interchangeable. The hash covers the resolved app
-config, and `app.config.js` gives each environment its own bundle id, App
+config, and `app.config.ts` gives each environment its own bundle id, App
 Group and APNs entitlement, so the same commit fingerprints differently
 per environment:
 
