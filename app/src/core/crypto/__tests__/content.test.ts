@@ -22,7 +22,8 @@ describe('circle content', () => {
 
   test('tampered ciphertext gives null', () => {
     const sealed = sealContent({ a: 1 }, KEY);
-    const tampered = `A${sealed.slice(1)}`;
+    // Flipped rather than set: the nonce is random, so it may already start with A.
+    const tampered = `${sealed[0] === 'A' ? 'B' : 'A'}${sealed.slice(1)}`;
 
     expect(openContent(tampered, KEY)).toBeNull();
   });
