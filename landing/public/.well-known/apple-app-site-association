@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["N323492Q8L.com.rarekiwisoftware.mimoza"],
+        "components": [{ "/": "/join/*" }]
+      },
+      {
+        "appIDs": ["N323492Q8L.com.rarekiwisoftware.mimoza.staging"],
+        "components": [{ "/": "/staging/join/*" }]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+/* Short enough to leave a gap under the footer on a tall screen. */
+.join-page { min-height: 100svh; display: flex; flex-direction: column; }
+.join-page > .policy-nav, .join-page > .policy { margin: 0 auto; width: 100%; }
+.join-page > footer { margin-top: auto; }
+
+.policy a.open-app { display: inline-flex; align-items: center; gap: 10px; height: 54px; padding: 0 24px; margin: 36px 0 0; border-radius: 10px; background: var(--brown); color: var(--paper); font-weight: 600; font-size: 15px; text-decoration: none; transition: transform .2s ease, background .2s ease; }
+.policy a.open-app:hover { transform: translateY(-2px); background: #2b231d; color: var(--paper); }
+.policy .store-row { align-items: flex-start; }

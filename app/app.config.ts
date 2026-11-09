@@ -1,6 +1,7 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 const GOOGLE_SIGN_IN = '@react-native-google-signin/google-signin';
+const INVITE_HOST = 'joinmimoza.com';
 
 type EnvironmentName = 'dev' | 'production' | 'staging';
 
@@ -9,6 +10,8 @@ type Environment = {
   iosGoogleServicesFile: string;
   /** The update channel. Dev has none and runs without updates. */
   channel?: string;
+  /** Where this environment's invite links live on INVITE_HOST. */
+  invitePath?: string;
   /** Set for an environment installed beside production as an app of its own. */
   separateApp?: {
     nameSuffix: string;
@@ -46,11 +49,13 @@ const ENVIRONMENTS: Record<EnvironmentName, Environment> = {
     channel: 'production',
     googleServicesFile: './google-services.prod.json',
     iosGoogleServicesFile: './GoogleService-Info.prod.plist',
+    invitePath: '/join/',
   },
   staging: {
     channel: 'staging',
     googleServicesFile: './google-services.staging.json',
     iosGoogleServicesFile: './GoogleService-Info.staging.plist',
+    invitePath: '/staging/join/',
     separateApp: {
       nameSuffix: ' Staging',
       idSuffix: '.staging',
@@ -75,6 +80,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     withSeparateApp,
     withEnv,
     withGoogleScheme,
+    withInviteLinks,
     withBuildNumber,
   ];
   return steps.reduce((current, step) => step(current, context), fromAppJson(config));
@@ -203,6 +209,33 @@ const withGoogleScheme: Step = (config) => {
       if (plugin !== GOOGLE_SIGN_IN) return [plugin];
       return scheme ? [[GOOGLE_SIGN_IN, { iosUrlScheme: scheme }]] : [];
     }),
+  };
+};
+
+/**
+ * Invite links are https because chat apps only make http(s) tappable:
+ * WhatsApp shows a mimoza:// link as plain text. Staging and production
+ * share the host and differ by path, and the site's verification files
+ * (landing/public/.well-known) say which app opens which, so a phone with
+ * both installed still opens the right one. Dev keeps its custom scheme.
+ */
+const withInviteLinks: Step = (config, { env }) => {
+  if (!env.invitePath) return config;
+  return {
+    ...config,
+    ios: { ...config.ios, associatedDomains: [`applinks:${INVITE_HOST}`] },
+    android: {
+      ...config.android,
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: [{ scheme: 'https', host: INVITE_HOST, pathPrefix: env.invitePath }],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
+    },
+    extra: { ...config.extra, inviteLinkBase: `https://${INVITE_HOST}${env.invitePath}` },
   };
 };
 

@@ -35,10 +35,7 @@ import { showAlert } from '@/core/services/alerts';
 import { showDone, showError } from '@/core/services/messages';
 import { useCoverUri } from '@/core/photo/use-photo-uri';
 import { pickAndCompressImage } from '@/core/photo/image';
-
-function inviteLink(code: string): string {
-  return `mimoza://join/${code}`;
-}
+import { inviteLink } from '@/features/invite/services/invite-link';
 
 function daysUntil(expiresAt: number): number {
   return Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000));

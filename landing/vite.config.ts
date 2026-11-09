@@ -15,6 +15,7 @@ export default defineConfig({
         support: "support/index.html",
         deleteAccount: "delete-account/index.html",
         terms: "terms/index.html",
+        join: "join/index.html",
       },
     },
   },
