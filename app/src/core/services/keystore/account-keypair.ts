@@ -35,8 +35,11 @@ function fingerprint(publicKey: Uint8Array): string {
   return bytesToHex(publicKey).slice(0, 8);
 }
 
-export async function getAccountKeypair(accountId: string): Promise<Keypair | null> {
-  const raw = await getSyncedSecret(storageKey(accountId));
+export async function getAccountKeypair(
+  accountId: string,
+  options?: { waitForSync?: boolean }
+): Promise<Keypair | null> {
+  const raw = await getSyncedSecret(storageKey(accountId), options);
   if (!raw) return null;
   const parsed = JSON.parse(raw) as { publicKey: string; secretKey: string };
   const keypair = { publicKey: hexToBytes(parsed.publicKey), secretKey: hexToBytes(parsed.secretKey) };

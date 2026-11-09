@@ -36,15 +36,21 @@ async function getSyncedOnce(key: string): Promise<string | null> {
  * genuinely has nothing local falls through to recovering one from
  * iCloud Keychain/Block Store, exactly the "new device" case that layer
  * exists for.
+ *
+ * `waitForSync: false` asks the sync layer once instead of retrying, for a
+ * caller that already knows nothing is on its way.
  */
-export async function getSyncedSecret(key: string): Promise<string | null> {
+export async function getSyncedSecret(
+  key: string,
+  { waitForSync = true }: { waitForSync?: boolean } = {}
+): Promise<string | null> {
   const local = await getSecret(key);
   if (local !== null) {
     console.log(`[synced-store] get ${key}: found locally`);
     return local;
   }
 
-  for (const delay of RESTORE_RETRY_DELAYS_MS) {
+  for (const delay of waitForSync ? RESTORE_RETRY_DELAYS_MS : []) {
     const value = await getSyncedOnce(key);
     if (value !== null) {
       console.log(`[synced-store] get ${key}: found via sync`);

@@ -84,6 +84,21 @@ describe('getSyncedSecret: recovering from the synced store', () => {
     expect(mockGetSynced).toHaveBeenCalledTimes(4); // 3 retries plus the final read
   });
 
+  test('waitForSync: false reads once and reports absence without waiting', async () => {
+    mockGetSynced.mockResolvedValue(null);
+
+    await expect(getSyncedSecret('k', { waitForSync: false })).resolves.toBeNull();
+    expect(mockGetSynced).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('waitForSync: false still returns a key the sync layer already has', async () => {
+    mockGetSynced.mockResolvedValue('found');
+
+    await expect(getSyncedSecret('k', { waitForSync: false })).resolves.toBe('found');
+    expect(mockLocalStore.get('k')).toBe('found');
+  });
+
   // A Keychain/Blockstore exception (not just "nothing found") must not
   // abort the search — this layer is a best-effort recovery path, and
   // the caller's real answer is "no local copy, nothing to recover".

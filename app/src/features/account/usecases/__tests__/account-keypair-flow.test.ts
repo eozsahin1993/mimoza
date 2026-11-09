@@ -4,6 +4,7 @@ jest.mock('@/core/services/keystore/synced-store');
 import { generateEphemeralKeypair } from '@/core/crypto/primitives';
 import { toWire } from '@/core/crypto/content';
 import { forgetAccountKeypair, saveAccountKeypair } from '@/core/services/keystore/account-keypair';
+import { getSyncedSecret } from '@/core/services/keystore/synced-store';
 import { getProfile, publishPublicKey } from '@/features/account/services/account-relay';
 import {
   KeypairPublishError,
@@ -57,6 +58,20 @@ describe('checkAccountKeypairStatus', () => {
 
   test('no local keypair but a name on the relay needs recovery', async () => {
     expect(await checkAccountKeypairStatus(ACCOUNT_ID)).toEqual({ kind: KeypairStatuses.NEEDS_RECOVERY });
+  });
+
+  test('with no key on the relay, the synced store is not waited on', async () => {
+    (getProfile as jest.Mock).mockResolvedValue({ ...RELAY_PROFILE, name: '' });
+
+    await checkAccountKeypairStatus(ACCOUNT_ID);
+    expect(getSyncedSecret).toHaveBeenCalledWith(expect.any(String), { waitForSync: false });
+  });
+
+  test('with a key on the relay, the synced store is waited on for a late delivery', async () => {
+    (getProfile as jest.Mock).mockResolvedValue({ ...RELAY_PROFILE, publicKey: 'on-file' });
+
+    await checkAccountKeypairStatus(ACCOUNT_ID);
+    expect(getSyncedSecret).toHaveBeenCalledWith(expect.any(String), { waitForSync: true });
   });
 });
 

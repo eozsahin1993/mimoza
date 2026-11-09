@@ -3,9 +3,9 @@
 // __mocks__/expo-secure-store.ts.
 const store = new Map<string, string>();
 
-export async function getSyncedSecret(key: string): Promise<string | null> {
-  return store.get(key) ?? null;
-}
+export const getSyncedSecret = jest.fn(
+  async (key: string, _options?: { waitForSync?: boolean }): Promise<string | null> => store.get(key) ?? null
+);
 
 export async function setSyncedSecret(key: string, value: string): Promise<void> {
   store.set(key, value);

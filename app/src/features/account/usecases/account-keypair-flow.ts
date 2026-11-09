@@ -4,26 +4,11 @@ import { getProfile as getRelayProfile, publishPublicKey } from '@/features/acco
 import type { Keypair } from '@/core/crypto/primitives';
 
 /**
- * What a caller needs to decide what to do next — never a callback, since
- * the real choice for `needsRecovery` is "navigate to a whole screen",
- * which doesn't fit through a Promise-returning callback the way a dialog
- * would.
- *
- * - `inSync`: this device's local keypair matches what the relay has on
- *   file. Nothing to do.
- * - `keypairMismatch`: this device *has* a local keypair, but it differs
- *   from the relay's — most often a leftover from an earlier sign-in that
- *   minted one and declined to publish it (see publishAccountKeypair's
- *   ambiguousRestore). There is nothing to ask the user: this key is
- *   already usable, it just needs telling to the relay as a reset.
- * - `freshSignup`: no local keypair, and the relay has never heard of this
- *   account either (no name on file) — a brand new account minting its
- *   first keypair. Mint and move on; there is nothing to recover.
- * - `needsRecovery`: no local keypair, but the relay already knows this
- *   account (a name on file) — a real returning account whose key is
- *   actually missing. This is the case that should navigate to a
- *   "scan another device or create a new key" screen instead of minting
- *   silently.
+ * What sign-in does next with the account keypair. A mismatch is usually a
+ * key an earlier sign-in minted and held back (see ambiguousRestore), so it
+ * is published rather than asked about. With no key on this device, a name
+ * on the relay is what tells a returning account, which needs recovery,
+ * from a new one, which mints.
  */
 export const KeypairStatuses = {
   IN_SYNC: 'inSync',
@@ -40,7 +25,7 @@ export type AccountKeypairStatus =
 
 export async function checkAccountKeypairStatus(accountId: string): Promise<AccountKeypairStatus> {
   const relayProfile = await getRelayProfile();
-  const keypair = await getAccountKeypair(accountId);
+  const keypair = await getAccountKeypair(accountId, { waitForSync: !!relayProfile.publicKey });
   if (keypair) {
     return toWire(keypair.publicKey) === relayProfile.publicKey
       ? { kind: KeypairStatuses.IN_SYNC }
@@ -49,13 +34,7 @@ export async function checkAccountKeypairStatus(accountId: string): Promise<Acco
   return relayProfile.name ? { kind: KeypairStatuses.NEEDS_RECOVERY } : { kind: KeypairStatuses.FRESH_SIGNUP };
 }
 
-/**
- * Thrown only after the caller's own session is already established, so it
- * can tell "sign-in itself failed" apart from "signed in fine, but the
- * keypair step didn't" instead of both looking like the same thrown error.
- * The account keypair is not required to use the app; a stale server-side
- * key is.
- */
+/** Lets sign-in tell its own failure apart from a key that didn't publish after the session was saved. */
 export class KeypairPublishError extends Error {
   readonly accountId: string;
   readonly relayName: string;
@@ -70,12 +49,9 @@ export class KeypairPublishError extends Error {
 }
 
 /**
- * Tells the relay about a keypair the caller already has in hand — from
- * checkAccountKeypairStatus's `keypairMismatch`, a fresh mint, or a keypair
- * adopted from another device via a scan. Knows nothing about how it was
- * obtained beyond `created`. `reset` is true whenever this overwrites a
- * *different* key already on file — not whenever `created` is true, since
- * a first-ever signup also mints with nothing to have lost.
+ * Publishes a keypair the caller already holds. It goes up as a reset only
+ * when it replaces a different key on the relay, not whenever it was just
+ * minted: a first signup mints too, with nothing to lose.
  */
 export async function publishAccountKeypair(accountId: string, keypair: Keypair, created: boolean): Promise<void> {
   const relayProfile = await getRelayProfile();
@@ -83,10 +59,8 @@ export async function publishAccountKeypair(accountId: string, keypair: Keypair,
     const publicKey = toWire(keypair.publicKey);
     const keyChanged = relayProfile.publicKey !== publicKey;
 
-    // Might be a restore still in flight, not a confirmed loss — publishing
-    // as reset here would be irreversible if so, so this is left
-    // unpublished for another chance (the next sign-in, or a scan, either
-    // of which can supply the real key before anything commits).
+    // Possibly a restore still in flight rather than a lost key. A reset can't
+    // be undone, so this waits for the next sign-in or a scan to settle it.
     const ambiguousRestore = created && !!relayProfile.publicKey;
     if (ambiguousRestore) {
       console.warn(
@@ -103,11 +77,8 @@ export async function publishAccountKeypair(accountId: string, keypair: Keypair,
 }
 
 /**
- * The only caller that matters right now: by the time sign-in reaches
- * this, saveAuthToken has already landed, so a keypair-specific failure
- * here must not make a sign-in that already succeeded look like it
- * didn't. Anything else thrown (a network error, the relay itself
- * refusing) is a real failure and still propagates.
+ * For sign-in, whose session is already saved by now: a key that fails to
+ * publish is logged rather than thrown, so the sign-in doesn't look failed.
  */
 export async function publishAccountKeypairOrDegrade(accountId: string, keypair: Keypair, created: boolean): Promise<void> {
   try {
