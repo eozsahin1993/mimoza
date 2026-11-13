@@ -14,6 +14,7 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "Açık",
     "appearanceDark": "Koyu",
+    "connect": "Bağlan",
     "language": "Dil",
     "languageRow": "Uygulama dili",
     "languageSystem": "Telefonun dili",
@@ -107,6 +108,7 @@
     },
     "scanDevice": {
       "header": "Başka bir cihaz ekle",
+      "description": "Diğer cihazındaki QR kodu tara",
       "instructions": "Eklemek istediğin cihazda Mimoza’ya giriş yap, ardından bu kamerayı orada çıkan koda tut.",
       "confirmTitleUnnamed": "Bu cihaz eklensin mi?",
       "confirmMessage_one": "Bu cihaz mevcut telefonunla aynı anahtarlara sahip olacak ve çevreni görebilecek. Bu erişimi sonradan geri alamazsın.",
@@ -121,7 +123,6 @@
       "cameraNeeded": "Kodu tarayabilmek için Mimoza’nın kamera erişimine ihtiyacı var.",
       "openSettings": "Ayarları aç",
       "allowCamera": "Kameraya izin ver",
-      "confirmNote": "Bu telefondan bir şey gönderilmeden önce senden onay istenecek.",
       "back": "Geri"
     },
     "privacy": {
@@ -453,6 +454,14 @@
       "request": "Katılma isteği gönder",
       "sendFailed": "İstek gönderilemedi",
       "retry": "Tekrar dene"
+    },
+    "scan": {
+      "joinWithQr": "QR kodla katıl",
+      "joinWithQrDescription": "Bir üyenin telefonundaki QR kodu tara",
+      "header": "Çevreye katıl",
+      "instructions": "Bir üyeden çevrenin QR kodunu göstermesini iste, ardından bu kamerayı koda tut.",
+      "notInvite": "Bu bir Mimoza daveti değil",
+      "tryAgain": "Tekrar dene"
     },
     "pending": {
       "title": "Katılma isteği",

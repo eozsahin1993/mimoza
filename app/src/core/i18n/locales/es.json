@@ -14,6 +14,7 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
     "appearanceDark": "Oscuro",
+    "connect": "Conectar",
     "language": "Idioma",
     "languageRow": "Idioma de la app",
     "languageSystem": "Idioma del teléfono",
@@ -107,6 +108,7 @@
     },
     "scanDevice": {
       "header": "Añadir otro dispositivo",
+      "description": "Escanea el código QR de tu otro dispositivo",
       "instructions": "Inicia sesión en Mimoza en el dispositivo que quieres añadir y apunta esta cámara al código que aparece.",
       "confirmTitleUnnamed": "¿Añadir este dispositivo?",
       "confirmMessage_one": "Tendrá las mismas claves que este teléfono y verá tu círculo. No podrás deshacerlo más adelante.",
@@ -121,7 +123,6 @@
       "cameraNeeded": "Mimoza necesita tu cámara para escanear el código.",
       "openSettings": "Abrir Ajustes",
       "allowCamera": "Permitir cámara",
-      "confirmNote": "Te pediremos confirmación antes de que nada salga de este teléfono.",
       "back": "Atrás"
     },
     "privacy": {
@@ -453,6 +454,14 @@
       "request": "Pedir unirme",
       "sendFailed": "No se ha podido enviar la solicitud",
       "retry": "Reintentar"
+    },
+    "scan": {
+      "joinWithQr": "Unirse con un código QR",
+      "joinWithQrDescription": "Escanea el código QR en el móvil de un miembro",
+      "header": "Unirse a un círculo",
+      "instructions": "Pide a un miembro que muestre el código QR del círculo y apunta esta cámara hacia él.",
+      "notInvite": "No es una invitación de Mimoza",
+      "tryAgain": "Reintentar"
     },
     "pending": {
       "title": "Solicitud para unirte",

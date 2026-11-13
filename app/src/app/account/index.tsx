@@ -16,7 +16,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Space, Spacing } from '@/ui/theme/tokens';
+import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { deleteAccount } from '@/features/account/usecases/delete-account';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { signOut } from '@/features/account/usecases/sign-in';
@@ -66,6 +66,25 @@ export default function AccountScreen() {
   /** Same shape the circle screen uses — one list, one row component, one set of spacings. */
   const settingsGroups: SettingsGroup[] = [
     {
+      title: t('settings.connect'),
+      rows: [
+        {
+          label: t('invite.scan.header'),
+          description: t('invite.scan.joinWithQrDescription'),
+          icon: Icons.qrCode,
+          control: { kind: 'navigate' },
+          onPress: () => router.push('/join/scan'),
+        },
+        {
+          label: t('account.scanDevice.header'),
+          description: t('account.scanDevice.description'),
+          icon: Icons.qrCode,
+          control: { kind: 'navigate' },
+          onPress: () => router.push('/account/device-link-scan'),
+        },
+      ],
+    },
+    {
       title: t('settings.language'),
       rows: [
         {
@@ -111,12 +130,6 @@ export default function AccountScreen() {
     {
       title: t('settings.account'),
       rows: [
-        {
-          label: t('account.scanDevice.header'),
-          description: t('account.scanDevice.confirmNote'),
-          control: { kind: 'navigate' },
-          onPress: () => router.push('/account/device-link-scan'),
-        },
         {
           label: signingOut ? t('settings.signingOut') : t('settings.signOut'),
           description: t('settings.signOutDescription'),

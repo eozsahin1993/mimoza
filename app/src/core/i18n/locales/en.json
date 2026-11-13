@@ -14,6 +14,7 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
+    "connect": "Connect",
     "language": "Language",
     "languageRow": "App language",
     "languageSystem": "Same as phone",
@@ -107,6 +108,7 @@
     },
     "scanDevice": {
       "header": "Add another device",
+      "description": "Scan the QR code on your other device",
       "instructions": "Sign in to Mimoza on the device you're adding, then point this camera at the code it shows.",
       "confirmTitleUnnamed": "Add that device?",
       "confirmMessage_one": "It will hold the same keys as this phone and see your circle. You cannot take that back later.",
@@ -121,7 +123,6 @@
       "cameraNeeded": "Mimoza needs your camera to scan the code.",
       "openSettings": "Open Settings",
       "allowCamera": "Allow camera",
-      "confirmNote": "You will be asked to confirm before anything leaves this phone.",
       "back": "Back"
     },
     "privacy": {
@@ -453,6 +454,14 @@
       "request": "Request to join",
       "sendFailed": "Could not send your request",
       "retry": "Retry"
+    },
+    "scan": {
+      "joinWithQr": "Join with a QR code",
+      "joinWithQrDescription": "Scan the QR code on a member's phone",
+      "header": "Join a circle",
+      "instructions": "Ask a member to show the circle's QR code, then point this camera at it.",
+      "notInvite": "That's not a Mimoza invite",
+      "tryAgain": "Try again"
     },
     "pending": {
       "title": "Join request",

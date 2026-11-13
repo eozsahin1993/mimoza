@@ -163,6 +163,12 @@ export default function CircleListScreen() {
     return results.some((result) => result.state === 'approved');
   }, [setPending]);
 
+  const openPendingInvite = useCallback(() => {
+    takePendingInviteCode()
+      .then((code) => code && setJoinCode(code))
+      .catch((err) => console.error('Failed to read a pending invite code', err));
+  }, [setJoinCode]);
+
   // On mount as well as on focus. A screen underneath a modal never gains
   // focus, so opening an invite link — which puts this screen up and a
   // sheet straight over it — would otherwise leave the list behind the
@@ -172,13 +178,11 @@ export default function CircleListScreen() {
     // promise callback a query later, not synchronously in the effect body.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadFromDatabase().catch((err) => console.error('Failed to load circles', err));
-    takePendingInviteCode()
-      .then((code) => code && setJoinCode(code))
-      .catch((err) => console.error('Failed to read a pending invite code', err));
+    openPendingInvite();
     shouldOfferNotifications()
       .then(setOfferNotifications)
       .catch((err) => console.error('Failed to check notification permission', err));
-  }, [loadFromDatabase]);
+  }, [loadFromDatabase, openPendingInvite]);
 
   // A background pass writes straight to SQLite while this screen may
   // already be the focused one, so focus alone won't catch it.
@@ -196,6 +200,8 @@ export default function CircleListScreen() {
   useFocusEffect(
     useCallback(() => {
       loadFromDatabase().catch((err) => console.error('Failed to load circles', err));
+      // The in-app scanner parks its code and goes back to this screen.
+      openPendingInvite();
 
       // Opportunistically completes a join even if the user never reopens
       // /join/pending directly — the invite handshake can't depend on push
@@ -206,7 +212,7 @@ export default function CircleListScreen() {
           if (joined) return loadFromDatabase();
         })
         .catch((err) => console.error('Failed to complete pending joins', err));
-    }, [loadFromDatabase, completePendingJoins]),
+    }, [loadFromDatabase, completePendingJoins, openPendingInvite]),
   );
 
   const handleCancelPending = useCallback((request: PendingRequest) => {
@@ -365,7 +371,10 @@ export default function CircleListScreen() {
                 <ThemedText type="bodyMedium" themeColor="muted" style={styles.emptyBody}>
                   {t('circle.list.emptyBody')}
                 </ThemedText>
-                <SecondaryButton label={t('circle.list.createCircle')} onPress={() => router.push('/circle/new')} style={styles.emptyButton} />
+                <View style={styles.emptyButtons}>
+                  <SecondaryButton label={t('circle.list.createCircle')} onPress={() => router.push('/circle/new')} />
+                  <SecondaryButton label={t('invite.scan.joinWithQr')} onPress={() => router.push('/join/scan')} />
+                </View>
               </View>
             ) : null
           }
@@ -463,8 +472,10 @@ const styles = StyleSheet.create({
   emptyBody: {
     textAlign: 'center',
   },
-  emptyButton: {
+  // Centered at the width of the longer label, with both buttons stretched to it.
+  emptyButtons: {
     marginTop: Space.s100,
+    gap: Space.s300,
   },
   fab: {
     position: 'absolute',

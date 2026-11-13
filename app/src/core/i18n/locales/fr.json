@@ -14,6 +14,7 @@
     "appearanceSystem": "Système",
     "appearanceLight": "Clair",
     "appearanceDark": "Sombre",
+    "connect": "Connecter",
     "language": "Langue",
     "languageRow": "Langue de l’app",
     "languageSystem": "Langue du téléphone",
@@ -107,6 +108,7 @@
     },
     "scanDevice": {
       "header": "Ajouter un autre appareil",
+      "description": "Scanne le code QR de ton autre appareil",
       "instructions": "Connecte-toi à Mimoza sur l’appareil que tu veux ajouter, puis vise le code qu’il affiche avec cette caméra.",
       "confirmTitleUnnamed": "Ajouter cet appareil ?",
       "confirmMessage_one": "Il aura les mêmes clés que ce téléphone et verra ton cercle. Tu ne pourras pas revenir en arrière.",
@@ -121,7 +123,6 @@
       "cameraNeeded": "Mimoza a besoin de ta caméra pour scanner le code.",
       "openSettings": "Ouvrir Réglages",
       "allowCamera": "Autoriser la caméra",
-      "confirmNote": "On te demandera de confirmer avant que quoi que ce soit ne quitte ce téléphone.",
       "back": "Retour"
     },
     "privacy": {
@@ -453,6 +454,14 @@
       "request": "Demander à rejoindre",
       "sendFailed": "Impossible d’envoyer la demande",
       "retry": "Réessayer"
+    },
+    "scan": {
+      "joinWithQr": "Rejoindre avec un code QR",
+      "joinWithQrDescription": "Scanne le code QR sur le téléphone d’un membre",
+      "header": "Rejoindre un cercle",
+      "instructions": "Demande à un membre d’afficher le code QR du cercle, puis vise-le avec cette caméra.",
+      "notInvite": "Ce n’est pas une invitation Mimoza",
+      "tryAgain": "Réessayer"
     },
     "pending": {
       "title": "Demande pour rejoindre",

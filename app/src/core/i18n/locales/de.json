@@ -14,6 +14,7 @@
     "appearanceSystem": "System",
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
+    "connect": "Verbinden",
     "language": "Sprache",
     "languageRow": "App-Sprache",
     "languageSystem": "Sprache des Handys",
@@ -107,6 +108,7 @@
     },
     "scanDevice": {
       "header": "Weiteres Gerät hinzufügen",
+      "description": "Scanne den QR-Code auf deinem anderen Gerät",
       "instructions": "Melde dich auf dem Gerät, das du hinzufügen willst, bei Mimoza an. Richte dann diese Kamera auf den Code, den es anzeigt.",
       "confirmTitleUnnamed": "Dieses Gerät hinzufügen?",
       "confirmMessage_one": "Es bekommt dieselben Schlüssel wie dieses Handy und sieht deinen Kreis. Das kannst du später nicht rückgängig machen.",
@@ -121,7 +123,6 @@
       "cameraNeeded": "Mimoza benötigt Zugriff auf deine Kamera, um den Code zu scannen.",
       "openSettings": "Einstellungen öffnen",
       "allowCamera": "Kamera erlauben",
-      "confirmNote": "Bevor irgendetwas dieses Handy verlässt, wirst du um Bestätigung gebeten.",
       "back": "Zurück"
     },
     "privacy": {
@@ -453,6 +454,14 @@
       "request": "Beitritt anfragen",
       "sendFailed": "Anfrage konnte nicht gesendet werden",
       "retry": "Erneut versuchen"
+    },
+    "scan": {
+      "joinWithQr": "Mit QR-Code beitreten",
+      "joinWithQrDescription": "Scanne den QR-Code auf dem Handy eines Mitglieds",
+      "header": "Einem Kreis beitreten",
+      "instructions": "Bitte ein Mitglied, den QR-Code des Kreises zu zeigen, und richte dann diese Kamera darauf.",
+      "notInvite": "Das ist keine Mimoza-Einladung",
+      "tryAgain": "Erneut versuchen"
     },
     "pending": {
       "title": "Beitrittsanfrage",
