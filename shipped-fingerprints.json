@@ -6,7 +6,7 @@
   },
   "production": {
     "version": "1.0.0",
-    "ios": "56f07e6a65ccef33e3993deef3c3444f34e1ba81",
-    "android": "2310663a556dabbb0a873a69ca21111e3ceeeb58"
+    "ios": "222ec47fe3128b9a26dc3fe640c9bc11016b3519",
+    "android": "177d0abb8858e32911dacb4fb24030b17a21c1bf"
   }
 }
