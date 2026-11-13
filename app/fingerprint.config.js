@@ -11,4 +11,14 @@ const { SourceSkips } = require('@expo/fingerprint');
  */
 module.exports = {
   sourceSkips: SourceSkips.ExpoConfigExtraSection,
+  // Fingerprint hashes the app icon and splash images but not
+  // expo-notifications' icon, so editing it in place would ship as an OTA
+  // update, which can't carry a native drawable.
+  extraSources: [
+    {
+      type: 'file',
+      filePath: 'assets/images/notification-icon.png',
+      reasons: ['expoNotificationsIcon'],
+    },
+  ],
 };

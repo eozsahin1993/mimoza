@@ -117,12 +117,15 @@ def main():
             out('android-icon-monochrome.png')
         )
         transparent(read('splash-icon.svg'), tmp, 'splash').save(out('splash-icon.png'))
+        transparent(read('notification-icon.svg'), tmp, 'notif').resize((384, 384), Image.LANCZOS).save(
+            out('notification-icon.png')
+        )
 
         # 600x240 = Android 12's 200x80dp branding image at 3x; the iOS
         # storyboard uses the same file (plugins/with-splash-wordmark.js).
         fit(transparent(wordmark_svg(), tmp, 'wordmark'), (600, 240)).save(out('splash-wordmark.png'))
 
-    for name in ['icon.png', 'android-icon-foreground.png', 'android-icon-monochrome.png', 'splash-icon.png', 'splash-wordmark.png']:
+    for name in ['icon.png', 'android-icon-foreground.png', 'android-icon-monochrome.png', 'splash-icon.png', 'notification-icon.png', 'splash-wordmark.png']:
         image = Image.open(out(name))
         print(f'{name:32} {image.size[0]}x{image.size[1]} {image.mode}')
 
