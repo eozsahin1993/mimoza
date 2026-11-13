@@ -212,6 +212,13 @@
       "emptyTitle": "Nothing in the album yet",
       "emptyBody": "Photos you add to the album while posting collect here, so they outlast the feed."
     },
+    "frame": {
+      "title": "Frame the cover",
+      "hint": "Drag and pinch to choose what everyone sees on the circles list.",
+      "use": "Use photo",
+      "fit": "Fit",
+      "fill": "Fill"
+    },
     "create": {
       "title": "Create circle",
       "name": "Name",

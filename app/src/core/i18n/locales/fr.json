@@ -212,6 +212,13 @@
       "emptyTitle": "L’album est encore vide",
       "emptyBody": "Les photos que tu ajoutes à l’album en publiant sont gardées ici, même quand le fil les a laissées derrière."
     },
+    "frame": {
+      "title": "Cadre la couverture",
+      "hint": "Fais glisser et pince pour choisir ce que tout le monde voit dans la liste des cercles.",
+      "use": "Utiliser la photo",
+      "fit": "Ajuster",
+      "fill": "Remplir"
+    },
     "create": {
       "title": "Créer un cercle",
       "name": "Nom",

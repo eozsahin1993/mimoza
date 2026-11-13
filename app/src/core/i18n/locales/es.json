@@ -212,6 +212,13 @@
       "emptyTitle": "El álbum aún está vacío",
       "emptyBody": "Las fotos que añades al álbum al publicarlas se guardan aquí, aunque en el feed queden atrás."
     },
+    "frame": {
+      "title": "Encuadra la portada",
+      "hint": "Arrastra y pellizca para elegir lo que todos ven en la lista de círculos.",
+      "use": "Usar foto",
+      "fit": "Encajar",
+      "fill": "Llenar"
+    },
     "create": {
       "title": "Crear círculo",
       "name": "Nombre",

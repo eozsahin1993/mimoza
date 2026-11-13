@@ -212,6 +212,13 @@
       "emptyTitle": "Noch nichts im Album",
       "emptyBody": "Fotos, die du beim Posten zum Album hinzufügst, landen hier und bleiben erhalten, auch wenn sie im Feed längst weiter unten sind."
     },
+    "frame": {
+      "title": "Titelbild zuschneiden",
+      "hint": "Ziehen und zoomen, um festzulegen, was alle in der Kreisliste sehen.",
+      "use": "Foto verwenden",
+      "fit": "Einpassen",
+      "fill": "Füllen"
+    },
     "create": {
       "title": "Kreis erstellen",
       "name": "Name",

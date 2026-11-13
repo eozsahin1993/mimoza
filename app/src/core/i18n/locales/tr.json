@@ -212,6 +212,13 @@
       "emptyTitle": "Albümde henüz fotoğraf yok",
       "emptyBody": "Paylaşırken albüme eklediğin fotoğraflar burada toplanır; akışta geride kalsalar bile burada durur."
     },
+    "frame": {
+      "title": "Kapağı ayarla",
+      "hint": "Sürükleyip yakınlaştırarak çevreler listesinde herkesin göreceği kısmı seç.",
+      "use": "Bu fotoğrafı kullan",
+      "fit": "Sığdır",
+      "fill": "Doldur"
+    },
     "create": {
       "title": "Çevre oluştur",
       "name": "Çevre adı",

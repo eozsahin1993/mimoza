@@ -17,6 +17,17 @@ import { generateUUID } from '@/core/crypto/primitives';
 const MAX_DIMENSION = 1080;
 const JPEG_QUALITY = 0.85;
 
+/** Twice what's kept, so zooming in while framing still has real pixels to crop. */
+const FRAMING_MAX_DIMENSION = MAX_DIMENSION * 2;
+/** High because the framed copy gets re-encoded once more after cropping. */
+const FRAMING_JPEG_QUALITY = 0.95;
+/**
+ * The long edge a photo is shrunk to before being stretched back up as the
+ * backdrop behind a cover that doesn't fill its frame. The manipulator has
+ * no blur, and this round trip through a few pixels is one.
+ */
+const BACKDROP_SAMPLE = 24;
+
 /**
  * A small avatar-sized thumbnail — for embedding directly inside an
  * encrypted payload that needs to stay small (e.g. a join request's
@@ -87,10 +98,17 @@ export async function pickImage(): Promise<string | null> {
   return result.canceled ? null : result.assets[0].uri;
 }
 
-function getImageSize(uri: string): Promise<{ width: number; height: number }> {
+type Size = { width: number; height: number };
+
+function getImageSize(uri: string): Promise<Size> {
   return new Promise((resolve, reject) => {
     Image.getSize(uri, (width, height) => resolve({ width, height }), reject);
   });
+}
+
+/** A resize that caps whichever edge is longer, so a portrait photo isn't capped on the wrong axis. */
+function capLongEdge({ width, height }: Size, max: number) {
+  return width >= height ? { width: Math.min(width, max) } : { height: Math.min(height, max) };
 }
 
 export type CompressedImage = {
@@ -99,6 +117,13 @@ export type CompressedImage = {
   /** Same file's bytes — what actually gets stored/encrypted. */
   bytes: Uint8Array;
 };
+
+export type SizedImage = Size & { uri: string };
+
+/** A photo ready to frame, with a blurred copy of itself to fill whatever it leaves of the frame. */
+export type FramingSource = SizedImage & { backdrop: string };
+
+export type CropRect = { originX: number; originY: number; width: number; height: number };
 
 /**
  * Resizes `uri` so its longer edge is at most `MAX_DIMENSION`, re-encodes it
@@ -109,10 +134,7 @@ export type CompressedImage = {
  * through a base64 data-URI when the resized file is already sitting on disk.
  */
 export async function compressImage(uri: string): Promise<CompressedImage> {
-  const { width, height } = await getImageSize(uri);
-  const resize = width >= height ? { width: Math.min(width, MAX_DIMENSION) } : { height: Math.min(height, MAX_DIMENSION) };
-
-  const rendered = await ImageManipulator.manipulate(uri).resize(resize).renderAsync();
+  const rendered = await ImageManipulator.manipulate(uri).resize(capLongEdge(await getImageSize(uri), MAX_DIMENSION)).renderAsync();
   const saved = await rendered.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG });
 
   const bytes = await new File(saved.uri).arrayBuffer();
@@ -123,6 +145,85 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
 export async function pickAndCompressImage(): Promise<CompressedImage | null> {
   const uri = await pickImage();
   return uri ? compressImage(uri) : null;
+}
+
+/**
+ * Picks an image and makes the copy it gets framed on, or null if
+ * cancelled. The size comes from that copy, not the original, so the crop
+ * is measured on the same upright pixels the manipulator later cuts; the
+ * original's reported size can disagree with them over EXIF orientation.
+ */
+export async function pickImageToFrame(): Promise<FramingSource | null> {
+  const uri = await pickImage();
+  if (!uri) return null;
+
+  const rendered = await ImageManipulator.manipulate(uri).resize(capLongEdge(await getImageSize(uri), FRAMING_MAX_DIMENSION)).renderAsync();
+  const saved = await rendered.saveAsync({ compress: FRAMING_JPEG_QUALITY, format: SaveFormat.JPEG });
+
+  const longEdge = (max: number) => (saved.width >= saved.height ? { width: max } : { height: max });
+  const blurred = await ImageManipulator.manipulate(saved.uri).resize(longEdge(BACKDROP_SAMPLE)).resize(longEdge(MAX_DIMENSION)).renderAsync();
+  const backdrop = await blurred.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG });
+
+  return { uri: saved.uri, width: saved.width, height: saved.height, backdrop: backdrop.uri };
+}
+
+/** Deletes a framing source's two temp files once its cover is made, or abandoned. */
+export function discardFramingSource(source: FramingSource) {
+  for (const uri of [source.uri, source.backdrop]) {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+  }
+}
+
+/**
+ * How far below "covers the frame" (zoom 1) a photo may shrink: to the
+ * point where all of it fits inside.
+ */
+export function minZoomFor(image: Size, frame: Size): number {
+  const across = frame.width / image.width;
+  const down = frame.height / image.height;
+  return Math.min(across, down) / Math.max(across, down);
+}
+
+/**
+ * The part of `image` (pixels) showing through a `frame` (points) once the
+ * image covers the frame, is scaled by `zoom` on top of that, and has its
+ * centre moved by `offset` (points) from the frame's.
+ */
+export function cropRectFor(image: Size, frame: Size, zoom: number, offset: { x: number; y: number }): CropRect {
+  const scale = Math.max(frame.width / image.width, frame.height / image.height) * zoom;
+  const width = Math.min(image.width, Math.round(frame.width / scale));
+  const height = Math.min(image.height, Math.round(frame.height / scale));
+  const originX = Math.round((image.width - width) / 2 - offset.x / scale);
+  const originY = Math.round((image.height - height) / 2 - offset.y / scale);
+
+  return {
+    originX: Math.min(Math.max(originX, 0), image.width - width),
+    originY: Math.min(Math.max(originY, 0), image.height - height),
+    width,
+    height,
+  };
+}
+
+/** Turns a rendered PNG (base64, as `react-native-svg` hands one back) into a cover-sized JPEG. */
+export async function compressRenderedPng(base64: string): Promise<CompressedImage> {
+  const png = new File(Paths.cache, `rendered-${generateUUID()}.png`);
+  png.create({ overwrite: true });
+  png.write(new Uint8Array(Buffer.from(base64, 'base64')));
+  try {
+    return await compressImage(png.uri);
+  } finally {
+    png.delete();
+  }
+}
+
+/** Cuts `rect` out of a framed copy and compresses it like any other photo. */
+export async function cropAndCompressImage(source: SizedImage, rect: CropRect): Promise<CompressedImage> {
+  const rendered = await ImageManipulator.manipulate(source.uri).crop(rect).resize(capLongEdge(rect, MAX_DIMENSION)).renderAsync();
+  const saved = await rendered.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG });
+
+  const bytes = await new File(saved.uri).arrayBuffer();
+  return { uri: saved.uri, bytes: new Uint8Array(bytes) };
 }
 
 /**
@@ -138,10 +239,7 @@ export async function compressToThumbnail(bytes: Uint8Array): Promise<Uint8Array
   source.create({ overwrite: true });
   source.write(bytes);
   try {
-    const { width, height } = await getImageSize(source.uri);
-    const resize =
-      width >= height ? { width: Math.min(width, THUMBNAIL_MAX_DIMENSION) } : { height: Math.min(height, THUMBNAIL_MAX_DIMENSION) };
-
+    const resize = capLongEdge(await getImageSize(source.uri), THUMBNAIL_MAX_DIMENSION);
     const rendered = await ImageManipulator.manipulate(source.uri).resize(resize).renderAsync();
     const saved = await rendered.saveAsync({ compress: THUMBNAIL_JPEG_QUALITY, format: SaveFormat.JPEG });
     const savedFile = new File(saved.uri);

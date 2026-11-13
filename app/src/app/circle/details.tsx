@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { ActionSheet, type ActionSheetOption } from '@/ui/components/action-sheet';
+import { CoverFramer } from '@/features/circle/components/cover-framer';
 import { MemberList } from '@/features/circle/components/member-list';
 import { confirmRemoveFromPhone } from '@/features/feed/components/no-longer-member-row';
 import { InviteSheet } from '@/features/invite/components/invite-sheet';
@@ -34,7 +35,7 @@ import {
 import { showAlert } from '@/core/services/alerts';
 import { showDone, showError } from '@/core/services/messages';
 import { useCoverUri } from '@/core/photo/use-photo-uri';
-import { pickAndCompressImage } from '@/core/photo/image';
+import { pickImageToFrame, type CompressedImage, type FramingSource } from '@/core/photo/image';
 import { inviteLink } from '@/features/invite/services/invite-link';
 
 function daysUntil(expiresAt: number): number {
@@ -55,6 +56,7 @@ export default function CircleDetailsScreen() {
   const [inviteSheet, setInviteSheet] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [coverUri, setCoverUri] = useState<string | undefined>();
+  const [framing, setFraming] = useState<FramingSource | null>(null);
   const [levelPicker, setLevelPicker] = useState(false);
   const liveCoverUri = useCoverUri(circleId, coverUri);
 
@@ -289,12 +291,21 @@ export default function CircleDetailsScreen() {
     );
   }
 
-  async function handleSetCoverPhoto() {
+  async function handlePickCoverPhoto() {
+    try {
+      const picked = await pickImageToFrame();
+      if (picked) setFraming(picked);
+    } catch (err) {
+      console.error('Failed to pick a cover photo', err);
+      showError(t('circle.details.coverFailed'));
+    }
+  }
+
+  async function handleSetCoverPhoto(cover: CompressedImage) {
+    setFraming(null);
     if (!circleId) return;
     try {
-      const picked = await pickAndCompressImage();
-      if (!picked) return;
-      await setCoverPhoto(circleId, picked.bytes);
+      await setCoverPhoto(circleId, cover.bytes);
       await reload();
     } catch (err) {
       console.error('Failed to set the cover photo', err);
@@ -407,7 +418,7 @@ export default function CircleDetailsScreen() {
           // fallback included, so the row can't show a circle a different
           // face from the one you just tapped.
           control: { kind: 'image', uri: liveCoverUri },
-          onPress: handleSetCoverPhoto,
+          onPress: handlePickCoverPhoto,
         },
         admin && {
           label: t('circle.details.rename'),
@@ -504,6 +515,15 @@ export default function CircleDetailsScreen() {
         avatarColorSeed={memberMenu?.accountId}
         options={memberMenuOptions}
       />
+
+      {framing ? (
+        <CoverFramer
+          source={framing}
+          name={circle?.name}
+          onCancel={() => setFraming(null)}
+          onDone={handleSetCoverPhoto}
+        />
+      ) : null}
     </ThemedView>
   );
 }

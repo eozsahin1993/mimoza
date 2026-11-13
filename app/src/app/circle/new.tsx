@@ -11,9 +11,10 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Fonts, PhotoAspect, Radius, Space, Spacing } from '@/ui/theme/tokens';
+import { CoverFramer } from '@/features/circle/components/cover-framer';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
-import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
+import { pickImageToFrame, type CompressedImage, type FramingSource } from '@/core/photo/image';
 
 /** Scroll clearance above the footer button, same idea as the feed's FAB. */
 const FOOTER_CLEARANCE = 110;
@@ -24,12 +25,13 @@ export default function NewCircleScreen() {
   const tints = useTints();
   const [name, setName] = useState('');
   const [cover, setCover] = useState<CompressedImage | null>(null);
+  const [framing, setFraming] = useState<FramingSource | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handlePickCover() {
-    const picked = await pickAndCompressImage();
-    if (picked) setCover(picked);
+    const picked = await pickImageToFrame();
+    if (picked) setFraming(picked);
   }
 
   async function handleCreate() {
@@ -101,6 +103,18 @@ export default function NewCircleScreen() {
         ) : null}
         <PrimaryButton label={t('circle.create.submit')} disabled={!name.trim() || creating} onPress={handleCreate} />
       </ThemedSafeAreaView>
+
+      {framing ? (
+        <CoverFramer
+          source={framing}
+          name={name.trim()}
+          onCancel={() => setFraming(null)}
+          onDone={(framed) => {
+            setFraming(null);
+            setCover(framed);
+          }}
+        />
+      ) : null}
     </ThemedView>
   );
 }

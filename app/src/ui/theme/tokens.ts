@@ -14,6 +14,7 @@ import Camera from 'lucide-react-native/icons/camera';
 import CameraOff from 'lucide-react-native/icons/camera-off';
 import Check from 'lucide-react-native/icons/check';
 import Clock from 'lucide-react-native/icons/clock';
+import Expand from 'lucide-react-native/icons/expand';
 import Flag from 'lucide-react-native/icons/flag';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleAlert from 'lucide-react-native/icons/circle-alert';
@@ -31,6 +32,7 @@ import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import SendHorizontal from 'lucide-react-native/icons/send-horizontal';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import ShieldOff from 'lucide-react-native/icons/shield-off';
+import Shrink from 'lucide-react-native/icons/shrink';
 import SquarePen from 'lucide-react-native/icons/square-pen';
 import Trash from 'lucide-react-native/icons/trash';
 import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
@@ -281,6 +283,8 @@ export const Icons = {
   camera: Camera,
   cameraOff: CameraOff,
   album: Album,
+  fitPhoto: Shrink,
+  fillPhoto: Expand,
 } as const satisfies Record<string, IconGlyph>;
 
 export const Radius = {
@@ -364,5 +368,9 @@ export const Spacing = {
  */
 export const ButtonHeight = { primary: 52 } as const;
 
-/** Feed/detail posts: 4/5, edge to edge, no radius. Covers/memories: 16/9, radius = Radius.panel. */
-export const PhotoAspect = { post: 4 / 5, cover: 16 / 9 } as const;
+/**
+ * Feed/detail posts: 4/5, edge to edge, no radius. Covers: the circle
+ * card's own strip, which is what a cover is framed to — every other
+ * place a cover shows uses the same shape, or it crops what was framed.
+ */
+export const PhotoAspect = { post: 4 / 5, cover: 7 / 2 } as const;

@@ -1,4 +1,4 @@
-import { bytesToDataUri, parsePictureThumbnail } from '@/core/photo/image';
+import { bytesToDataUri, cropRectFor, minZoomFor, parsePictureThumbnail } from '@/core/photo/image';
 
 const JPEG_HEADER = [0xff, 0xd8, 0xff];
 
@@ -59,4 +59,56 @@ test('accepts a decoded payload right at the size limit', () => {
   const atLimit = jpegBytes(32 * 1024 - JPEG_HEADER.length);
 
   expect(parsePictureThumbnail(toBase64(atLimit))).toEqual(atLimit);
+});
+
+describe('cropRectFor', () => {
+  // A 4:3 photo framed in a 350x100 strip: width-bound, so at zoom 1 the
+  // strip spans the photo's full width and a 7:2 band of its height.
+  const photo = { width: 2000, height: 1500 };
+  const strip = { width: 350, height: 100 };
+
+  test('untouched, it takes the middle band at full width', () => {
+    expect(cropRectFor(photo, strip, 1, { x: 0, y: 0 })).toEqual({ originX: 0, originY: 465, width: 2000, height: 571 });
+  });
+
+  test('dragging the photo down shows more of its top', () => {
+    const rect = cropRectFor(photo, strip, 1, { x: 0, y: 50 });
+    expect(rect.originY).toBeLessThan(465);
+    expect(rect.height).toBe(571);
+  });
+
+  test('zooming in takes a proportionally smaller rect around the same centre', () => {
+    expect(cropRectFor(photo, strip, 2, { x: 0, y: 0 })).toEqual({ originX: 500, originY: 607, width: 1000, height: 286 });
+  });
+
+  test('never reaches outside the photo, whatever offset it is handed', () => {
+    const rect = cropRectFor(photo, strip, 2, { x: 10_000, y: -10_000 });
+    expect(rect.originX).toBe(0);
+    expect(rect.originY).toBe(photo.height - rect.height);
+  });
+
+  test('a tall photo is bound by the strip\'s width too, never stretched', () => {
+    const rect = cropRectFor({ width: 1000, height: 2000 }, strip, 1, { x: 0, y: 0 });
+    expect(rect.width).toBe(1000);
+    expect(rect.width / rect.height).toBeCloseTo(3.5, 1);
+  });
+});
+
+describe('minZoomFor', () => {
+  const strip = { width: 350, height: 100 };
+
+  test('lets a landscape photo shrink until its full height fits the strip', () => {
+    const zoom = minZoomFor({ width: 2000, height: 1500 }, strip);
+    const shown = (strip.width / 2000) * zoom;
+    expect(1500 * shown).toBeCloseTo(strip.height);
+    expect(2000 * shown).toBeLessThan(strip.width);
+  });
+
+  test('lets a portrait photo shrink much further, down to a sliver', () => {
+    expect(minZoomFor({ width: 1500, height: 2000 }, strip)).toBeLessThan(minZoomFor({ width: 2000, height: 1500 }, strip));
+  });
+
+  test('is 1 for a photo already the strip\'s shape: nothing to fit', () => {
+    expect(minZoomFor({ width: 1400, height: 400 }, strip)).toBeCloseTo(1);
+  });
 });

@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/ui/components/icon';
 import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Colors, Icons, Petal, Radius, Space } from '@/ui/theme/tokens';
+import { Colors, Icons, Petal, PhotoAspect, Radius, Space } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 import { useCoverUri } from '@/core/photo/use-photo-uri';
 
@@ -30,14 +30,13 @@ export type CircleCardProps = {
   onPress?: () => void;
 };
 
-export const CARD_HEIGHT = 100;
-
 // The photo is the card, so everything on it is fixed light regardless of
 // scheme, the same way the wordmark sits over the welcome photo. The scrim
 // is what keeps that legible on a bright cover: clear across the top,
 // dark by the bottom edge where the text is.
-const ON_PHOTO = Colors.dark.text;
-const SCRIM = ['rgba(20,16,12,0)', 'rgba(20,16,12,0.78)'] as const;
+export const ON_PHOTO = Colors.dark.text;
+export const SCRIM = ['rgba(20,16,12,0)', 'rgba(20,16,12,0.78)'] as const;
+export const SCRIM_LOCATIONS = [0.4, 1] as const;
 // Over the photo and its scrim for an archived circle. Grey rather than
 // black: a veil toward grey takes the colour out of the cover as well as
 // the light, so it reads as faded, not just as a darker photo.
@@ -57,7 +56,7 @@ export function CircleCard({ circleId, name, memberCount, photoUri, newCount, la
     <Pressable style={[styles.card, { borderColor: tints.cardEdge }]} onPress={onPress}>
       <PhotoPlaceholder style={StyleSheet.absoluteFill} />
       {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-      <LinearGradient colors={SCRIM} locations={[0.4, 1]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={SCRIM} locations={SCRIM_LOCATIONS} style={StyleSheet.absoluteFill} />
       {archived ? <View style={[StyleSheet.absoluteFill, { backgroundColor: ARCHIVED_VEIL }]} pointerEvents="none" /> : null}
 
       {archived ? (
@@ -106,8 +105,10 @@ export function CircleCard({ circleId, name, memberCount, photoUri, newCount, la
 }
 
 const styles = StyleSheet.create({
+  // Shaped, not sized: a cover is framed to this aspect, so a fixed height
+  // would show a different slice of it on every screen width.
   card: {
-    height: CARD_HEIGHT,
+    aspectRatio: PhotoAspect.cover,
     borderRadius: Radius.circleCard,
     // A hairline so a dark cover, or the hatch in dark mode, still has an
     // edge against the background. On a light photo it is invisible.
