@@ -10,22 +10,26 @@ export type PrimaryButtonProps = PressableProps & {
   label: string;
   /** 'destructive' fills the button in the danger color instead of the accent gradient — for a confirm that can't be undone. */
   tone?: 'default' | 'destructive';
+  /** Tighter side padding, for a button sharing a row where the label needs the width. */
+  compact?: boolean;
 };
 
-export function PrimaryButton({ label, style, disabled, tone = 'default', ...rest }: PrimaryButtonProps) {
+const COMPACT_HIT_SLOP = { top: 2, bottom: 2 };
+
+export function PrimaryButton({ label, style, disabled, tone = 'default', compact, ...rest }: PrimaryButtonProps) {
   const theme = useTheme();
 
   return (
-    <Pressable style={style} disabled={disabled} {...rest}>
+    <Pressable style={style} disabled={disabled} hitSlop={compact ? COMPACT_HIT_SLOP : undefined} {...rest}>
       {({ pressed }) =>
         disabled ? (
-          <ThemedView style={styles.button} type="surface">
+          <ThemedView style={[styles.button, compact && styles.compact]} type="surface">
             <ThemedText type="labelLarge" themeColor="faintest" numberOfLines={1}>
               {label}
             </ThemedText>
           </ThemedView>
         ) : tone === 'destructive' ? (
-          <View style={[styles.button, { backgroundColor: theme.danger }, pressed && styles.pressed]}>
+          <View style={[styles.button, compact && styles.compact, { backgroundColor: theme.danger }, pressed && styles.pressed]}>
             <ThemedText type="labelLarge" style={styles.destructiveLabel} numberOfLines={1}>
               {label}
             </ThemedText>
@@ -35,7 +39,7 @@ export function PrimaryButton({ label, style, disabled, tone = 'default', ...res
             colors={[theme.accent, theme.accentBright]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={[styles.button, pressed && styles.pressed]}>
+            style={[styles.button, compact && styles.compact, pressed && styles.pressed]}>
             <ThemedText type="labelLarge" themeColor="accentLabel" numberOfLines={1}>
               {label}
             </ThemedText>
@@ -54,6 +58,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Space.s600,
+  },
+  compact: {
+    minHeight: ButtonHeight.compact,
+    paddingHorizontal: Space.s200,
   },
   pressed: {
     opacity: 0.85,

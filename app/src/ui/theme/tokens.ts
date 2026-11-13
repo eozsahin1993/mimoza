@@ -366,7 +366,11 @@ export const Spacing = {
  * stack; labels scale with Dynamic Type, though, and a fixed height would
  * clip them rather than grow. Comfortably over the 44pt tap target.
  */
-export const ButtonHeight = { primary: 52 } as const;
+export const ButtonHeight = {
+  primary: 52,
+  /** A dialog's buttons, where 52 reads heavy stacked full-width. Exactly 44, so the button pads its hit area to Android's 48dp. */
+  compact: 44,
+} as const;
 
 /**
  * Feed/detail posts: 4/5, edge to edge, no radius. Covers: the circle

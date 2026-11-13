@@ -19,7 +19,11 @@ export type DialogProps = {
   visible: boolean;
   title: string;
   message?: string;
-  /** One button renders full-width; two render side by side, the first as the secondary (left) action. */
+  /**
+   * One button renders full-width; two render side by side, the first as
+   * the secondary (left) action, or stacked with the primary on top when
+   * either label won't fit in half the width.
+   */
   buttons: DialogButton[];
   /**
    * Tapping outside or the Android back button, when there's no
@@ -45,6 +49,8 @@ export function Dialog({ visible, title, message, buttons, onDismiss, onHidden }
   const tints = useTints();
   const [mounted, setMounted] = useState(visible);
   const [progress] = useState(() => new Animated.Value(visible ? 1 : 0));
+  const [rowWidth, setRowWidth] = useState(0);
+  const [widestButton, setWidestButton] = useState(0);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -68,6 +74,7 @@ export function Dialog({ visible, title, message, buttons, onDismiss, onHidden }
 
   const [first, second] = buttons;
   const primary = second ?? first;
+  const stacked = second !== undefined && rowWidth > 0 && widestButton > (rowWidth - Space.s300) / 2;
 
   function handleBackdrop() {
     // Matches what the platform's own alert does: a way to decline
@@ -95,12 +102,30 @@ export function Dialog({ visible, title, message, buttons, onDismiss, onHidden }
               {message}
             </ThemedText>
           ) : null}
-          <View style={styles.actions}>
-            {second ? <SecondaryButton label={first.text} style={styles.action} onPress={first.onPress} /> : null}
+          {second ? (
+            // Invisible copies at their natural width, which the real ones
+            // can't report: side by side, each is squeezed to half the row.
+            <View
+              style={styles.measure}
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              onLayout={(event) => setWidestButton(event.nativeEvent.layout.width)}>
+              <SecondaryButton label={first.text} compact />
+              <PrimaryButton label={second.text} compact />
+            </View>
+          ) : null}
+          <View
+            style={[styles.actions, stacked && styles.stacked]}
+            onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}>
+            {second ? (
+              <SecondaryButton label={first.text} compact style={stacked ? undefined : styles.action} onPress={first.onPress} />
+            ) : null}
             <PrimaryButton
               label={primary.text}
               tone={primary.style === 'destructive' ? 'destructive' : 'default'}
-              style={styles.action}
+              compact
+              style={stacked ? undefined : styles.action}
               onPress={primary.onPress}
             />
           </View>
@@ -130,5 +155,15 @@ const styles = StyleSheet.create({
   },
   action: {
     flex: 1,
+  },
+  // Cancel at the bottom, as both platforms stack their own.
+  stacked: {
+    flexDirection: 'column-reverse',
+    gap: Space.s200,
+  },
+  measure: {
+    position: 'absolute',
+    opacity: 0,
+    alignItems: 'flex-start',
   },
 });

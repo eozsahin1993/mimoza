@@ -6,18 +6,23 @@ import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type SecondaryButtonProps = PressableProps & {
   label: string;
+  /** Tighter side padding, for a button sharing a row where the label needs the width. */
+  compact?: boolean;
 };
 
-export function SecondaryButton({ label, style, ...rest }: SecondaryButtonProps) {
+const COMPACT_HIT_SLOP = { top: 2, bottom: 2 };
+
+export function SecondaryButton({ label, style, compact, ...rest }: SecondaryButtonProps) {
   const theme = useTheme();
   const tints = useTints();
 
   return (
-    <Pressable style={style} {...rest}>
+    <Pressable style={style} hitSlop={compact ? COMPACT_HIT_SLOP : undefined} {...rest}>
       {({ pressed }) => (
         <View
           style={[
             styles.button,
+            compact && styles.compact,
             { borderColor: pressed ? theme.accent : tints.secondaryButtonBorder },
           ]}>
           <ThemedText type="labelLarge" numberOfLines={1}>
@@ -38,5 +43,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Space.s600,
+  },
+  compact: {
+    minHeight: ButtonHeight.compact,
+    paddingHorizontal: Space.s200,
   },
 });
