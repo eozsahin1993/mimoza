@@ -7,7 +7,9 @@ import appConfig from '../app.config';
 import { withoutStagingPrefix } from '@/core/services/deep-links';
 
 const APP_JSON = JSON.parse(readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8')).expo as Partial<ExpoConfig>;
-const AASA_PATH = path.join(__dirname, '..', '..', 'landing', 'public', '.well-known', 'apple-app-site-association');
+const WELL_KNOWN = path.join(__dirname, '..', '..', 'landing', 'public', '.well-known');
+const AASA_PATH = path.join(WELL_KNOWN, 'apple-app-site-association');
+const ASSETLINKS_PATH = path.join(WELL_KNOWN, 'assetlinks.json');
 
 // Set on process.env itself, never by replacing it: under jest,
 // babel-preset-expo turns process.env.EXPO_PUBLIC_* into a read from
@@ -97,5 +99,27 @@ describe("the website's iOS verification file", () => {
     const appId = `${config.ios?.appleTeamId}.${config.ios?.bundleIdentifier}`;
 
     expect(details.find((entry) => entry.appIDs.includes(appId))?.components).toEqual([{ '/': `${invitePath(config)}*` }]);
+  });
+});
+
+// Android verifies the whole host, not a path, and only for a package whose
+// signing certificate the file lists; a mistyped fingerprint fails silently,
+// so at least its shape is checked here.
+describe("the website's Android verification file", () => {
+  const statements = JSON.parse(readFileSync(ASSETLINKS_PATH, 'utf8')) as {
+    relation: string[];
+    target: { namespace: string; package_name: string; sha256_cert_fingerprints: string[] };
+  }[];
+
+  test.each(['production', 'staging'])('lets the %s app handle links on the site', (appEnv) => {
+    const config = resolve(appEnv);
+    const statement = statements.find((entry) => entry.target.package_name === config.android?.package);
+
+    expect(statement?.relation).toContain('delegate_permission/common.handle_all_urls');
+    expect(statement?.target.namespace).toBe('android_app');
+    expect(statement?.target.sha256_cert_fingerprints.length).toBeGreaterThan(0);
+    for (const fingerprint of statement?.target.sha256_cert_fingerprints ?? []) {
+      expect(fingerprint).toMatch(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
+    }
   });
 });

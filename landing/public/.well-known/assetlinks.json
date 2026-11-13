@@ -1,0 +1,23 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rarekiwisoftware.mimoza",
+      "sha256_cert_fingerprints": [
+        "B2:0E:D2:C3:DA:42:91:A0:5A:3A:FC:88:C7:16:EE:57:06:C5:A0:0C:6E:49:57:A4:72:E0:02:9E:85:B7:68:5B",
+        "49:7A:16:78:26:89:D6:2C:41:00:32:74:0D:DC:18:58:D5:9C:DA:21:6F:99:06:3C:07:3C:CF:6A:30:6D:08:AF"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rarekiwisoftware.mimoza.staging",
+      "sha256_cert_fingerprints": [
+        "49:7A:16:78:26:89:D6:2C:41:00:32:74:0D:DC:18:58:D5:9C:DA:21:6F:99:06:3C:07:3C:CF:6A:30:6D:08:AF"
+      ]
+    }
+  }
+]
