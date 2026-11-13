@@ -2,6 +2,7 @@ jest.mock('@/features/push-notifications/services/device-relay');
 jest.mock('@/features/push-notifications/services/tokens');
 jest.mock('@/core/services/settings');
 
+import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
 import { initDatabase, saveLocalAccount } from '@/data/db';
 import { forgetLocalAccount } from '@/data/db/local-account';
 import { registerDevice, unregisterDevice } from '@/features/push-notifications/services/device-relay';
@@ -20,6 +21,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   jest.clearAllMocks();
   await forgetLocalAccount('account-1');
+  await saveAuthToken('session-token');
   (getAppSettings as jest.Mock).mockResolvedValue({ language: 'system' });
   (registerDevice as jest.Mock).mockResolvedValue(undefined);
   (unregisterDevice as jest.Mock).mockResolvedValue(undefined);
@@ -31,6 +33,18 @@ test('does nothing without a device id', async () => {
 
   await registerThisDevice();
 
+  expect(registerDevice).not.toHaveBeenCalled();
+});
+
+/** Signing out keeps the local account row, so the device id outlives the session. */
+test('does nothing while signed out, without reading the OS token', async () => {
+  await saveLocalAccount({ accountId: 'account-1', deviceId: 'device-1', name: '', createdAt: 1, updatedAt: 1 });
+  await deleteAuthToken();
+  (getDevicePushToken as jest.Mock).mockResolvedValue(device);
+
+  await registerThisDevice();
+
+  expect(getDevicePushToken).not.toHaveBeenCalled();
   expect(registerDevice).not.toHaveBeenCalled();
 });
 

@@ -24,7 +24,7 @@ export type FinishSignIn = {
  * since the two callers can't share component state.
  */
 export async function finishSignIn({ accountId, name, suggestedName, suggestedPictureUrl }: FinishSignIn): Promise<void> {
-  // Launch skipped this while signed out, and signing out removed it.
+  // Launch skips this while signed out, and signing out removed it.
   enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
 
   // A returning device (local profile already exists — e.g. this was just

@@ -1,4 +1,5 @@
 import { getLocalAccount } from '@/data/db';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { getAppSettings } from '@/core/services/settings';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 import { registerDevice as putDevice, unregisterDevice as deleteDevice } from '@/features/push-notifications/services/device-relay';
@@ -14,6 +15,9 @@ import { registerDevice as putDevice, unregisterDevice as deleteDevice } from '@
  * ever surface as an error to whoever just opened the app.
  */
 export async function registerThisDevice(): Promise<void> {
+  // The device id isn't enough: signing out keeps the local account row.
+  if (!(await getAuthToken())) return;
+
   const profile = await getLocalAccount();
   if (!profile?.deviceId) return;
 
