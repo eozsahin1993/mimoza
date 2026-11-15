@@ -1,8 +1,8 @@
 {
   "staging": {
     "version": "1.0.0",
-    "ios": "8eb9a0883f9deca4140e3fb95efceaaf8320fff4",
-    "android": "98bb078bf0d807c639fed9ac210bc31f56b884ff"
+    "ios": "9f15e82a097d0c3956232802131c385bb458e21e",
+    "android": "17754b413a4c4e0284f5909e9ea364174d54d826"
   },
   "production": {
     "version": "1.0.0",
