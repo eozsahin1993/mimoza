@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSCameraUsageDescription": "Mimoza usa tu cámara para escanear un código de transferencia de dispositivo.",
+    "NSCameraUsageDescription": "Mimoza usa tu cámara para escanear códigos de invitación y de transferencia de dispositivo.",
     "NSPhotoLibraryUsageDescription": "Mimoza accede a tus fotos para que elijas las que quieres compartir en tus círculos.",
     "Localizable.strings": {
       "push.approved": "%1$@ aceptó tu solicitud",

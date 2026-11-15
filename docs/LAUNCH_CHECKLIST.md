@@ -99,7 +99,7 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       config plugin Expo applies even when it isn't listed, and its default
       adds the microphone. `microphonePermission: false` in `app.json`
       removes it and blocks any other package from adding it back. What
-      remains: `CAMERA` (device-transfer QR), `INTERNET`, and the legacy
+      remains: `CAMERA` (invite and device-transfer QR), `INTERNET`, and the legacy
       storage pair capped at API 32.
 - [x] R8 on for Android release builds (`expo-build-properties`,
       `enableMinifyInReleaseBuilds`) — 2026-10-20. The mapping file goes

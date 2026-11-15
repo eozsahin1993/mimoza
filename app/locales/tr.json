@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSCameraUsageDescription": "Mimoza, cihaz aktarım kodunu taramak için kameranı kullanır.",
+    "NSCameraUsageDescription": "Mimoza, davet kodlarını ve cihaz aktarım kodlarını taramak için kameranı kullanır.",
     "NSPhotoLibraryUsageDescription": "Mimoza, çevrelerinde paylaşacağın fotoğrafları seçebilmen için fotoğraflarına erişir.",
     "Localizable.strings": {
       "push.approved": "%1$@ isteğini kabul etti",
