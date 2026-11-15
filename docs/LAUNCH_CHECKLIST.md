@@ -4,17 +4,15 @@ Everything between here and both stores. Grouped by what blocks what, not
 by store — several items gate others, and two of them cost calendar time
 rather than work.
 
-Status as of 2026-11-07. Tick items as they land; add a date when you do,
+Status as of 2026-11-14. Tick items as they land; add a date when you do,
 so a stale "done" is visible.
 
 ## Start these first — they cost waiting, not doing
 
 - [x] **Apple Developer Program** — converted from the individual
       membership to the LLC, confirmed 2026-11-07. Same Apple ID and Team
-      ID. developer@rarekiwisoftware.com added as Admin 2026-11-07. Still
-      to do: accept the new Program License Agreement if App Store Connect
-      shows one, from the Account Holder (TestFlight uploads fail until
-      then).
+      ID. developer@rarekiwisoftware.com added as Admin 2026-11-07. No
+      agreement is pending: rc.5 reached production TestFlight 2026-11-13.
 - [x] **D-U-N-S for the LLC** — confirmed by D&B 2026-10-05, on the
       registered agent's address. Apple copies this address to EU product
       pages for traders, so it must never be a home address.
@@ -41,7 +39,9 @@ so a stale "done" is visible.
       in the portal (the relay's revoke call signs `sub` = bundle id and
       fails as `invalid_client` until it points at the new one), and
       deleting the old App IDs, Firebase apps and OAuth clients once new
-      builds are out.
+      builds are out. Sign-in working proves nothing about the revoke; to
+      test it, delete an account made with Apple, then check that Mimoza
+      is gone from iOS Settings → Apple ID → Sign in with Apple.
 - [ ] **BIS notification email.** One message, no reply expected, to
       `crypt@bis.doc.gov` and `enc@nsa.gov` with the GitHub URL. Publicly
       available encryption source is not subject to the EAR once notified
@@ -93,8 +93,9 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       `ITSEncryptionExportComplianceCode` Apple issues. `true` without a
       code got every CI upload rejected (90592) in October.
 - [x] `ios.buildNumber` and `android.versionCode` set, both `1` —
-      2026-09-28. Still open: whether CI bumps them or you do. Each store
-      rejects a repeat upload of the same number.
+      2026-09-28. CI bumps both: iOS to the latest TestFlight build plus
+      one, Android past Play's internal track. Each store rejects a repeat
+      upload of the same number.
 - [x] `RECORD_AUDIO` dropped — 2026-09-28. `expo-image-picker` ships a
       config plugin Expo applies even when it isn't listed, and its default
       adds the microphone. `microphonePermission: false` in `app.json`
@@ -107,15 +108,18 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       Resource shrinking stays off: push strings are resolved by a name
       that arrives in the payload, so the shrinker would drop them all.
       Verify on a Play-installed build: sign-in, a push, a photo post.
-- [ ] `npx expo prebuild --clean` before either release build. `android/`
-      is gitignored and the one on disk predates the permission change.
+- [x] `npx expo prebuild --clean` before either release build. Moot now:
+      release builds come from CI, which regenerates both native folders
+      every run.
 - [ ] Play upload key generated and backed up somewhere you'd still have
       after losing the laptop. Losing it means a new listing.
 - [ ] Verify Play's target API floor at submission — it moves every
       August. Expo 57 resolves to `targetSdk 36`, which clears the 2025
       floor.
-- [ ] Build both stores' release artifacts and install them from
-      TestFlight / internal testing, not from Xcode.
+- [x] Build both stores' release artifacts and install them from
+      TestFlight / internal testing, not from Xcode. Google and Apple
+      sign-in confirmed on the Play internal build and production
+      TestFlight — 2026-11-14.
 
 ## Review blockers
 
@@ -132,16 +136,16 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       prohibited-content list and what a report leads to. Accepted on the
       first-run profile screen ("By continuing you agree", above Continue,
       onboarding only) and linked from Settings → About.
-- [ ] **Review notes, both stores.** Apple's "App Review Information" and
-      Play's "App access" section. Apple's are written and ship with
-      `fastlane ios listing` from `metadata/review_information/notes.txt`
-      (reporting path corrected 2026-11-07); Play's still need pasting. Sign-in is Google or Apple only, so
+- [x] **Review notes, both stores.** Apple's "App Review Information" and
+      Play's "App access" section. Apple's ship with `fastlane ios listing`
+      from `metadata/review_information/notes.txt` and the live copy
+      matches the repo; Play's App access is filled in — 2026-11-14. Sign-in is Google or Apple only, so
       there is no demo account to hand over — say that any account works,
       and walk them fresh account → create a circle → post a photo.
       Confirmed solo-reachable, so no invite and no second device — say it
       explicitly, because "we were unable to complete the review" is the
       default outcome when an invite looks required.
-- [ ] Say in the same notes that content is end-to-end encrypted, so the
+- [x] Say in the same notes that content is end-to-end encrypted, so the
       relay can't inspect anything; a report names the photo and circle
       ids, which is enough to find the entry and remove it.
 - [ ] Consider a standing invite link in the notes anyway, so a reviewer
@@ -165,15 +169,15 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       sends once the `website-mailer` key is set as two Pages secrets;
       until then the form answers "could not send". `hello@joinmimoza.com`
       covers Play.
-- [ ] **Play account deletion URL**: a *web* page where someone can
+- [x] **Play account deletion URL**: a *web* page where someone can
       request deletion without installing the app, declared in Data
       safety. `joinmimoza.com/delete-account/` exists as of 2026-11-07:
       in-app steps first, then a request form that emails the support
       inbox through the same Pages Function as `/support`, with a mailto
       fallback. Identity is confirmed by reply, since the relay holds no
-      email or phone. Still to do: paste the URL into Data safety →
-      Data deletion in Play Console once the site is deployed.
-- [ ] App Privacy (Apple) and Data safety (Play): account identifier from
+      email or phone. Declared in Data safety → Data deletion — 2026-11-14.
+- [x] App Privacy (Apple) and Data safety (Play), both filled in —
+      2026-11-14. Account identifier from
       Apple/Google, push token, **and now Analytics / Usage Data** —
       screen views and the three named events above. This wasn't true
       when this line was first written; it is now. Content is E2EE and
@@ -203,9 +207,17 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       members share photos and comments; messaging yes (comments within a
       circle); unrestricted web access, gambling, contests, ads no. The
       result should be 13+, matching the privacy policy's minimum age; if
-      Apple computes higher, check which answer pushed it.
-- [ ] Availability: every territory on both stores. Apple defaults to all;
-      Play makes you tick them ("add all countries"). The listing stays
+      Apple computes higher, check which answer pushed it. Play's IARC is
+      done. Apple's still reads 4+ with messaging answered no
+      (2026-11-14): set it to yes, and if that alone doesn't reach 13+,
+      use the age rating override.
+- [x] Play's other App content declarations — 2026-11-14: target audience
+      13+, no ads, and no advertising ID, which holds because `app.json`
+      blocks the `AD_ID` permissions Firebase would otherwise add.
+- [x] Availability — 2026-11-14. Apple: 173 of 175 territories, France
+      held back for the ANSSI declaration above and China because it needs
+      a licence; "available in new territories" is off. Play: all
+      countries. The listing stays
       English everywhere, like Threads' Turkish page does — the store
       falls back to the primary localization, and the "Languages" line
       comes from the binary, which already says Turkish.
@@ -285,6 +297,20 @@ and uploaded by `fastlane ios listing` and `fastlane android listing`.
 - [ ] 7" and 10" tablet shots are optional. The app isn't restricted from
       tablets, so the console warns without one set; it doesn't block.
 - [ ] Promo video optional, a YouTube URL.
+
+## Submission
+
+Planned for 2026-11-15. The store copy was checked against precheck's
+rules and the app's behaviour on 2026-11-14, and passed.
+
+- [ ] Tag the next release candidate on the last app commit, not on a
+      bot's `[skip ci]` fingerprint commit: GitHub skips tag pushes on
+      those too. rc.5 lacks the camera permission text (8469baa) and the
+      cover framing fix (9c943f3), so it isn't the one to submit.
+- [ ] App Store Connect: attach that build to 1.0.0 and submit. Release
+      type is manual, so approval doesn't publish it; you press Release.
+- [ ] Play Console: promote the internal release to production. CI can't,
+      by design.
 
 ## Already done
 
