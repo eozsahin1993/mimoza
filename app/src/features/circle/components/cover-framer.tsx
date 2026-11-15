@@ -4,8 +4,8 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
-import Svg, { ClipPath, Defs, Image as SvgImage, Rect } from 'react-native-svg';
+import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Svg, { Image as SvgImage, Rect } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { ON_PHOTO, SCRIM, SCRIM_LOCATIONS } from '@/features/circle/components/circle-card';
@@ -29,22 +29,13 @@ import {
 } from '@/core/photo/image';
 
 const MAX_ZOOM = 4;
-/** Below this the photo no longer fills the frame, and the backdrop, border and shadow come in. */
+/** Below this the photo no longer fills the frame and sits on a blurred copy of itself. */
 const FILLS = 0.999;
 
-// A photo smaller than its frame sits on a blurred copy of itself. The
-// edge and shadow keep the two from reading as one picture.
-const PHOTO_RADIUS = 6;
-const PHOTO_EDGE = 1.5;
-const PHOTO_EDGE_COLOR = 'rgba(255,255,255,0.85)';
 const BACKDROP_DIM = 0.18;
-/** Stacked translucent rects, the baked stand-in for a blurred drop shadow. */
-const SHADOW_LAYERS = [
-  { spread: 1, opacity: 0.16 },
-  { spread: 3, opacity: 0.1 },
-  { spread: 6, opacity: 0.06 },
-] as const;
-const SHADOW_DROP = 2;
+
+/** Marks where the photo ends while framing. On screen only, never drawn into the saved cover. */
+const GUIDE_COLOR = 'rgba(255,255,255,0.9)';
 
 /**
  * A freshly mounted SVG image reports its load, but on Android only the
@@ -66,25 +57,6 @@ function bound(offset: number, zoom: number, base: number, frame: number) {
 }
 
 type Placement = { x: number; y: number; width: number; height: number };
-
-/**
- * One of the stacked shadow rects, live. Inside the photo's own scaled
- * box, so every distance is divided by the zoom to stay put on screen.
- */
-function ShadowLayer({ zoom, spread, opacity }: { zoom: SharedValue<number>; spread: number; opacity: number }) {
-  const style = useAnimatedStyle(() => {
-    const z = zoom.get();
-    return {
-      opacity: z < FILLS ? opacity : 0,
-      left: -spread / z,
-      right: -spread / z,
-      top: (SHADOW_DROP - spread) / z,
-      bottom: -(SHADOW_DROP + spread) / z,
-      borderRadius: (PHOTO_RADIUS + spread) / z,
-    };
-  });
-  return <Animated.View pointerEvents="none" style={[styles.shadow, style]} />;
-}
 
 export type CoverFramerProps = {
   /** From `pickImageToFrame`. The framer owns it from here and deletes its files on the way out. */
@@ -174,13 +146,16 @@ export function CoverFramer({ source, name, onCancel, onDone }: CoverFramerProps
     transform: [{ translateX: offsetX.get() }, { translateY: offsetY.get() }, { scale: zoom.get() }],
   }));
 
-  // Divided by the zoom because the box is scaled by it, and the edge and
-  // corners should stay the same size on screen whatever it is.
-  const photoEdge = useAnimatedStyle(() => {
-    const shrunk = zoom.get() < FILLS;
+  // Laid out at the photo's size rather than scaled with it, so the dashes
+  // stay the same size whatever the zoom.
+  const guide = useAnimatedStyle(() => {
+    const z = zoom.get();
     return {
-      borderRadius: shrunk ? PHOTO_RADIUS / zoom.get() : 0,
-      borderWidth: shrunk ? PHOTO_EDGE / zoom.get() : 0,
+      opacity: z < FILLS ? 1 : 0,
+      left: stage.width / 2 + offsetX.get() - (baseWidth * z) / 2,
+      top: stage.height / 2 + offsetY.get() - (baseHeight * z) / 2,
+      width: baseWidth * z,
+      height: baseHeight * z,
     };
   });
 
@@ -195,7 +170,7 @@ export function CoverFramer({ source, name, onCancel, onDone }: CoverFramerProps
     onCancel();
   }
 
-  /** Draws the backdrop, shadow, photo and edge into one picture, through the SVG already on screen. */
+  /** Draws the backdrop and photo into one picture, through the SVG already on screen. */
   async function renderShrunk(placement: Placement): Promise<CompressedImage> {
     const loaded = new Promise<void>((resolve) => {
       photoLoaded.current = resolve;
@@ -297,53 +272,25 @@ export function CoverFramer({ source, name, onCancel, onDone }: CoverFramerProps
                       />
                       <Rect width={frame.width} height={frame.height} fill="rgb(20,16,12)" fillOpacity={BACKDROP_DIM} />
                       {composing ? (
-                        <>
-                          <Defs>
-                            <ClipPath id="photo">
-                              <Rect {...composing} rx={PHOTO_RADIUS} />
-                            </ClipPath>
-                          </Defs>
-                          {SHADOW_LAYERS.map(({ spread, opacity }) => (
-                            <Rect
-                              key={spread}
-                              x={composing.x - spread}
-                              y={composing.y - spread + SHADOW_DROP}
-                              width={composing.width + 2 * spread}
-                              height={composing.height + 2 * spread}
-                              rx={PHOTO_RADIUS + spread}
-                              fill="#000"
-                              fillOpacity={opacity}
-                            />
-                          ))}
-                          <SvgImage
-                            href={{ uri: source.uri }}
-                            {...composing}
-                            preserveAspectRatio="none"
-                            clipPath="url(#photo)"
-                            onLoad={() => photoLoaded.current?.()}
-                          />
-                          <Rect {...composing} rx={PHOTO_RADIUS} fill="none" stroke={PHOTO_EDGE_COLOR} strokeWidth={PHOTO_EDGE} />
-                        </>
+                        <SvgImage
+                          href={{ uri: source.uri }}
+                          {...composing}
+                          preserveAspectRatio="none"
+                          onLoad={() => photoLoaded.current?.()}
+                        />
                       ) : null}
                     </Svg>
                   </View>
 
-                  {/* Drawn shadows, not platform ones: Android lifts an
-                      elevated view above every sibling, the veil and name
-                      included, and these match what gets saved. */}
                   <Animated.View
                     style={[
                       styles.photoBox,
                       { left: (stage.width - baseWidth) / 2, top: (stage.height - baseHeight) / 2, width: baseWidth, height: baseHeight },
                       imageMotion,
                     ]}>
-                    {SHADOW_LAYERS.map(({ spread, opacity }) => (
-                      <ShadowLayer key={spread} zoom={zoom} spread={spread} opacity={opacity} />
-                    ))}
-                    <Animated.View style={[styles.photo, photoEdge]}>
-                      <Image source={{ uri: source.uri }} style={styles.fill} />
-                    </Animated.View>
+                    <Image source={{ uri: source.uri }} style={styles.fill} />
                   </Animated.View>
+                  <Animated.View pointerEvents="none" style={[styles.guide, guide]} />
 
                   {/* One border rather than four strips round the frame: a
                       border's inner corner follows its radius, so the
@@ -405,18 +352,11 @@ const styles = StyleSheet.create({
   photoBox: {
     position: 'absolute',
   },
-  shadow: {
+  guide: {
     position: 'absolute',
-    backgroundColor: '#000',
-  },
-  photo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden',
-    borderColor: PHOTO_EDGE_COLOR,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: GUIDE_COLOR,
   },
   veil: {
     position: 'absolute',
