@@ -2,13 +2,11 @@ import { Icon } from "../../components/Icon";
 import { Wordmark } from "../../components/wordmark";
 import { Footer } from "../../sections/footer";
 import "../../styles/staticPage.css";
-import { useScrollToHash } from "../../useScrollToHash";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
 const LAST_UPDATED = "17 November 2026";
 
 export function Terms() {
-  useScrollToHash();
   return (
     <main>
       <nav className="policy-nav">
