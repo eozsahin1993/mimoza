@@ -1,1 +1,1 @@
-shared,group,encrypted,sharing,memories,baby,kids,grandparents,secure,pictures,relatives,parents
+share,shared,sharing,pictures,pics,gallery,encrypted,secure,group,memories,baby,kids,grandparents
