@@ -34,14 +34,15 @@ so a stale "done" is visible.
       (`APNS_TOPIC` and `APPLE_CLIENT_ID_IOS` on each Lambda; prod's
       re-read from SSM 2026-11-07, both team ids matching `appleTeamId`).
       Production App Store Connect record created 2026-11-07, named to
-      match `metadata/en-US/name.txt`. Still open: the Sign in with Apple
-      key's Primary App ID
-      in the portal (the relay's revoke call signs `sub` = bundle id and
-      fails as `invalid_client` until it points at the new one), and
-      deleting the old App IDs, Firebase apps and OAuth clients once new
-      builds are out. Sign-in working proves nothing about the revoke; to
-      test it, delete an account made with Apple, then check that Mimoza
-      is gone from iOS Settings → Apple ID → Sign in with Apple.
+      match `metadata/en-US/name.txt`. The Sign in with Apple key had no
+      Primary App ID until 2026-11-17, when it was set to the new bundle
+      id. Sign-in never showed it, since verifying a token needs no key of
+      ours; only the relay's code exchange and revoke do. Checked by
+      signing a client secret with the prod key and sending Apple a fake
+      code: `invalid_grant` means the key is accepted, `invalid_client`
+      means it isn't. Prod accounts from before have no grant to revoke
+      until their next sign-in. Still open: deleting the old App IDs,
+      Firebase apps and OAuth clients once new builds are out.
 - [ ] **BIS notification email.** One message, no reply expected, to
       `crypt@bis.doc.gov` and `enc@nsa.gov` with the GitHub URL. Publicly
       available encryption source is not subject to the EAR once notified
