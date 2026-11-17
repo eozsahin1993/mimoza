@@ -4,7 +4,7 @@ import { Footer } from "../../sections/footer";
 import "../../styles/staticPage.css";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
-const LAST_UPDATED = "7 November 2026";
+const LAST_UPDATED = "17 November 2026";
 
 export function Terms() {
   return (
@@ -70,6 +70,33 @@ export function Terms() {
           circle, or delete that account. For the categories above we do this without warning. Where the law requires
           it, we also report to the relevant authority.
         </p>
+
+        <h2 id="child-safety">Child safety</h2>
+        <p>
+          Mimoza: Private Photo Circles, made by RareKiwi Software, has zero tolerance for child sexual abuse and
+          exploitation (CSAE). That includes child sexual abuse material (CSAM), grooming, sextortion, and any content
+          or contact that sexualises a minor.
+        </p>
+        <ul>
+          <li>
+            Accounts are for people 13 and over. Circles are invite only: there are no public profiles, and no way to
+            find or contact someone outside a circle you share.
+          </li>
+          <li>
+            Anyone can report a photo from inside the app with <strong>Report this photo</strong>, or from Settings
+            with <strong>Send feedback</strong> and <strong>Report a post</strong>. You can also email{" "}
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Reports reach a person at Mimoza.
+          </li>
+          <li>
+            Content is end-to-end encrypted, so we can't scan circles and we act on reports. When we learn of CSAE in
+            Mimoza, we remove the content and delete the account that shared it, without warning.
+          </li>
+          <li>
+            We report child sexual abuse material to the National Center for Missing &amp; Exploited Children (NCMEC),
+            as US law requires, and cooperate with law enforcement.
+          </li>
+          <li>If a child is in immediate danger, contact your local emergency services first.</li>
+        </ul>
 
         <h2 id="your-content">Your content</h2>
         <p>
