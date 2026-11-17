@@ -34,6 +34,17 @@ const FILLS = 0.999;
 
 const BACKDROP_DIM = 0.18;
 
+/**
+ * The backdrop file is a few dozen pixels stretched to size, which shows as
+ * tiles. It is drawn this many times per axis, each copy shifted a fraction
+ * of a tile and averaged in, which smooths the tiles away. Plain image
+ * drawing rather than react-native-svg's blur filter, whose strength differs
+ * between iOS and Android and is capped on Android.
+ */
+const BACKDROP_TAPS = 4;
+/** How far the backdrop runs past the frame, so every shifted copy still covers it. More than half a tile. */
+const BACKDROP_BLEED = 24;
+
 /** Marks where the photo ends while framing. On screen only, never drawn into the saved cover. */
 const GUIDE_COLOR = 'rgba(255,255,255,0.9)';
 
@@ -101,6 +112,11 @@ export function CoverFramer({ source, name, onCancel, onDone }: CoverFramerProps
   const minZoom = stage.width > 0 ? minZoomFor(source, frame) : 1;
   const canFit = minZoom < FILLS;
   const reach = Math.max(stage.width, stage.height);
+
+  const backdropBox = { width: frame.width + 2 * BACKDROP_BLEED, height: frame.height + 2 * BACKDROP_BLEED };
+  const tile = Math.max(backdropBox.width / source.backdropTiles.width, backdropBox.height / source.backdropTiles.height);
+  const taps = Array.from({ length: BACKDROP_TAPS }, (_, i) => ((i + 0.5) / BACKDROP_TAPS - 0.5) * tile);
+  const backdropShifts = taps.flatMap((dy) => taps.map((dx) => ({ dx, dy })));
 
   // Deltas rather than totals, so a pan and a pinch running together each
   // add their own movement instead of overwriting the other's.
@@ -264,12 +280,18 @@ export function CoverFramer({ source, name, onCancel, onDone }: CoverFramerProps
                       only loads an SVG image it has drawn. */}
                   <View pointerEvents="none" style={[styles.backdrop, frameRect]}>
                     <Svg ref={svg} width={frame.width} height={frame.height} viewBox={`0 0 ${frame.width} ${frame.height}`}>
-                      <SvgImage
-                        href={{ uri: source.backdrop }}
-                        width={frame.width}
-                        height={frame.height}
-                        preserveAspectRatio="xMidYMid slice"
-                      />
+                      {/* Copy n at 1/n opacity leaves every copy equally weighted. */}
+                      {backdropShifts.map(({ dx, dy }, index) => (
+                        <SvgImage
+                          key={index}
+                          href={{ uri: source.backdrop }}
+                          x={dx - BACKDROP_BLEED}
+                          y={dy - BACKDROP_BLEED}
+                          {...backdropBox}
+                          preserveAspectRatio="xMidYMid slice"
+                          opacity={1 / (index + 1)}
+                        />
+                      ))}
                       <Rect width={frame.width} height={frame.height} fill="rgb(20,16,12)" fillOpacity={BACKDROP_DIM} />
                       {composing ? (
                         <SvgImage

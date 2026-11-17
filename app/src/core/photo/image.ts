@@ -22,11 +22,15 @@ const FRAMING_MAX_DIMENSION = MAX_DIMENSION * 2;
 /** High because the framed copy gets re-encoded once more after cropping. */
 const FRAMING_JPEG_QUALITY = 0.95;
 /**
- * The long edge a photo is shrunk to before being stretched back up as the
+ * The short edge a photo is shrunk to before being stretched back up as the
  * backdrop behind a cover that doesn't fill its frame. The manipulator has
- * no blur, and this round trip through a few pixels is one.
+ * no blur, so this round trip is what throws the detail away; the framer
+ * smooths over the tiles it leaves. The short edge,
+ * because that is the one a portrait photo's width is stretched from.
  */
-const BACKDROP_SAMPLE = 24;
+const BACKDROP_SAMPLE = 32;
+/** A fitted cover is mostly smooth blur, which bands into visible steps at the photos' own quality. */
+const COVER_JPEG_QUALITY = 0.9;
 
 /**
  * A small avatar-sized thumbnail — for embedding directly inside an
@@ -121,7 +125,11 @@ export type CompressedImage = {
 export type SizedImage = Size & { uri: string };
 
 /** A photo ready to frame, with a blurred copy of itself to fill whatever it leaves of the frame. */
-export type FramingSource = SizedImage & { backdrop: string };
+export type FramingSource = SizedImage & {
+  backdrop: string;
+  /** The pixel grid the backdrop was shrunk to, which the framer needs to smooth out its tiles. */
+  backdropTiles: Size;
+};
 
 export type CropRect = { originX: number; originY: number; width: number; height: number };
 
@@ -133,9 +141,9 @@ export type CropRect = { originX: number; originY: number; width: number; height
  * just want to *display* the picture having to round-trip the bytes back
  * through a base64 data-URI when the resized file is already sitting on disk.
  */
-export async function compressImage(uri: string): Promise<CompressedImage> {
+export async function compressImage(uri: string, quality = JPEG_QUALITY): Promise<CompressedImage> {
   const rendered = await ImageManipulator.manipulate(uri).resize(capLongEdge(await getImageSize(uri), MAX_DIMENSION)).renderAsync();
-  const saved = await rendered.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG });
+  const saved = await rendered.saveAsync({ compress: quality, format: SaveFormat.JPEG });
 
   const bytes = await new File(saved.uri).arrayBuffer();
   return { uri: saved.uri, bytes: new Uint8Array(bytes) };
@@ -160,11 +168,14 @@ export async function pickImageToFrame(): Promise<FramingSource | null> {
   const rendered = await ImageManipulator.manipulate(uri).resize(capLongEdge(await getImageSize(uri), FRAMING_MAX_DIMENSION)).renderAsync();
   const saved = await rendered.saveAsync({ compress: FRAMING_JPEG_QUALITY, format: SaveFormat.JPEG });
 
-  const longEdge = (max: number) => (saved.width >= saved.height ? { width: max } : { height: max });
-  const blurred = await ImageManipulator.manipulate(saved.uri).resize(longEdge(BACKDROP_SAMPLE)).resize(longEdge(MAX_DIMENSION)).renderAsync();
+  const landscape = saved.width >= saved.height;
+  const across = Math.round((BACKDROP_SAMPLE * Math.max(saved.width, saved.height)) / Math.min(saved.width, saved.height));
+  const tiles = landscape ? { width: across, height: BACKDROP_SAMPLE } : { width: BACKDROP_SAMPLE, height: across };
+  const longEdge = landscape ? { width: MAX_DIMENSION } : { height: MAX_DIMENSION };
+  const blurred = await ImageManipulator.manipulate(saved.uri).resize(tiles).resize(longEdge).renderAsync();
   const backdrop = await blurred.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG });
 
-  return { uri: saved.uri, width: saved.width, height: saved.height, backdrop: backdrop.uri };
+  return { uri: saved.uri, width: saved.width, height: saved.height, backdrop: backdrop.uri, backdropTiles: tiles };
 }
 
 /** Deletes a framing source's two temp files once its cover is made, or abandoned. */
@@ -211,7 +222,7 @@ export async function compressRenderedPng(base64: string): Promise<CompressedIma
   png.create({ overwrite: true });
   png.write(new Uint8Array(Buffer.from(base64, 'base64')));
   try {
-    return await compressImage(png.uri);
+    return await compressImage(png.uri, COVER_JPEG_QUALITY);
   } finally {
     png.delete();
   }
