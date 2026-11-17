@@ -3,10 +3,12 @@ import { Icon } from "../../components/Icon";
 import { Wordmark } from "../../components/wordmark";
 import { Footer } from "../../sections/footer";
 import "../../styles/staticPage.css";
+import { useScrollToHash } from "../../useScrollToHash";
 
 const SUPPORT_EMAIL = "hello@joinmimoza.com";
 
 export function DeleteAccount() {
+  useScrollToHash();
   return (
     <main>
       <nav className="policy-nav">
