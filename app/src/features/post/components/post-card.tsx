@@ -237,6 +237,7 @@ export function PostCard({
           onPressShowAll={onPressComments ? handleShowAll : undefined}
           composerOpen={composerOpen}
           onSubmit={handleAddComment}
+          onCloseComposer={() => setComposerOpen(false)}
         />
       </View>
     </ThemedView>

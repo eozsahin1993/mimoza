@@ -26,6 +26,7 @@ export type PostCommentsProps = {
   /** Revealed by the card's Comment button — a quiet post shows the chip row and nothing more. */
   composerOpen: boolean;
   onSubmit: (body: string) => void;
+  onCloseComposer: () => void;
   /** Opens the post's own screen, where the whole thread lives. */
   onPressShowAll?: () => void;
 };
@@ -47,6 +48,7 @@ export function PostComments({
   total,
   composerOpen,
   onSubmit,
+  onCloseComposer,
   onPressShowAll,
 }: PostCommentsProps) {
   const { t } = useTranslation();
@@ -64,7 +66,7 @@ export function PostComments({
       ) : null}
 
       {composerOpen ? (
-        <CommentComposerBar onSubmit={onSubmit} />
+        <CommentComposerBar onSubmit={onSubmit} onClose={onCloseComposer} />
       ) : null}
     </View>
   );

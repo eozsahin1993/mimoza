@@ -10,7 +10,14 @@ import { useOwnAccount } from '@/core/account/use-own-account';
 
 export type CommentComposerBarProps = {
   onSubmit: (body: string) => void;
+  /**
+   * Dismisses without sending. Otherwise the only way out is the Comment
+   * chip that opened it, which nothing signposts, same as the emoji picker.
+   */
+  onClose: () => void;
 };
+
+const CLOSE_ICON_SIZE = 20;
 
 /** Matches the one line of 14pt comment text this sits beside, not a form field's usual height. */
 const COMPOSER_HEIGHT = 42;
@@ -22,7 +29,7 @@ const COMPOSER_HEIGHT = 42;
  * this one gets scrolled above the keyboard rather than needing to float
  * itself there.
  */
-export function CommentComposerBar({ onSubmit }: CommentComposerBarProps) {
+export function CommentComposerBar({ onSubmit, onClose }: CommentComposerBarProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
@@ -39,6 +46,11 @@ export function CommentComposerBar({ onSubmit }: CommentComposerBarProps) {
 
   return (
     <View style={styles.row}>
+      {/* Leading, as far from Send as the row allows: a miss either way
+          throws away the comment or posts it half-written. */}
+      <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('ui.close')}>
+        <Icon icon={Icons.close} size={CLOSE_ICON_SIZE} color={theme.secondary} />
+      </Pressable>
       {/* Full composer height, unlike the comment rows' smaller avatar —
           here it's one of three controls on a line, and a short circle
           beside a tall box reads as misaligned however it's centred. */}
