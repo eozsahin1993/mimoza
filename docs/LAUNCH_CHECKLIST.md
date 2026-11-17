@@ -217,7 +217,10 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       blocks the `AD_ID` permissions Firebase would otherwise add.
 - [x] Availability — 2026-11-14. Apple: 173 of 175 territories, France
       held back for the ANSSI declaration above and China because it needs
-      a licence; "available in new territories" is off. Play: all
+      a licence; "available in new territories" is off. Before China is
+      ever turned on, revisit App Compliance → Security Assessment: the
+      encrypted circles fall under it, so the answer there is Yes, with
+      the assessment report attached. Play: all
       countries. The listing stays
       English everywhere, like Threads' Turkish page does — the store
       falls back to the primary localization, and the "Languages" line

@@ -100,7 +100,7 @@ export default function FeedScreen() {
                   accessibilityLabel={t('circle.feed.album')}
                   onPress={() => router.push({ pathname: '/circle/album', params: { circleId } })}
                 />
-                <HeaderIconButton icon={Icons.more} accessibilityLabel={t('circle.feed.details')} onPress={openDetails} />
+                <HeaderIconButton icon={Icons.people} accessibilityLabel={t('circle.feed.details')} onPress={openDetails} />
               </>
             }
           />
