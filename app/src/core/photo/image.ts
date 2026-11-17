@@ -13,12 +13,20 @@ import { generateUUID } from '@/core/crypto/primitives';
  * happen — there's no server-side resize step to fall back on. Resolution
  * matters far more than quality percentage for file size, since nobody
  * views a photo at full camera resolution on a phone screen anyway.
+ *
+ * The cap is on the long edge, so at 1080 a portrait photo came out 810px
+ * wide and looked soft at full width; 1600 fills most phone screens. Sharpness
+ * tracks resolution more than quality, so the quality is lowered to pay for it.
  */
-const MAX_DIMENSION = 1080;
-const JPEG_QUALITY = 0.85;
+const MAX_DIMENSION = 1600;
+const JPEG_QUALITY = 0.7;
 
-/** Twice what's kept, so zooming in while framing still has real pixels to crop. */
-const FRAMING_MAX_DIMENSION = MAX_DIMENSION * 2;
+/**
+ * Headroom over what's kept, so zooming in while framing still has real
+ * pixels to crop. Fixed, not a multiple of MAX_DIMENSION, which would hand
+ * the framer a 3200px copy.
+ */
+const FRAMING_MAX_DIMENSION = 2160;
 /** High because the framed copy gets re-encoded once more after cropping. */
 const FRAMING_JPEG_QUALITY = 0.95;
 /**
