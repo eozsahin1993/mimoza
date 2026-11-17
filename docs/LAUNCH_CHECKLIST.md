@@ -203,15 +203,14 @@ environments and local profiles. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
       The feedback form doesn't qualify for Apple's optional-disclosure
       exemption (the account's name isn't shown on the form), so its two
       rows stay.
-- [ ] Age rating questionnaires — IARC for Play, Apple's own. Apple: none
+- [x] Age rating questionnaires — IARC for Play, Apple's own. Apple: none
       for every content category; user-generated content yes, since
       members share photos and comments; messaging yes (comments within a
       circle); unrestricted web access, gambling, contests, ads no. The
       result should be 13+, matching the privacy policy's minimum age; if
       Apple computes higher, check which answer pushed it. Play's IARC is
-      done. Apple's still reads 4+ with messaging answered no
-      (2026-11-14): set it to yes, and if that alone doesn't reach 13+,
-      use the age rating override.
+      done. Apple's read 4+ with messaging answered no until it was fixed;
+      it reads 13+ since 2026-11-17.
 - [x] Play's other App content declarations — 2026-11-14: target audience
       13+, no ads, and no advertising ID, which holds because `app.json`
       blocks the `AD_ID` permissions Firebase would otherwise add.
