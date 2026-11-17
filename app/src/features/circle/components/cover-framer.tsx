@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Image as SvgImage, Rect } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -231,125 +232,129 @@ export function CoverFramer({ source, name, onCancel, onDone }: CoverFramerProps
     <Modal animationType="slide" onRequestClose={handleCancel}>
       {/* A Modal is its own native root, so the app's gestures don't reach in here without one. */}
       <GestureHandlerRootView style={styles.fill}>
-        <ThemedSafeAreaView style={styles.fill}>
-          <View style={styles.padded}>
-            <ScreenHeader
-              hideBack
-              title={t('circle.frame.title')}
-              actions={
-                <HeaderIconButton
-                  icon={Icons.close}
-                  accessibilityLabel={t('common.cancel')}
-                  disabled={saving}
-                  onPress={handleCancel}
-                />
-              }
-            />
-            <ThemedText type="bodyMedium" themeColor="muted">
-              {t('circle.frame.hint')}
-            </ThemedText>
-            {canFit ? (
-              <View style={styles.options}>
-                <ReactionChip
-                  icon={Icons.fillPhoto}
-                  label={t('circle.frame.fill')}
-                  reacted={preset === 'fill'}
-                  disabled={saving}
-                  onPress={() => animateTo(1)}
-                />
-                <ReactionChip
-                  icon={Icons.fitPhoto}
-                  label={t('circle.frame.fit')}
-                  reacted={preset === 'fit'}
-                  disabled={saving}
-                  onPress={() => animateTo(minZoom)}
-                />
-              </View>
-            ) : null}
-          </View>
-
-          <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
-            <View
-              style={styles.stage}
-              onLayout={(event) => setStage({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
-              {stage.width > 0 ? (
-                <>
-                  {/* Under the photo, so it only shows where the photo
-                      doesn't reach. It is also what gets rendered into
-                      the saved cover, so it has to be on screen: Android
-                      only loads an SVG image it has drawn. */}
-                  <View pointerEvents="none" style={[styles.backdrop, frameRect]}>
-                    <Svg ref={svg} width={frame.width} height={frame.height} viewBox={`0 0 ${frame.width} ${frame.height}`}>
-                      {/* Copy n at 1/n opacity leaves every copy equally weighted. */}
-                      {backdropShifts.map(({ dx, dy }, index) => (
-                        <SvgImage
-                          key={index}
-                          href={{ uri: source.backdrop }}
-                          x={dx - BACKDROP_BLEED}
-                          y={dy - BACKDROP_BLEED}
-                          {...backdropBox}
-                          preserveAspectRatio="xMidYMid slice"
-                          opacity={1 / (index + 1)}
-                        />
-                      ))}
-                      <Rect width={frame.width} height={frame.height} fill="rgb(20,16,12)" fillOpacity={BACKDROP_DIM} />
-                      {composing ? (
-                        <SvgImage
-                          href={{ uri: source.uri }}
-                          {...composing}
-                          preserveAspectRatio="none"
-                          onLoad={() => photoLoaded.current?.()}
-                        />
-                      ) : null}
-                    </Svg>
-                  </View>
-
-                  <Animated.View
-                    style={[
-                      styles.photoBox,
-                      { left: (stage.width - baseWidth) / 2, top: (stage.height - baseHeight) / 2, width: baseWidth, height: baseHeight },
-                      imageMotion,
-                    ]}>
-                    <Image source={{ uri: source.uri }} style={styles.fill} />
-                  </Animated.View>
-                  <Animated.View pointerEvents="none" style={[styles.guide, guide]} />
-
-                  {/* One border rather than four strips round the frame: a
-                      border's inner corner follows its radius, so the
-                      cut-out rounds the way the card does. */}
-                  <View
-                    pointerEvents="none"
-                    style={[
-                      styles.veil,
-                      {
-                        left: frameLeft - reach,
-                        top: frameTop - reach,
-                        width: frame.width + 2 * reach,
-                        height: frame.height + 2 * reach,
-                        borderWidth: reach,
-                        borderRadius: Radius.circleCard + reach,
-                        borderColor: theme.background,
-                      },
-                    ]}
+        {/* Same for safe areas: without a provider of its own, the SafeAreaView
+            reads its insets once, mid-slide, and keeps those zeros. */}
+        <SafeAreaProvider>
+          <ThemedSafeAreaView style={styles.fill}>
+            <View style={styles.padded}>
+              <ScreenHeader
+                hideBack
+                title={t('circle.frame.title')}
+                actions={
+                  <HeaderIconButton
+                    icon={Icons.close}
+                    accessibilityLabel={t('common.cancel')}
+                    disabled={saving}
+                    onPress={handleCancel}
                   />
-
-                  <View pointerEvents="none" style={[styles.frame, frameRect, { borderColor: tints.cardEdge }]}>
-                    <LinearGradient colors={SCRIM} locations={SCRIM_LOCATIONS} style={StyleSheet.absoluteFill} />
-                    {name ? (
-                      <ThemedText type="titleLarge" numberOfLines={1} style={[styles.name, { color: ON_PHOTO }]}>
-                        {name}
-                      </ThemedText>
-                    ) : null}
-                  </View>
-                </>
+                }
+              />
+              <ThemedText type="bodyMedium" themeColor="muted">
+                {t('circle.frame.hint')}
+              </ThemedText>
+              {canFit ? (
+                <View style={styles.options}>
+                  <ReactionChip
+                    icon={Icons.fillPhoto}
+                    label={t('circle.frame.fill')}
+                    reacted={preset === 'fill'}
+                    disabled={saving}
+                    onPress={() => animateTo(1)}
+                  />
+                  <ReactionChip
+                    icon={Icons.fitPhoto}
+                    label={t('circle.frame.fit')}
+                    reacted={preset === 'fit'}
+                    disabled={saving}
+                    onPress={() => animateTo(minZoom)}
+                  />
+                </View>
               ) : null}
             </View>
-          </GestureDetector>
 
-          <View style={[styles.padded, styles.footer]}>
-            <PrimaryButton label={t('circle.frame.use')} disabled={saving} onPress={handleUse} />
-          </View>
-        </ThemedSafeAreaView>
+            <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
+              <View
+                style={styles.stage}
+                onLayout={(event) => setStage({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
+                {stage.width > 0 ? (
+                  <>
+                    {/* Under the photo, so it only shows where the photo
+                        doesn't reach. It is also what gets rendered into
+                        the saved cover, so it has to be on screen: Android
+                        only loads an SVG image it has drawn. */}
+                    <View pointerEvents="none" style={[styles.backdrop, frameRect]}>
+                      <Svg ref={svg} width={frame.width} height={frame.height} viewBox={`0 0 ${frame.width} ${frame.height}`}>
+                        {/* Copy n at 1/n opacity leaves every copy equally weighted. */}
+                        {backdropShifts.map(({ dx, dy }, index) => (
+                          <SvgImage
+                            key={index}
+                            href={{ uri: source.backdrop }}
+                            x={dx - BACKDROP_BLEED}
+                            y={dy - BACKDROP_BLEED}
+                            {...backdropBox}
+                            preserveAspectRatio="xMidYMid slice"
+                            opacity={1 / (index + 1)}
+                          />
+                        ))}
+                        <Rect width={frame.width} height={frame.height} fill="rgb(20,16,12)" fillOpacity={BACKDROP_DIM} />
+                        {composing ? (
+                          <SvgImage
+                            href={{ uri: source.uri }}
+                            {...composing}
+                            preserveAspectRatio="none"
+                            onLoad={() => photoLoaded.current?.()}
+                          />
+                        ) : null}
+                      </Svg>
+                    </View>
+
+                    <Animated.View
+                      style={[
+                        styles.photoBox,
+                        { left: (stage.width - baseWidth) / 2, top: (stage.height - baseHeight) / 2, width: baseWidth, height: baseHeight },
+                        imageMotion,
+                      ]}>
+                      <Image source={{ uri: source.uri }} style={styles.fill} />
+                    </Animated.View>
+                    <Animated.View pointerEvents="none" style={[styles.guide, guide]} />
+
+                    {/* One border rather than four strips round the frame: a
+                        border's inner corner follows its radius, so the
+                        cut-out rounds the way the card does. */}
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.veil,
+                        {
+                          left: frameLeft - reach,
+                          top: frameTop - reach,
+                          width: frame.width + 2 * reach,
+                          height: frame.height + 2 * reach,
+                          borderWidth: reach,
+                          borderRadius: Radius.circleCard + reach,
+                          borderColor: theme.background,
+                        },
+                      ]}
+                    />
+
+                    <View pointerEvents="none" style={[styles.frame, frameRect, { borderColor: tints.cardEdge }]}>
+                      <LinearGradient colors={SCRIM} locations={SCRIM_LOCATIONS} style={StyleSheet.absoluteFill} />
+                      {name ? (
+                        <ThemedText type="titleLarge" numberOfLines={1} style={[styles.name, { color: ON_PHOTO }]}>
+                          {name}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+                  </>
+                ) : null}
+              </View>
+            </GestureDetector>
+
+            <View style={[styles.padded, styles.footer]}>
+              <PrimaryButton label={t('circle.frame.use')} disabled={saving} onPress={handleUse} />
+            </View>
+          </ThemedSafeAreaView>
+        </SafeAreaProvider>
       </GestureHandlerRootView>
     </Modal>
   );
